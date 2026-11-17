@@ -2,7 +2,7 @@
 
 This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME-POS-Wireframe.figcraft) to the user stories in [User-Stories-SME-Automation-Platform.md](../User-Stories-SME-Automation-Platform.md) and the tasks in [Task-Breakdown-SME-Automation-Platform.md](../Task-Breakdown-SME-Automation-Platform.md).
 
-- **Baseline:** PRD v0.10, US-001–US-054, T-001–T-120.
+- **Baseline:** PRD v0.12, US-001–US-056, T-001–T-124.
 - **Open the file:** FigCraft (`figcraft SME-POS-Wireframe.figcraft`). PNG previews of each page are in [`previews/`](previews/).
 - **Labels:** every screen on the canvas has a label above it in the form `Code · Name — US-xxx · T-xxx`, matching the tables below.
 - **Fidelity:** low-to-mid fidelity wireframes. The colours follow the agreed reference (light sidebar, navy primary `#1E4FA3`, light-blue background `#F3F6FB`). Copy is in Bahasa Indonesia, as in the product.
@@ -16,6 +16,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | 02 · Admin — Staff Ops | S1–S9 | [02-admin-staff.png](previews/02-admin-staff.png) |
 | 03 · WhatsApp Customer | W1–W12 (MVP), A1–A2 (Phase 2) | [03-whatsapp-customer.png](previews/03-whatsapp-customer.png) |
 | 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
+| 05 · Tablet Absensi Outlet | K0–K4 | [05-tablet-absensi.png](previews/05-tablet-absensi.png) |
 | 99 · Components | `Sidebar/Owner`, `Sidebar/Staff` | — |
 
 ## Screen → user story → task
@@ -25,8 +26,8 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | O1 Login (invite-only) & Buat Bisnis | US-001, US-002, US-003, US-008 | T-006, T-010, T-011, T-024, T-066 |
-| O2 Dashboard | US-032, US-033 | T-043, T-071 |
-| O3 Bisnis & Outlet (PB1, payment mode, QRIS, cash drawers, attendance grace period) | US-002, US-017, US-018, US-019, US-020, US-053 | T-011, T-014, T-039, T-066, T-118 |
+| O2 Dashboard + keramaian (busy/quiet hours, busyness map, current crowd) | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
+| O3 Bisnis & Outlet (PB1, payment mode, QRIS, cash drawers, attendance tablets, grace period) | US-002, US-017, US-018, US-019, US-020, US-053, US-055 | T-011, T-014, T-039, T-066, T-118, T-121 |
 | O4 Staf & Akses (staff invitation, access matrix) | US-003, US-033 | T-006, T-012, T-013, T-066 |
 | O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
 | O6 Resep & Bahan | US-006, US-007 | T-019, T-021, T-022, T-066 |
@@ -37,7 +38,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O11 Audit Log | US-004, US-016, US-021 | T-031, T-101 |
 | O12 WhatsApp Setup & Template | US-002, US-008, US-015, US-036 | T-045, T-051, T-084, T-100 |
 | O13 Dead-letter & Antrean Pesan | US-036, US-037, US-050 | T-081, T-112 |
-| O14 Kehadiran Staf & Koreksi | US-053, US-054 | T-118, T-119 |
+| O14 Kehadiran Staf, Selfie & Koreksi | US-053, US-054 | T-118, T-119, T-122 |
 
 ### Staff (web admin)
 
@@ -51,7 +52,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | S6 Reservasi & Meja (today) | US-024, US-026, US-027 | T-062, T-063, T-064, T-070 |
 | S7 Stok & Pergerakan | US-006, US-007 | T-020, T-022, T-069 |
 | S8 Shift Kasir & Blind Count | US-018, US-030 | T-039, T-040, T-070 |
-| S9 Absensi Saya (clock in / out) | US-053 | T-116, T-117 |
+| S9 Absensi Saya (own history and selfies; no clock-in here) | US-053 | T-116, T-117, T-122 |
 
 ### Customer (WhatsApp)
 
@@ -81,7 +82,17 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | M3 Open Bill | US-020, US-035 | T-068, T-072 |
 | M4 Reservasi hari ini | US-026, US-027, US-035 | T-070, T-072 |
 | M5 Stok | US-006, US-007, US-035 | T-069, T-072 |
-| M6 Absensi | US-035, US-053 | T-072, T-117 |
+| M6 Absensi Saya (own history) | US-035, US-053 | T-072, T-117 |
+
+### Outlet attendance tablet
+
+| Screen | User stories | Tasks |
+|---|---|---|
+| K0 Pairing tablet ke outlet | US-055 | T-121 |
+| K1 Pilih nama staf | US-053, US-055 | T-116, T-117, T-121 |
+| K2 Ambil selfie (required) | US-053 | T-117, T-122 |
+| K3 Cek foto & simpan (+ first-use privacy notice) | US-053 | T-117, T-122 |
+| K4 Berhasil + error states (camera, offline, already clocked in, revoked tablet) | US-053, US-055 | T-117, T-121 |
 
 Role-aware navigation (`Sidebar/Owner`, `Sidebar/Staff`) covers US-003 and US-033 through T-013 and T-072.
 
@@ -136,8 +147,10 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-050 | O13 |
 | US-051 | — (scheduled jobs: T-104; the results show in W7, S6 and O14) |
 | US-052 | W9 |
-| US-053 | S9, M6, O3 |
+| US-053 | K1–K4, S9, M6, O3 |
 | US-054 | O14 |
+| US-055 | K0, K1, K4, O3 |
+| US-056 | O2 |
 | US-042 (Phase 2) | A1 |
 | US-043 (Phase 2) | A2 |
 | US-044, US-045 (Phase 2) | Not drawn yet |
@@ -165,6 +178,7 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-069 Stock screens | S7, M5 |
 | T-070 Reservation/table view and cashier shift | S6, S8, M4 |
 | T-071 Owner dashboard | O2 |
+| T-123, T-124 Busyness queries and dashboard views | O2 |
 | T-072 Role-aware navigation, 360 px responsive | sidebars, M1–M6 |
 | T-073 Owner picks, best sellers | O7, W9 |
 | T-074 Recommendation product message + add to cart | W9 |
@@ -175,9 +189,12 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-101 Audit log screen | O11 |
 | T-102 Cash count report | O10 |
 | T-112 Dead-letter visibility and replay | O13 |
-| T-117 Staff clock in/out screen | S9, M6 |
+| T-116 Attendance domain (tablet session, selfie required) | K1, S9 |
+| T-117 Attendance tablet screens + staff own history | K1–K4, S9, M6 |
 | T-118 Missing clock-out flag + grace-period setting | O3, O14, S9 |
-| T-119 Owner attendance report and corrections | O14 |
+| T-119 Owner attendance report, selfies and corrections | O14 |
+| T-121 Outlet attendance tablet pairing and device session | K0, K4, O3 |
+| T-122 Selfie storage, signed links, 90-day deletion | K2, K3, O14, S9 |
 | T-087, T-088 Phase 2 free-text order and reservation | A1, A2 |
 
 ## Decisions reflected in the wireframes
@@ -185,9 +202,10 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 - Counter orders are **dine-in or takeaway** only; "walk-in" appears only as table occupancy for guests without a reservation (S6, M4).
 - AI in the MVP is limited to **Rekomendasi** (W9): read-only suggestions, an immediate "Sebentar ya…" reply, and a fallback to owner's picks + best sellers after an error or 30 seconds. Free-text ordering and booking are Phase 2 (A1, A2).
 - Staff accounts are **invite-only**; there is no public sign-up (O1, O4).
-- Attendance: a forgotten clock-out is flagged "perlu dikoreksi" without inventing a time; the owner corrects it with a required reason (S9, M6, O14).
+- Attendance is recorded only on the outlet's paired tablet (K0–K4): the staff member taps their name and takes a required selfie, so they must be at the outlet. Staff phones and the admin app only show their own history (S9, M6). Selfies are private, visible to the owner and the staff member, and deleted after 90 days.
+- A forgotten clock-out is flagged "perlu dikoreksi" without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
 
 ## Open points
 
-- Attendance verification (own login vs outlet QR or location check) is still open in the PRD. If a check is added, S9 and M6 need a scan or location step.
+- Still open in the PRD: selfie retention (90 days proposed), whether staff also enter a short PIN on the tablet, and the 2-hour grace period.
 - Phase 2 screens for US-044 (FAQ, upsell) and US-045 (forecast, restock suggestions), and all Phase 3 screens, are not drawn yet.
