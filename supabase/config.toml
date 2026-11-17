@@ -1,0 +1,71 @@
+# Supabase CLI config for local development (config only; no hosted project yet).
+# NOTE: written by hand because the CLI could not be installed in the authoring
+# environment. Before first use, run `supabase init` in a scratch folder and diff
+# its generated config.toml against this file to confirm key names and defaults.
+# Hosted project settings (region, auth, buckets) are applied in the dashboard
+# or via `supabase link` + `supabase config push` once T-079 provisions them.
+
+project_id = "sme-pos"
+
+[api]
+enabled = true
+port = 54321
+# Schema `app` is deliberately NOT exposed to the Data API (Appendix B.4).
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Keep in sync with the hosted project's Postgres major version (T-079).
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/auth/callback"]
+# Short access-token expiry (NFR5). Outlet access and active status are checked live.
+jwt_expiry = 900
+enable_refresh_token_rotation = true
+# Invite-only: no public sign-up (US-003, NFR5).
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+
+# Custom access token hook adds tenant_id and app_role claims (T-113).
+# Enable once the function app.custom_access_token_hook exists.
+[auth.hook.custom_access_token]
+enabled = false
+uri = "pg-functions://postgres/app/custom_access_token_hook"
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+# All buckets are private; files are served through short-lived signed URLs.
+[storage.buckets.menu-photos]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
+
+[storage.buckets.qris-images]
+public = false
+file_size_limit = "2MiB"
+allowed_mime_types = ["image/jpeg", "image/png"]
+
+[storage.buckets.payment-proofs]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
+
+[storage.buckets.attendance-selfies]
+public = false
+file_size_limit = "2MiB"
+allowed_mime_types = ["image/jpeg", "image/webp"]
