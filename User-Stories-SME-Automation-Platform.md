@@ -44,6 +44,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Staf hanya melihat data outlet yang ditugaskan.
   - Owner-only actions ditolak untuk staf dan tidak mengubah data.
   - Sesi aktif staf yang dinonaktifkan segera ditolak.
+  - Akun staf dibuat melalui undangan email Supabase Auth; penonaktifan memblokir login baru dan mencabut sesi aktif.
+  - Pendaftaran publik dinonaktifkan; email yang tidak diundang owner tidak dapat membuat akun.
 - **Traceability:** FR1.3–FR1.5, FR7.1–FR7.2, AC1.3–AC1.6, AC7.1
 
 ### US-004 — Audit reversal dan perubahan penting
@@ -363,6 +365,21 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Item dapat ditambahkan ke cart dan melanjutkan alur add-on, ringkasan, dan konfirmasi normal.
 - **Traceability:** FR8.3, AC8.3
 
+### US-052 — Meminta rekomendasi dengan bantuan AI
+
+**Sebagai** pelanggan, **saya ingin** menceritakan selera saya di menu Rekomendasi (misalnya "yang manis buat berdua"), **sehingga** saya mendapat saran menu yang cocok tanpa harus menelusuri seluruh katalog.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - AI hanya berjalan di alur Rekomendasi; alur Pesan, Reservasi, dan lainnya tetap berbasis tombol tanpa AI.
+  - Saran hanya berisi item aktif yang tersedia di outlet tersebut dengan harga outlet; owner's picks diutamakan bila sesuai permintaan.
+  - AI hanya membaca data (menu, tag, ketersediaan, penjualan 30 hari) dan tidak membuat cart, order, atau perubahan stok.
+  - Item yang dipilih pelanggan masuk ke alur add-on, ringkasan, dan Confirm yang normal (US-029, US-011).
+  - Bot langsung membalas "Sebentar ya, lagi cariin rekomendasi…" sebelum AI selesai, supaya chat tidak terasa diam selama proses yang bisa sampai 30 detik.
+  - Jika AI gagal atau lebih dari 30 detik, bot mengirim owner's picks dan best sellers (US-028).
+  - Pemanggilan tool AI tercatat dengan aktor `agent`.
+- **Traceability:** FR8.4, FR6.3, AC8.4–AC8.7
+
 ## Epic G — Ledger, laporan, dan admin web
 
 ### US-030 — Menyimpan ledger append-only
@@ -413,7 +430,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 ### US-034 — Memasukkan order dari counter
 
-**Sebagai** staf, **saya ingin** membuat order dine-in, takeaway, dan walk-in dari counter screen, **sehingga** pelanggan yang datang langsung tetap menggunakan proses order dan stok yang sama.
+**Sebagai** staf, **saya ingin** membuat order dine-in dan takeaway dari counter screen, **sehingga** pelanggan yang datang langsung tetap menggunakan proses order dan stok yang sama.
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
@@ -445,6 +462,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Pesan keluar dan sinkronisasi katalog juga melalui queue dan di-retry saat gagal/rate-limited.
   - Event yang masuk saat worker berhenti tidak hilang dan diproses saat worker kembali.
   - Signature webhook tidak valid ditolak dan tidak masuk queue.
+  - Topologi antrean, retry bertingkat, dan dead-letter mengikuti US-050.
 - **Traceability:** FR6.1, FR6.4, NFR4, ACN4–ACN5
 
 ### US-037 — Menjamin pemrosesan pesan idempotent
@@ -469,6 +487,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Endpoint FastAPI selain webhook menolak token hilang, invalid, atau expired.
   - Record operasional membawa tenant_id dan outlet_id.
   - Service API dan worker bersifat stateless, containerized, memakai pooled PostgreSQL connections, dan dapat diskalakan tanpa redesign schema/arsitektur.
+  - Login dan token dikelola Supabase Auth; token membawa klaim `tenant_id` dan `app_role`; RLS membaca tenant dan pengguna dari sesi database yang diisi backend setelah token diverifikasi, akses outlet dan status aktif dicek langsung ke database, dan backend tidak memakai service role untuk membaca atau menulis data tenant.
+  - Token ditandatangani dengan kunci asimetris dan diverifikasi lewat public key; token dengan kunci atau algoritma yang salah ditolak.
 - **Traceability:** NFR2, NFR5, NFR6, ACN2, ACN6, ACN8
 
 ### US-039 — Memenuhi data residency dan auditability
@@ -477,7 +497,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Database, backup, object storage, dan payment screenshot berada di region Indonesia.
+  - Auth, database, backup, object storage, dan payment screenshot berada di Supabase. Supabase tidak punya region Indonesia, sehingga region terdekat (Singapura) dipakai.
+  - Data nyata hanya boleh disimpan setelah dasar transfer lintas negara yang ditinjau legal dicatat (T-108) dan privacy notice menyebutkan lokasi penyimpanan; sebelum itu semua environment hanya berisi data dummy.
   - Ledger dan stock movement bersifat append-only.
   - Setiap write pada ledger/stock mencatat actor dan timestamp.
   - Agent tidak memiliki akses tulis langsung ke tabel ledger atau stock.
@@ -534,17 +555,17 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Booking dibuat melalui fungsi deterministik yang sama dengan alur terstruktur dan tetap tunduk pada aturan kapasitas/ketersediaan.
 - **Traceability:** FR9.9, FR6.3, AC6.4
 
-### US-044 — Menjawab rekomendasi, FAQ, dan upsell
+### US-044 — Menjawab FAQ dan upsell
 
-**Sebagai** pelanggan, **saya ingin** bertanya secara bebas tentang menu dan rekomendasi, **sehingga** saya mendapat bantuan yang relevan dalam percakapan.
+**Sebagai** pelanggan, **saya ingin** bertanya secara bebas tentang menu, jam buka, dan info outlet lainnya, **sehingga** saya mendapat bantuan yang relevan dalam percakapan.
 
 - **Fase/Prioritas:** P2 / P1
 - **Acceptance criteria:**
   - Agent menggunakan data menu, stok, tag, dan penjualan outlet yang benar.
-  - Rekomendasi bersifat advisory; item tidak masuk order tanpa konfirmasi pelanggan.
+  - Rekomendasi percakapan sudah tersedia di MVP (US-052); story ini memperluas agent ke FAQ dan upsell di luar alur Rekomendasi.
   - FAQ dapat dijawab tanpa mengubah data operasional.
   - Upsell tidak mengubah cart/order secara langsung.
-- **Traceability:** FR8.4, FR6.3
+- **Traceability:** FR6.3
 
 ### US-045 — Mendapatkan rekomendasi restock dan anomali cashflow
 
@@ -560,16 +581,16 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 ## Epic K — Scale dan ekspansi (Phase 3)
 
-### US-046 — Mengelola jadwal dan kehadiran staf
+### US-046 — Mengelola jadwal shift dan saran jadwal staf
 
-**Sebagai** owner, **saya ingin** mencatat shift dan attendance staf serta menerima saran jadwal, **sehingga** kebutuhan manpower dapat direncanakan.
+**Sebagai** owner, **saya ingin** mencatat shift terjadwal staf (kehadiran sudah dicatat di US-053) dan menerima saran jadwal, **sehingga** kebutuhan manpower dapat direncanakan.
 
 - **Fase/Prioritas:** P3 / P1
 - **Acceptance criteria:**
-  - Sistem mencatat shift dan kehadiran.
+  - Sistem mencatat shift terjadwal dan membandingkannya dengan kehadiran dari US-053.
   - Agent menyarankan jadwal berdasarkan pola demand historis.
   - Jadwal tetap memerlukan keputusan owner dan tidak mengubah penugasan tanpa persetujuan.
-- **Traceability:** FR5.1–FR5.2
+- **Traceability:** FR5.2, FR5.5
 
 ### US-047 — Mengonfirmasi pembayaran secara otomatis
 
@@ -593,6 +614,78 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Order marketplace memakai prinsip auditability, tenant isolation, dan duplicate-safe processing yang sama.
 - **Traceability:** FR1.1, Scope item 15, §10 Phase 3
 
+## Epic L — Platform, hosting, dan antrean (Supabase, Railway, RabbitMQ)
+
+### US-049 — Menjalankan environment demo dan pilot di Supabase dan Railway
+
+**Sebagai** tim produk, **saya ingin** menjalankan aplikasi di Supabase dan Railway, **sehingga** demo dapat diperlihatkan ke calon merchant dengan biaya rendah dan jalur yang jelas menuju pilot.
+
+- **Fase/Prioritas:** MVP (demo dan pilot) / P0
+- **Acceptance criteria:**
+  - Auth, PostgreSQL, dan Storage memakai Supabase; API, worker WhatsApp, dan RabbitMQ berjalan di Railway; admin app dapat di-host terpisah (Cloudflare Pages atau Vercel).
+  - Environment demo, staging, dan produksi terpisah (project, secret, dan nomor WhatsApp).
+  - Demo hanya memakai data dummy, berjalan di Supabase Free dan Railway Hobby, dan pemakaian dipantau dengan alert.
+  - Project Supabase Free tidak ter-pause saat demo karena ada keep-alive.
+  - Dasar transfer lintas negara (karena Supabase dan Railway berada di Singapura) terdokumentasi sebelum data nyata masuk.
+  - Sebelum pilot dengan merchant nyata, checklist promosi lulus: Supabase Pro dengan backup, volume untuk RabbitMQ, API dan worker dipisah, dan keputusan region terpenuhi.
+- **Traceability:** NFR1, NFR4, NFR6. Keputusan hosting baru, perlu ditambahkan ke PRD.
+
+### US-050 — Antrean pesan dengan retry bertingkat dan dead-letter
+
+**Sebagai** owner, **saya ingin** pesan yang gagal diulang otomatis dan tetap terlihat jika terus gagal, **sehingga** tidak ada pesan pelanggan atau notifikasi yang hilang diam-diam.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Antrean terpisah tersedia untuk inbound WhatsApp, outbound WhatsApp, sinkronisasi katalog, dan job terjadwal; semua durable dan pesan bersifat persisten.
+  - Kegagalan sementara (timeout, HTTP 429, 5xx, deadlock database) diulang dengan jeda bertingkat 5 detik, 30 detik, lalu 2 menit, dengan batas percobaan per antrean.
+  - Kegagalan permanen (HTTP 4xx selain 429, payload tidak valid) langsung masuk dead-letter dengan alasan kegagalan.
+  - Pesan dead-letter dapat dilihat, diperiksa, dan diputar ulang atau dibuang oleh admin berwenang; tindakan itu tercatat.
+  - Ack dikirim setelah transaksi database commit; redelivery tidak menghasilkan order, stock movement, atau ledger ganda (US-037).
+  - Satu percakapan diproses berurutan sehingga cart selalu diproses sebelum konfirmasi.
+  - Alert muncul jika ada pesan di dead-letter atau antrean inbound menumpuk.
+- **Traceability:** NFR4, NFR8, ACN4–ACN5, ACN7
+
+### US-051 — Job terjadwal yang andal
+
+**Sebagai** owner, **saya ingin** pembatalan order unpaid, reminder reservasi, pelepasan no-show, dan anonimisasi berjalan tepat waktu walau layanan restart, **sehingga** stok, meja, dan data pelanggan tidak tertahan karena timer hilang.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Job disimpan di database dan dipublikasikan ke RabbitMQ saat jatuh tempo; restart broker atau worker tidak menghilangkan job.
+  - Handler idempotent dan memeriksa status terkini sebelum bertindak (misalnya order sudah punya screenshot, atau booking sudah seated).
+  - Job yang terlambat karena downtime tetap dijalankan segera setelah sistem pulih.
+  - Job yang dibatalkan (misalnya screenshot masuk) tidak dijalankan.
+  - Berlaku untuk unpaid timeout (US-021), reminder reservasi (US-025), no-show 15 menit (US-027), dan anonimisasi pelanggan yang menolak membership (US-040, US-041).
+- **Traceability:** FR10.4, FR9.4, FR9.7, FR12.5, NFR4
+
+## Epic M — Kehadiran staf (MVP)
+
+### US-053 — Clock in dan clock out staf
+
+**Sebagai** staf, **saya ingin** mencatat jam masuk dan jam pulang dari aplikasi, **sehingga** kehadiran saya tercatat tanpa buku absen.
+
+- **Fase/Prioritas:** MVP (Phase 1 dan pilot) / P0
+- **Acceptance criteria:**
+  - Staf clock in dan clock out dari admin app (mobile 360 px maupun desktop) untuk outlet yang ditugaskan; waktu ditampilkan dalam zona waktu outlet.
+  - Satu staf hanya memiliki satu catatan terbuka; clock in kedua ditolak, dan clock in di outlet yang tidak ditugaskan ditolak, termasuk lewat API langsung.
+  - Clock out tanpa catatan terbuka ditolak; setelah clock out, durasi ditampilkan.
+  - Jika staf belum clock out sampai jam tutup outlet ditambah masa tenggang (default 2 jam, diatur owner per outlet), catatan ditandai "perlu dikoreksi". Sistem tidak mengarang jam pulang, jam kerjanya belum dihitung, dan staf dapat clock in lagi.
+  - Staf hanya melihat catatan kehadirannya sendiri.
+- **Traceability:** FR5.1, FR5.3, AC5.1–AC5.3, AC5.5
+
+### US-054 — Melihat dan mengoreksi kehadiran staf
+
+**Sebagai** owner, **saya ingin** melihat jam kerja staf per outlet dan mengoreksi catatan yang salah, **sehingga** rekap kehadiran dapat dipercaya.
+
+- **Fase/Prioritas:** MVP (Phase 1 dan pilot) / P0
+- **Acceptance criteria:**
+  - Owner melihat kehadiran semua staf per outlet, staf, dan rentang tanggal: jam kerja per hari, total, dan catatan yang ditandai.
+  - Batas hari mengikuti zona waktu masing-masing outlet.
+  - Koreksi atau pengisian jam pulang yang hilang wajib disertai alasan; nilai asli tetap dapat dilihat, dan owner, waktu, serta alasan dicatat.
+  - Staf tidak dapat membuka laporan ini atau mengoreksi catatan, termasuk lewat API langsung.
+  - Perhitungan gaji dan lembur tidak termasuk MVP.
+- **Traceability:** FR5.4, AC5.4–AC5.5
+
 ## Traceability ringkas
 
 | Area PRD | User story |
@@ -601,10 +694,10 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | FR2 Order intake & WhatsApp catalog | US-008–US-015, US-034, US-042 |
 | FR3 Cashflow | US-030–US-032, US-045 |
 | FR4 Menu, stock, inventory | US-005–US-008, US-014, US-021, US-045 |
-| FR5 Manpower / staff Phase 3 | US-046 |
-| FR6 WhatsApp bot | US-015, US-036–US-037, US-042–US-045 |
+| FR5 Staff attendance (MVP) and scheduling (Phase 3) | US-046, US-053–US-054 |
+| FR6 WhatsApp bot | US-015, US-036–US-037, US-042–US-045, US-052 |
 | FR7 Admin web app | US-003, US-033–US-035 |
-| FR8 Recommendations | US-028–US-029, US-044 |
+| FR8 Recommendations | US-028–US-029, US-052 |
 | FR9 Reservations | US-022–US-027, US-043 |
 | FR10 Order lifecycle | US-004, US-015–US-021, US-034 |
 | FR11 Payments & tax | US-017–US-020, US-047 |
@@ -616,7 +709,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | NFR5 Security | US-038 |
 | NFR6 Scalability | US-038 |
 | NFR7 Connectivity | US-035 |
-| NFR8 Duplicate-safe processing | US-014, US-037 |
+| NFR8 Duplicate-safe processing | US-014, US-037, US-050 |
+| Hosting dan topologi antrean (Supabase, Railway, RabbitMQ) | US-049–US-051 |
 
 ## Definition of Done umum
 

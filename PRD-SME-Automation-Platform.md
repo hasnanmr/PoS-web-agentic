@@ -1,12 +1,15 @@
 # Product Requirements Document (PRD)
 ## [Product Name TBD] — SME Business Automation Platform (Indonesia)
 
-**Status:** Draft v0.7
-**Date:** November 17, 2026
+**Status:** Draft v0.10
+**Date:** November 18, 2026
 **Prepared by:** Hasnan
 **Market:** Indonesia (UMKM — restaurants and cafes first; marketplace dropshippers in Phase 3)
 
 **Change log**
+- **v0.10** — Staff attendance moves into the MVP (Phase 1, and the pilot): staff clock in and out from the admin app, a forgotten clock-out is flagged instead of guessed, and the owner can review hours and correct records with a reason (FR5.1, FR5.3, FR5.4, AC5.1–AC5.5). Scheduled shifts and schedule suggestions stay in Phase 3. Payroll is not part of the MVP.
+- **v0.9** — AI-assisted recommendations move into the MVP: a customer who taps Rekomendasi can describe what they want in free text, and the agent suggests available items from the outlet's catalog (FR8.4, AC8.4–AC8.6). This is the only AI feature in the MVP; free-text ordering and booking, FAQ handling, and upsell stay in Phase 2. If the agent fails or times out, the bot falls back to owner's picks and best sellers. Counter orders are now dine-in or takeaway only; the separate walk-in order type is removed (a walk-in guest is simply a dine-in or takeaway order). Marking a table occupied by guests without a reservation (FR9.7) is unchanged.
+- **v0.8** — Hosting decided for the demo and pilot: Supabase (Auth, PostgreSQL, Storage) and Railway (FastAPI app, workers, RabbitMQ). Login is handled by Supabase Auth, and row-level security reads tenant, role, and outlet from the login token. The demo runs on free tiers with dummy data only; a pilot with real merchants needs Supabase Pro. Auth and the database are fixed to Supabase, which has no Indonesia region, so real merchant data needs a legally reviewed cross-border transfer basis (NFR1). RabbitMQ keeps fixed-delay retries and dead-letter queues; timers such as unpaid-order cancellation, reminders, and no-show release are stored in the database and handed to RabbitMQ when due. Added acceptance criterion ACN10.
 - **v0.7** — Staff can reject a payment proof when the money hasn't arrived; the order is then cancelled straight away. Added payment status `proof_submitted`. The WhatsApp main menu is now a list message that includes My Reservations and My Data, and typing "menu" brings it back at any time. Cash drawers are configured per outlet (one by default), and each cashier shift belongs to one drawer. How PB1 is calculated on open bills is an open question. Added acceptance criteria for NFR6 (scalability) and NFR7 (connectivity). Pooled database connections and queue monitoring are now part of the MVP, not Phase 3. Agent restock and cashflow suggestions must show the data behind them, and suggested staff schedules only take effect once the owner approves.
 - **v0.6** — Added Given/When/Then acceptance criteria for every MVP requirement, the non-functional requirements, and the Phase 2 agent guardrails. The AI agent can never restock or reorder on its own. Delivery uses a flat fee per outlet. Unpaid-order timer stops once the customer sends payment proof.
 - **v0.5** — Dine-in payment mode (pay first or open bill) is set per outlet by the owner. MVP starts every tenant with a sample menu pushed to the WhatsApp catalog. Added end-of-shift cash count, a 15-minute table hold for reservations, and ordering for non-members. Split bills and reservation deposits are out of scope.
@@ -58,13 +61,13 @@ Customers use WhatsApp for three things:
 | User | Role | Primary surface |
 |---|---|---|
 | SME owner/manager | Runs the business across one or more outlets, wants visibility without manual bookkeeping; sets up menu, add-ons, prices, recipes, tables, and recommendations | Web admin app |
-| On-site staff (cashier, waiter) | Enters dine-in/walk-in orders, manages open bills and payments, records stock, manages reservations and table status during service at their assigned outlet(s) | Web admin app |
+| On-site staff (cashier, waiter) | Enters dine-in and takeaway orders at the counter, manages open bills and payments, records stock, manages reservations and table status during service at their assigned outlet(s) | Web admin app |
 | End customer | Orders online or at the table, asks for recommendations, books a table, and receives updates | WhatsApp only — never logs into the system |
 | Dropshipper (marketplace seller) — *Phase 3* | Sells via marketplace + WhatsApp, no physical counter | Web admin app |
 
 ### Personas (brief)
 - **"Ibu Sari," cafe owner** — 2–4 staff, wants daily cashflow and stock totals without reconciling paper receipts by hand.
-- **Cashier/waiter staff** — needs to enter a walk-in order, close a table's bill, seat a reservation, or check stock quickly mid-shift.
+- **Cashier/waiter staff** — needs to enter a counter order, close a table's bill, seat a reservation, or check stock quickly mid-shift.
 - **End customer** — orders, asks "what's good here?", books a table, and gets order/booking updates entirely inside a WhatsApp chat.
 - **"Andi," dropshipper (Phase 3)** — sells through a marketplace and WhatsApp, wants orders and stock to sync automatically with no physical POS.
 
@@ -79,19 +82,19 @@ Phases are defined in §10: **MVP = Phases 0–1**, **Phase 2 = agent layer**, *
 2. Sales / order intake via the WhatsApp catalog (deterministic, structured flow), starting from a sample menu — online orders (paid first, pickup or flat-fee delivery) and dine-in orders via table QR code (paid first or open bill, set per outlet)
 3. Order lifecycle — order status, payment status, open bills, cancellation, and logged reversals
 4. Payments via static QRIS (staff-confirmed) and cash for dine-in/counter orders, with an end-of-shift cash count; PB1 tax
-5. Menu recommendations via WhatsApp (rule-based: owner's picks and best sellers)
+5. Menu recommendations via WhatsApp: owner's picks and best sellers, plus AI-assisted suggestions when the customer describes what they want (the only AI feature in the MVP)
 6. Table reservations via WhatsApp (table-based, deterministic)
 7. Cashflow ledger (deterministic, append-only)
 8. Menu with per-outlet prices and add-ons; stock with ingredient recipes (deterministic, append-only movements)
 9. Customer membership & data consent (PDP Law)
-10. Owner/staff admin web app (React + TypeScript), including a counter order screen, order board with open bills, reservations/table view, and role-based access
+10. Owner/staff admin web app (React + TypeScript), including a counter order screen, order board with open bills, reservations/table view, staff clock in/out with an owner attendance report, and role-based access
 11. WhatsApp Business API integration (Meta Cloud API) — catalog sync, RabbitMQ-backed duplicate-safe message processing, and template messages for outside-window notifications (e.g. reservation reminders)
 
 ### Phase 2 — Agent layer
-12. AI agent layer (LangChain): free-text order parsing, free-text reservation requests, conversational recommendations, FAQ handling, upsell suggestions, demand forecasting, restock suggestions (advisory only)
+12. AI agent layer (LangChain): free-text order parsing, free-text reservation requests, FAQ handling, upsell suggestions, demand forecasting, restock suggestions (advisory only)
 
 ### Phase 3 — Scale & expansion
-13. Staff/manpower scheduling & attendance
+13. Staff/manpower scheduling (attendance clock in/out is in the MVP)
 14. Payment gateway (dynamic QRIS with automatic payment confirmation)
 15. Dropshipper vertical and marketplace integrations (Shopee, Tokopedia, TikTok Shop)
 
@@ -107,7 +110,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR1.1** — System shall onboard a new tenant business with a profile (name, type: restaurant/cafe). The dropshipper type is Phase 3. *[Deterministic · MVP]*
 - **FR1.2** — A tenant has one or more outlets. Each outlet has its own address, opening hours, time zone, WhatsApp number and catalog, menu prices, dine-in payment mode, flat delivery fee, PB1 setting, static QRIS code, cash drawers, tables, stock levels, and reservation settings. Menu items, add-ons, recipes, and owner's picks are shared across the tenant's outlets. *[Deterministic · MVP]*
 - **FR1.3** — Owner creates a staff account using a dedicated email address the owner has set up for that staff member, assigns it to one or more outlets, and can deactivate it. Staff cannot self-register. *[Deterministic · MVP]*
-- **FR1.4** — Staff log in with that email and a password, and only see data for the outlets they are assigned to. *[Deterministic · MVP]*
+- **FR1.4** — Staff log in with that email and a password (handled by Supabase Auth), and only see data for the outlets they are assigned to. *[Deterministic · MVP]*
 - **FR1.5** — Access is role-based (owner vs. staff), as shown in the table below. *[Deterministic · MVP]*
 - **FR1.6** — Every order reversal records who did it, when, and a required reason. The owner can review all reversals in an audit log. *[Deterministic · MVP]*
 
@@ -119,6 +122,8 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 | Record stock movements (restock, waste, adjustment) | ✓ | ✓ |
 | Reverse an order (reason required, logged — FR1.6) | ✓ | ✓ |
 | Handle reservations on the day (seat, no-show, walk-in tables) | ✓ | ✓ |
+| Clock in and out for their own attendance at an assigned outlet | — | ✓ |
+| View attendance of all staff and correct attendance records (reason required) | ✓ | — |
 | Edit menu, add-ons, prices, recipes, and recommendations | ✓ | — |
 | Log expenses, view cashflow and reports | ✓ | — |
 | Manage outlets (including dine-in payment mode, delivery fee, and cash drawers), WhatsApp numbers, tables, QRIS codes, PB1 settings, and staff accounts | ✓ | — |
@@ -196,14 +201,24 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **AC4.7** (FR4.7) — **Given** 100 ml of milk left at outlet A, **when** stock is updated, **then** every item needing more than 100 ml milk per portion is marked sold out at outlet A only, shown as unavailable in outlet A's catalog, and left out of outlet A's recommendations; after a restock, it becomes available again.
 - **AC4.8** (FR4.8) — **Given** Es Kopi Susu costs Rp25.000 at outlet A and Rp28.000 at outlet B, **when** it is ordered at each outlet, **then** each order uses its own outlet's price.
 
-### 5.5 Manpower / staff (Phase 3)
-- **FR5.1** — System records staff shifts and attendance. *[Deterministic · Phase 3]*
+### 5.5 Staff attendance (MVP) and scheduling (Phase 3)
+- **FR5.1** — Staff clock in and out from the admin app (mobile or desktop) for an outlet they are assigned to. Each record stores the staff member, the outlet, and the clock-in and clock-out times in the outlet's time zone. A staff member can have only one open record at a time and can clock in only at an assigned outlet. *[Deterministic · MVP]*
 - **FR5.2** — System suggests shift schedules based on historical demand patterns. Suggestions are advisory: a schedule or staff assignment changes only once the owner approves it. *[Agent · Phase 3]*
+- **FR5.3** — If a staff member has not clocked out by the outlet's closing time plus a grace period (default 2 hours, set by the owner per outlet), the record is flagged "needs correction". The system does not invent a clock-out time, a flagged record does not count toward worked hours until the owner corrects it, and the staff member can clock in again. *[Deterministic · MVP]*
+- **FR5.4** — The owner views attendance for all staff by outlet, staff member, and date range (hours per day and in total, and flagged records), and can correct a record or fill in a missing clock-out. A reason is required, the original values are kept, and each correction records the owner and the time. Staff see only their own records. Payroll, overtime, and salary calculation are not part of the MVP. *[Deterministic · MVP]*
+- **FR5.5** — System records scheduled staff shifts so they can be compared with attendance. *[Deterministic · Phase 3]*
+
+**Acceptance criteria (MVP attendance)**
+- **AC5.1** (FR5.1) — **Given** a staff member assigned only to outlet A, **when** they clock in at outlet A, **then** a record exists with their name, outlet A, and the time in outlet A's time zone; **when** they clock in again while that record is open, **then** it is refused; **when** they try to clock in at outlet B, through the app or by calling the API directly, **then** it is refused.
+- **AC5.2** (FR5.1) — **Given** an open record, **when** the staff member clocks out, **then** the record closes with the clock-out time and shows the duration; **given** no open record, **when** they try to clock out, **then** it is refused.
+- **AC5.3** (FR5.3) — **Given** an open record and an outlet whose closing time plus grace period has passed, **when** the check runs (including right after the workers were down), **then** the record is flagged "needs correction" with no clock-out time, it is left out of worked hours, and the staff member can clock in again.
+- **AC5.4** (FR5.4) — **Given** a flagged or wrong record, **when** the owner corrects it without a reason, **then** it is blocked; **when** they correct it with a reason, **then** the corrected values count, the original values remain viewable, and the owner, time, and reason are recorded.
+- **AC5.5** (FR5.4) — **Given** staff at several outlets, **when** the owner opens the report for a week, **then** the hours match the records and each day's boundary follows the outlet's time zone; **when** a staff member opens attendance, **then** they see only their own records, and any other staff member's records, the report, or a correction is refused, including by direct API call.
 
 ### 5.6 WhatsApp bot / chatbot
 - **FR6.1** — Integration via the official Meta WhatsApp Cloud API or an authorized Business Solution Provider (BSP). *[Deterministic/infra · MVP]*
 - **FR6.2** — All business-initiated messages sent outside the 24-hour customer service window use a Meta-approved template. *[Deterministic/constraint · MVP]*
-- **FR6.3** — An LLM-based agent (LangChain) handles FAQs and free-text conversation. Any state-changing action is routed through a deterministic tool call, never a direct database write; any order or booking needs the customer's explicit confirmation first; and the agent can never change stock on its own (FR4.4). *[Agent · Phase 2]*
+- **FR6.3** — An LLM-based agent (LangChain) handles FAQs and free-text conversation. In the MVP the agent is used only for recommendations (FR8.4); everything else in this requirement applies from Phase 2. Any state-changing action is routed through a deterministic tool call, never a direct database write; any order or booking needs the customer's explicit confirmation first; and the agent can never change stock on its own (FR4.4). *[Agent · Phase 2]*
 - **FR6.4** — Incoming WhatsApp webhooks and outgoing messages are processed through a RabbitMQ queue (NFR4), and each incoming message is processed only once (NFR8). *[Deterministic/infra · MVP]*
 
 **Acceptance criteria**
@@ -218,7 +233,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR7.1** — Owner and staff log in (FR1.4) and see views based on their role and assigned outlets (React + TypeScript). *[Deterministic · MVP]*
 - **FR7.2** — Owner dashboard shows sales, cashflow, and stock summaries per outlet and for all outlets combined. Staff see only their outlets' orders, open bills, reservations, and stock. *[Deterministic · MVP]*
 - **FR7.3** — App is responsive and usable on both desktop and mobile browsers. *[Deterministic · MVP]*
-- **FR7.4** — Staff can create dine-in, takeaway, and walk-in orders from a counter order screen, including add-ons; dine-in orders follow the outlet's payment mode (FR10.8). These use the same order-creation function as FR2.3. *[Deterministic · MVP]*
+- **FR7.4** — Staff can create dine-in and takeaway orders from a counter order screen, including add-ons; dine-in orders follow the outlet's payment mode (FR10.8). These use the same order-creation function as FR2.3. *[Deterministic · MVP]*
 
 **Acceptance criteria**
 - **AC7.1** (FR7.1, FR7.2) — **Given** the owner logs in, **then** the dashboard shows sales, cashflow, and stock for each outlet and all outlets combined; **given** a staff member logs in, **then** they see only orders, open bills, reservations, and stock for their outlets, and no cashflow figures.
@@ -229,12 +244,16 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR8.1** — Owner can mark products as "owner's picks" and tag them (e.g. coffee, sweet, good for sharing) in the admin app. *[Deterministic · MVP]*
 - **FR8.2** — Tapping **Rekomendasi** sends the owner's picks, then the outlet's best sellers (most units sold at that outlet in the last 30 days), as a product message from the outlet's catalog — up to 30 items, no item listed twice, excluding sold-out items (FR4.7). *[Deterministic · MVP]*
 - **FR8.3** — Customer can add recommended items straight to their cart from that message. *[Deterministic · MVP]*
-- **FR8.4** — Customer can ask for recommendations in free text (e.g. "something sweet for 4 people under Rp200rb"); the agent answers using menu, stock, and sales data. Suggestions are advisory — nothing is added to an order until the customer confirms. *[Agent · Phase 2]*
+- **FR8.4** — Customer can ask for recommendations in free text (e.g. "something sweet for 4 people under Rp200rb"); the agent answers using menu, stock, and sales data for that outlet, and only suggests items that are active and not sold out there, putting owner's picks first when they fit the request. Suggestions are advisory: the agent can only read data, and an item reaches the cart only when the customer taps it, after which the normal add-on, summary, and Confirm flow applies. If the agent fails or takes longer than 30 seconds, the bot sends the rule-based message from FR8.2 instead. *[Agent · MVP]*
 
 **Acceptance criteria**
 - **AC8.1** (FR8.1, FR8.2) — **Given** the owner marked 3 items as owner's picks and one of them is sold out, **when** a customer taps Rekomendasi, **then** the message shows the 2 available picks first, followed by best sellers.
 - **AC8.2** (FR8.2) — **Given** sales at outlet A over the last 30 days, **when** the message is built, **then** best sellers are ordered by units sold at outlet A in that period, an item that is both a pick and a best seller appears once, and the message never has more than 30 items.
 - **AC8.3** (FR8.3) — **Given** the recommendation message, **when** the customer adds items and sends the cart, **then** the normal order flow (add-ons, summary, confirm) continues.
+- **AC8.4** (FR8.4) — **Given** a customer in the Rekomendasi flow sends "yang manis buat berdua", **when** the agent replies, **then** every suggested item is active and available at that outlet, prices match the outlet's prices, and no cart, order, or stock record has been created or changed.
+- **AC8.5** (FR8.4) — **Given** the agent's suggestion, **when** the customer adds a suggested item, **then** it goes through the normal add-on, summary, and Confirm flow, and the order is created only after Confirm.
+- **AC8.6** (FR8.4) — **Given** the agent errors or takes longer than 30 seconds, **when** the customer is waiting for a recommendation, **then** the bot sends owner's picks and best sellers (FR8.2) instead.
+- **AC8.7** (FR8.4) — **Given** a customer in the Rekomendasi flow sends a free-text request, **when** the agent has not replied yet, **then** the bot has already sent a short acknowledgement ("Sebentar ya, lagi cariin rekomendasi…") before the agent call started, so the chat is not silent for up to 30 seconds, and the acknowledgement is sent only once per request.
 
 ### 5.9 Reservations & tables
 - **FR9.1** — For each outlet, owner can define tables (name/number, seat capacity, optional area such as indoor/outdoor) and reservation settings (bookable hours, default booking duration, how far ahead customers can book, maximum party size, reminder time, cancellation cutoff). *[Deterministic · MVP]*
@@ -243,7 +262,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR9.4** — System sends a booking confirmation immediately and a reminder at the outlet's configured time before the booking; reminders outside the 24-hour window use a pre-approved template. *[Deterministic · MVP]*
 - **FR9.5** — Customer can cancel or reschedule a booking via WhatsApp, from **Reservasi Saya** in the main menu (FR2.0), up to the outlet's cancellation cutoff before the booking time. *[Deterministic · MVP]*
 - **FR9.6** — Staff can view the day's reservations per table in the admin app, add bookings taken by phone or in person, reassign tables, and mark a booking as seated, completed, cancelled, or no-show. Every status change records who made it. *[Deterministic · MVP]*
-- **FR9.7** — Staff can mark a table as occupied by walk-in guests so it isn't offered for overlapping bookings. *[Deterministic · MVP]*
+- **FR9.7** — Staff can mark a table as occupied by walk-in guests (guests without a reservation) so it isn't offered for overlapping bookings. *[Deterministic · MVP]*
 - **FR9.8** — Reservation times are stored and shown in the outlet's local time zone (WIB/WITA/WIT). *[Deterministic · MVP]*
 - **FR9.9** — Customer can request a booking in free text (e.g. "meja buat 4 orang besok jam 7 malam"); the agent parses it, confirms the details with the customer, and calls the same booking function as FR9.2. *[Agent · Phase 2]*
 - **FR9.10** — A booking holds its table for 15 minutes after the booking time. If the guests haven't been seated by then, the booking is marked no-show automatically and the table is released. No deposit is taken. *[Deterministic · MVP]*
@@ -279,7 +298,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
   - **Online orders (paid first):** `pending_payment` → `confirmed` → `preparing` → `ready` → `out_for_delivery` (delivery only) → `completed`. An online order can't be prepared until it is paid.
   - **Dine-in orders at pay-first outlets:** `pending_payment` → `confirmed` → `preparing` → `ready` → `completed`. The order can't be prepared until it is paid.
   - **Dine-in orders at open-bill outlets (paid at the end):** `confirmed` → `preparing` → `ready` → `served` → `completed` when the bill is paid (FR10.6).
-  - **Takeaway and walk-in counter orders:** `confirmed` → `preparing` → `ready` → `completed` — completed only once paid.
+  - **Takeaway counter orders:** `confirmed` → `preparing` → `ready` → `completed` — completed only once paid.
 - **FR10.2** — Staff move orders through their statuses from an order board in the admin app; every change records who made it and when. *[Deterministic · MVP]*
 - **FR10.3** — Customer gets a WhatsApp update when their order is confirmed, ready, out for delivery, or cancelled. *[Deterministic · MVP]*
 - **FR10.4** — Unpaid pay-first orders (online, and dine-in at pay-first outlets) are cancelled automatically after a configurable time per outlet; their ingredients go back into stock and the customer is notified. The timer stops once the customer sends a payment screenshot, so an order waiting for staff to verify payment is never cancelled automatically. If staff reject the proof, the order is cancelled straight away (FR11.10). *[Deterministic · MVP]*
@@ -305,7 +324,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR11.2** — After an online order — or a dine-in order at a pay-first outlet — is placed through WhatsApp, the bot sends the outlet's QRIS image and the exact total (including PB1), and asks the customer to pay that amount and send the payment screenshot in the chat. Because the QRIS is static, the customer types the amount into their payment app. *[Deterministic · MVP]*
 - **FR11.3** — Staff check that the payment arrived in the outlet's QRIS merchant account, then mark the order paid in the admin app, with the customer's screenshot attached to the order. Only then is the sale posted to the ledger. Staff must never mark an order paid based on the screenshot alone. *[Deterministic · MVP]*
 - **FR11.10** — If staff can't find the payment in the merchant account, they reject the payment proof with a required reason. The order is cancelled straight away, its ingredients go back into stock with a reversal movement, and the customer is told the payment couldn't be verified and asked to contact the outlet. The rejection records who did it, when, and the reason. If the money turns up later, the outlet refunds it or re-enters the order manually. *[Deterministic · MVP]*
-- **FR11.4** — Dine-in orders (pay-first or open bill) and takeaway/walk-in counter orders can be paid by cash at the counter or with the outlet's QRIS; staff record which method was used. QRIS payments are confirmed the same way as FR11.3. Online orders can't be paid in cash. *[Deterministic · MVP]*
+- **FR11.4** — Dine-in orders (pay-first or open bill) and takeaway counter orders can be paid by cash at the counter or with the outlet's QRIS; staff record which method was used. QRIS payments are confirmed the same way as FR11.3. Online orders can't be paid in cash. *[Deterministic · MVP]*
 - **FR11.5** — Owner sets the PB1 rate per outlet, or turns PB1 off for outlets not registered for it. PB1 is calculated on the subtotal (including add-ons, excluding the delivery fee), rounded to the nearest rupiah, shown as a separate line in the order or bill summary, and posted to the ledger separately from revenue. *[Deterministic · MVP]*
 - **FR11.6** — For cash payments, staff enter the amount received and the system shows the change due. *[Deterministic · MVP]*
 - **FR11.7** — Owner sets up each outlet's cash drawers (e.g. "Kasir 1", "Bar"); every new outlet gets one drawer by default, so a single-counter outlet needs no setup. Staff open a cashier shift for a drawer by entering the starting cash. Only one shift can be open per drawer, cash payments can't be taken without an open shift, and every cash payment and cash refund during the shift is linked to it. *[Deterministic · MVP]*
@@ -341,24 +360,25 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 
 ## 6. Non-functional requirements
 
-- **NFR1 — Data residency:** Primary data storage hosted in an Indonesia-region cloud (AWS `ap-southeast-3` Jakarta, GCP Jakarta, or Alibaba Cloud Indonesia) to reduce cross-border transfer exposure under Indonesia's PDP Law (Law No. 27/2022) and to reduce latency for WhatsApp interactions.
+- **NFR1 — Data residency:** Authentication, the database, backups, and file storage (including payment screenshots) run on Supabase, which has no Indonesia region; the nearest is Singapore. Because Indonesia's PDP Law (Law No. 27/2022) restricts cross-border transfer of personal data, real merchant or customer data may only be stored once a cross-border transfer basis, reviewed by legal, is recorded as a decision. Until then, every environment holds dummy data only. The Singapore region is used to keep latency for WhatsApp interactions low. Moving off Supabase is not planned.
 - **NFR2 — Multi-tenancy & outlets:** Tenant data isolated at the database level using PostgreSQL row-level security (RLS), not solely application-level filtering — this closes the "forgot a `WHERE tenant_id`" failure mode. Staff access to outlets is enforced the same way.
 - **NFR3 — Auditability:** The deterministic core (ledger, stock) is append-only. The AI agent layer never writes to these tables directly — only through validated deterministic functions, which log the actor (human or agent) on every write. Order status changes and reversals are logged with actor, time, and reason.
-- **NFR4 — Reliability:** The WhatsApp webhook endpoint verifies the request, identifies the outlet from the receiving phone number, publishes the event to RabbitMQ, and responds immediately; workers consume the queue to run order flows, send replies, and (Phase 2) call the agent. Outgoing messages and catalog updates also go through the queue so failed or rate-limited calls are retried. This is in place from Phase 1.
-- **NFR5 — Security:** Role-based access control in the admin app (FR1.5); token-based authentication for FastAPI endpoints.
+- **NFR4 — Reliability:** The WhatsApp webhook endpoint verifies the request, identifies the outlet from the receiving phone number, publishes the event to RabbitMQ, and responds immediately; workers consume the queue to run order flows, send replies, and (Phase 2) call the agent. Outgoing messages and catalog updates also go through the queue so failed or rate-limited calls are retried with increasing delays (5 seconds, 30 seconds, then 2 minutes) and, if they keep failing, land in a dead-letter queue where an admin can inspect and replay them. Timers with variable delays (unpaid-order cancellation, reservation reminders, no-show release, anonymization) are stored in the database and published to RabbitMQ when due, so they survive a broker or worker restart. This is in place from Phase 1.
+- **NFR5 — Security:** Role-based access control in the admin app (FR1.5); token-based authentication for FastAPI endpoints using Supabase Auth tokens signed with asymmetric keys and verified through the public key set, with a short expiry. Accounts are invite-only: public sign-up is disabled. The token carries the tenant and role; outlet assignments and active status are checked against the database on every request, so a deactivated staff member is rejected immediately, and the backend never uses the Supabase service role to read or write tenant data.
 - **NFR6 — Scalability:** Stateless, containerized FastAPI services and queue workers, and pooled Postgres connections, so tenant and outlet growth doesn't require a schema or architecture redesign.
 - **NFR7 — Connectivity:** The web app requires an internet connection at each outlet; there is no offline mode in the MVP.
 - **NFR8 — Duplicate-safe processing:** Every incoming WhatsApp message is processed at most once, using Meta's message ID; a message ID that has already been processed is ignored. This covers both Meta resending a webhook and RabbitMQ redelivering a message after a worker crash, so one tap on Confirm can never create two orders, deduct stock twice, or post two ledger entries.
 
 **Acceptance criteria**
-- **ACN1** (NFR1) — **Given** the production environment, **when** its databases, backups, and file storage (including payment screenshots) are listed, **then** every one is in an Indonesia region.
+- **ACN1** (NFR1) — **Given** the production environment, **when** its databases, backups, and file storage (including payment screenshots) are listed, **then** every one is in the region named in the recorded residency decision (NFR1); **given** no such decision is recorded, **when** any environment is inspected, **then** it holds only dummy data.
 - **ACN2** (NFR2) — **Given** tenants 1 and 2 both have data, **when** any query runs as tenant 1 — including one written with no tenant filter — **then** no tenant 2 rows are returned.
 - **ACN3** (NFR3) — **Given** any write to the ledger or stock movements, **when** it is inspected, **then** it records the actor (a named user, or "agent") and the time.
 - **ACN4** (NFR4) — **Given** a valid webhook from Meta, **when** it arrives, **then** the endpoint returns success after queuing the event and before any order processing starts; **given** all workers are stopped, **when** webhooks keep arriving, **then** none are lost, and all are processed once workers restart.
 - **ACN5** (NFR4) — **Given** a webhook with an invalid signature, **when** it arrives, **then** it is rejected and nothing is queued.
-- **ACN6** (NFR5) — **Given** an API request with a missing, expired, or invalid token, **when** it reaches any FastAPI endpoint other than the webhook, **then** it is rejected.
+- **ACN6** (NFR5) — **Given** an API request with a missing, expired, or invalid token, **when** it reaches any FastAPI endpoint other than the webhook, **then** it is rejected, including a token signed with an unexpected key or algorithm.
 - **ACN7** (NFR8) — **Given** a customer's Confirm tap, **when** Meta delivers that same message twice, or a worker crashes after processing it and RabbitMQ redelivers it, **then** there is exactly one order, one stock deduction, and one set of ledger entries.
 - **ACN8** (NFR6) — **Given** the API and workers are running, **when** either is scaled from one instance to several, or one instance is restarted during traffic, **then** no request or conversation fails because of state held in a single instance, and every database connection goes through the connection pool.
+- **ACN10** (NFR4) — **Given** an unpaid order, a reservation reminder, or a no-show release is scheduled, **when** RabbitMQ or the workers restart before it is due, **then** the job still runs once at the scheduled time (or immediately after recovery, if overdue), and it re-checks the current order or booking state before acting.
 - **ACN9** (NFR7) — **Given** an outlet's device has lost its internet connection, **when** staff try to submit an order, payment, or stock movement, **then** the app shows that it is offline and nothing is saved partially or queued for later; once the connection is back, staff can submit again normally.
 
 ---
@@ -368,9 +388,9 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **Customers** reach the system only through **WhatsApp Business API** (Meta Cloud API or an official BSP). Each outlet has its own WhatsApp number and catalog.
 - **Owners and staff** use a **React + TypeScript web app** for admin, order handling, reporting, and product/stock management.
 - Incoming WhatsApp events hit a **FastAPI webhook**, which puts them on a **RabbitMQ** queue for workers to process. Workers also send replies and keep each outlet's catalog in sync.
-- The **FastAPI backend and workers**, hosted in an Indonesia-region cloud, are split into:
+- The **FastAPI backend and workers** run on Railway and use Supabase for Auth, PostgreSQL, and file storage (hosting region per NFR1). They are split into:
   - **Deterministic core** — PostgreSQL with row-level security; owns orders, bills, payments, stock, the ledger, and reservations, with every record scoped to a tenant and outlet.
-  - **Agent layer (Phase 2)** — LangChain-based; handles conversation, forecasting, and suggestions, and calls into the deterministic core as tools rather than writing to it directly. It has no tool that changes stock.
+  - **Agent layer (MVP: recommendations only; full layer in Phase 2)** — LangChain-based; handles conversation, forecasting, and suggestions, and calls into the deterministic core as tools rather than writing to it directly. It has no tool that changes stock.
 
 ```mermaid
 flowchart LR
@@ -382,16 +402,16 @@ flowchart LR
   O[Owner & staff<br/>React web app] --> A[FastAPI<br/>REST API]
   K --> D[Deterministic core<br/>orders · bills · payments<br/>stock · ledger · reservations]
   A --> D
-  K -. Phase 2 .-> G[Agent layer<br/>LangChain]
+  K -. MVP: recommendations / Phase 2: full .-> G[Agent layer<br/>LangChain]
   G -->|tool calls only| D
-  D --> P[(PostgreSQL + RLS<br/>Indonesia region)]
+  D --> P[(Supabase PostgreSQL + RLS)]
 ```
 
 ---
 
 ## 8. Data model (high-level entities)
 
-`tenants` · `outlets` (WhatsApp number, catalog, payment mode, delivery fee) · `users` · `staff_outlets` · `products` (menu items) · `addon_groups` · `addon_options` · `outlet_prices` (menu items and add-on options) · `product_tags` · `stock_items` (ingredients) · `recipe_items` · `stock_movements` · `bills` (open bills) · `orders` (channel, outlet, optional table or bill, order status, payment status) · `order_items` · `order_item_addons` · `order_events` (status changes and reversals, with actor and reason) · `payments` (cash or QRIS) · `payment_proofs` (customer screenshots, review result, reviewer, rejection reason) · `cash_drawers` · `cashier_shifts` (drawer, starting cash, counted cash, difference) · `ledger_entries` · `tables` · `reservations` · `reservation_events` · `whatsapp_contacts` · `customer_consents` · `conversations` · `messages` · `processed_messages` (duplicate check) · `staff_shifts` (Phase 3) · `attendance` (Phase 3)
+`tenants` · `outlets` (WhatsApp number, catalog, payment mode, delivery fee) · `users` · `staff_outlets` · `products` (menu items) · `addon_groups` · `addon_options` · `outlet_prices` (menu items and add-on options) · `product_tags` · `stock_items` (ingredients) · `recipe_items` · `stock_movements` · `bills` (open bills) · `orders` (channel, outlet, optional table or bill, order status, payment status) · `order_items` · `order_item_addons` · `order_events` (status changes and reversals, with actor and reason) · `payments` (cash or QRIS) · `payment_proofs` (customer screenshots, review result, reviewer, rejection reason) · `cash_drawers` · `cashier_shifts` (drawer, starting cash, counted cash, difference) · `ledger_entries` · `tables` · `reservations` · `reservation_events` · `whatsapp_contacts` · `customer_consents` · `conversations` · `messages` · `processed_messages` (duplicate check) · `scheduled_jobs` (timers for unpaid-order cancellation, reminders, no-show release, anonymization) · `attendance_records` and `attendance_events` (MVP: clock in, clock out, flag, correction) · `staff_shifts` (Phase 3)
 
 Every operational record (stock movements, bills, orders, payments, ledger entries, tables, reservations) carries both `tenant_id` and `outlet_id`.
 
@@ -404,11 +424,14 @@ Every operational record (stock movements, bills, orders, payments, ledger entri
 | Backend | FastAPI (Python) |
 | Message queue | RabbitMQ |
 | AI / automation | LangChain |
-| Database | PostgreSQL (row-level security for multi-tenancy) |
+| Database | PostgreSQL on Supabase (row-level security for multi-tenancy, accessed through the connection pooler) |
 | Admin frontend | React + TypeScript |
 | Customer channel | WhatsApp Business API (Meta Cloud API / official BSP), with one number and catalog per outlet |
 | Payments | Static QRIS (staff-confirmed) and cash for dine-in/counter orders (MVP); payment gateway in Phase 3 |
-| Hosting | Indonesia-region cloud (AWS `ap-southeast-3`, GCP Jakarta, or Alibaba Cloud Indonesia) |
+| Authentication | Supabase Auth (JWT with tenant and role claims; outlet access checked live) |
+| File storage | Supabase Storage (menu photos, QRIS images, payment screenshots) |
+| Hosting (demo) | Supabase Free + Railway Hobby (app, workers, RabbitMQ), dummy data only; admin app on Cloudflare Pages or Vercel |
+| Hosting (pilot and production) | Supabase Pro + Railway with a RabbitMQ volume, both in Singapore, with the cross-border transfer decision recorded first (NFR1) |
 
 ---
 
@@ -417,11 +440,11 @@ Every operational record (stock movements, bills, orders, payments, ledger entri
 | Phase | Focus |
 |---|---|
 | **0 — Foundation** | Tenant, outlet, and staff accounts with RLS and role permissions; pooled Postgres connections; schema for menu, add-ons, per-outlet prices, recipes, stock, orders, bills, payments, ledger, tables, and reservations; FastAPI CRUD; React admin with menu/recipe/stock management and counter order screen |
-| **1 — Deterministic WhatsApp flows** | WhatsApp number and catalog setup per outlet, with catalog sync and a sample menu; RabbitMQ-backed, duplicate-safe webhook processing; main menu (Pesan / Rekomendasi / Reservasi); catalog ordering with add-on follow-up (online + table QR), pickup or flat-fee delivery; order lifecycle with per-outlet dine-in payment mode (pay first or open bill), sold-out handling, static QRIS and cash payments with end-of-shift cash count, and PB1; rule-based recommendations; table reservations with reminders and 15-minute hold; membership consent; order board and reservations view in admin; queue monitoring and alerts for failed messages and catalog updates. Start the WhatsApp template approval process in parallel (order updates, reservation confirmation/reminder), since Meta's review queue is outside our control |
-| **2 — Agent layer** | LangChain-based free-text ordering and booking (always confirmed by the customer), conversational recommendations, FAQ handling, upsell + forecast/restock suggestions (advisory only — the agent never changes stock) — all gated through deterministic tool calls |
-| **3 — Scale & expansion** | Capacity scaling for larger tenants, staff/manpower module, payment gateway (dynamic QRIS with automatic confirmation), dropshipper vertical, marketplace integrations |
+| **1 — Deterministic WhatsApp flows** | WhatsApp number and catalog setup per outlet, with catalog sync and a sample menu; RabbitMQ-backed, duplicate-safe webhook processing; main menu (Pesan / Rekomendasi / Reservasi); catalog ordering with add-on follow-up (online + table QR), pickup or flat-fee delivery; order lifecycle with per-outlet dine-in payment mode (pay first or open bill), sold-out handling, static QRIS and cash payments with end-of-shift cash count, and PB1; recommendations (owner's picks and best sellers, plus AI-assisted suggestions with rule-based fallback); table reservations with reminders and 15-minute hold; membership consent; order board and reservations view in admin; staff clock in/out with owner attendance report and corrections; queue monitoring and alerts for failed messages and catalog updates. Start the WhatsApp template approval process in parallel (order updates, reservation confirmation/reminder), since Meta's review queue is outside our control |
+| **2 — Agent layer** | LangChain-based free-text ordering and booking (always confirmed by the customer), FAQ handling, upsell + forecast/restock suggestions (advisory only — the agent never changes stock) — all gated through deterministic tool calls |
+| **3 — Scale & expansion** | Capacity scaling for larger tenants, staff scheduling suggestions built on attendance data, payment gateway (dynamic QRIS with automatic confirmation), dropshipper vertical, marketplace integrations |
 
-The MVP (Phases 0–1) alone is a shippable, revenue-generating product and doubles as the fallback the bot degrades to if the agent layer misbehaves. A phase is complete when every acceptance criterion for its requirements passes.
+The MVP (Phases 0–1) alone is a shippable, revenue-generating product. Its only AI feature is recommendations, which fall back to rule-based recommendations, so every MVP flow still works with the agent switched off; the MVP is also the fallback the bot degrades to if the Phase 2 agent misbehaves. A phase is complete when every acceptance criterion for its requirements passes.
 
 ---
 
@@ -443,6 +466,7 @@ The MVP (Phases 0–1) alone is a shippable, revenue-generating product and doub
 - **Per-outlet WhatsApp setup:** Every outlet needs its own WhatsApp number, Meta account setup, catalog, and possibly its own template approvals, which slows onboarding for multi-outlet businesses. Customers also have to message the right outlet. Mitigation: show each outlet's number on its signage, maps listing, and table QR codes.
 - **Catalog limits:** The WhatsApp cart can't hold add-ons, and catalog updates aren't instant. Mitigation: add-ons are collected after the cart is sent (FR2.2), and stock is re-checked on confirmation (FR2.9).
 - **Trust in AI suggestions:** Owners may be wary of AI-driven restock or scheduling suggestions. Mitigation: the agent is advisory-only for stock — it suggests, and the owner decides and records any restock (FR4.4). Customer-facing agent actions (orders, bookings) always require the customer's confirmation.
+- **Hosting region and free tiers:** Supabase and Railway have no Indonesia region (nearest: Singapore), so real merchant data depends on a legally reviewed cross-border transfer basis (NFR1). Mitigation: the demo uses dummy data only, and the legal decision is made before the pilot. Supabase Free also pauses idle projects and has no backups, so a pilot with real merchants moves to Supabase Pro first.
 - **Regulatory drift:** Indonesia's PDP Law implementing regulations were still being finalized as of 2026 — the architecture should stay flexible enough to tighten data handling if requirements change.
 - **Connectivity:** The web app requires internet at every outlet (NFR7). If an outlet's connection drops, staff can't enter counter orders, close bills, confirm payments, or record stock until it's restored.
 - **Fake payment proof:** Static QRIS gives no automatic payment notification, so a customer could send an edited or reused screenshot. Mitigation: staff confirm every payment against the merchant account, never the screenshot alone (FR11.3), and reject the proof — cancelling the order — when the money isn't there (FR11.10).
@@ -450,6 +474,7 @@ The MVP (Phases 0–1) alone is a shippable, revenue-generating product and doub
 - **Unpaid open bills:** Dine-in guests pay at the end, so they could leave without paying. Mitigation: staff see every open bill and how long it has been open (FR10.7), and owners can switch an outlet to pay-first mode (FR10.8).
 - **Missing cash:** Cash is easier to lose or take than QRIS payments. Mitigation: a blind end-of-shift cash count, with every difference recorded and shown to the owner (FR11.8).
 - **Table QR spoofing:** The table identifier in a pre-filled WhatsApp message can be edited or reused by someone not at the table. Mitigation: include a rotating token in the QR code and/or have staff confirm the first dine-in order per table.
+- **Attendance fraud:** A staff member could clock in for someone else or from outside the outlet, because the MVP does not verify location or identity beyond the staff member's own login. Mitigation: each record is tied to a named login, the owner can review and correct records with an audit trail (FR5.4), and stronger checks (outlet QR code or location) can be added later.
 - **No-shows:** Free WhatsApp bookings can lead to no-shows that block tables. Mitigation: reminders (FR9.4), easy cancellation (FR9.5), the 15-minute hold (FR9.10), and no-show tracking (FR9.6).
 
 ---
@@ -460,6 +485,8 @@ The MVP (Phases 0–1) alone is a shippable, revenue-generating product and doub
 - Monetization model (subscription tiers, per-transaction fee, free tier for early adopters) — **TBD**
 - Concrete success-metric targets and timeline milestones — **TBD**, needs business-side input
 - PB1 on open bills — calculated per order and added up, or once on the bill subtotal when the bill is closed? This affects rounding, the bill summary, and how PB1 is posted to the ledger (FR10.6, FR11.5, AC10.8). — **TBD**
+- Hosting region — as of November 18, 2026, neither Supabase nor Railway lists an Indonesia region (the nearest is Singapore for both). Auth and the database stay on Supabase, so the pilot with real data needs a legally reviewed cross-border transfer basis under the PDP Law (NFR1). Who obtains it, and what must the privacy notice and consent text say about storage in Singapore? — **TBD**, blocks any real merchant data
+- Attendance verification — is a staff member's own login enough to clock in, or does the outlet need an outlet QR code or location check to stop clocking in for someone else? Also, is the 2-hour grace period before a missing clock-out is flagged right? — **TBD**
 - Delivery — who delivers (outlet staff or a courier the customer books)? The fee is a flat amount per outlet (FR2.6). — **TBD**
 
 ---
