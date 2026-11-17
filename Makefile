@@ -1,7 +1,7 @@
 # Local development shortcuts. Run `make help` for the list.
 .DEFAULT_GOAL := help
 .PHONY: help setup up down api worker admin test lint fmt build check \
-        backend-test backend-lint admin-test admin-lint
+        backend-test backend-lint admin-test admin-lint db-reset db-test check-migrations openapi
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -27,11 +27,29 @@ worker: ## Run the WhatsApp worker process (stub)
 admin: ## Run the admin web app dev server on :5173
 	cd admin && pnpm dev
 
+LOCAL_DB_ADMIN_URL ?= postgresql://pos:pos@localhost:5432/pos
+
+db-reset: ## Recreate the local docker DB schema: shim, migrations, seed, app_backend password
+	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -c "drop schema if exists app cascade; drop schema if exists auth cascade"
+	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -f supabase/tests/supabase_shim.sql
+	for f in supabase/migrations/*.sql; do psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -f $$f || exit 1; done
+	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
+	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -c "alter role app_backend password 'app_backend_local'"
+
+db-test: ## Migrations + SQL tests on an EMPTY database (TEST_DB_URL=postgresql://...)
+	DATABASE_URL="$(TEST_DB_URL)" scripts/db-test.sh
+
+check-migrations: ## Migration naming and no edits to migrations already on origin/main
+	scripts/check-migrations.sh
+
+openapi: ## Regenerate docs/api/openapi.json (API contract)
+	cd backend && uv run python -m app.tools.export_openapi
+
 backend-test: ## Backend tests
 	cd backend && uv run pytest
 
-backend-lint: ## Backend lint + format check
-	cd backend && uv run ruff check . && uv run ruff format --check .
+backend-lint: ## Backend lint + format check + API contract check
+	cd backend && uv run ruff check . && uv run ruff format --check . && uv run python -m app.tools.export_openapi --check
 
 admin-test: ## Admin tests
 	cd admin && pnpm test
@@ -41,7 +59,7 @@ admin-lint: ## Admin lint + typecheck
 
 test: backend-test admin-test ## All tests
 
-lint: backend-lint admin-lint ## All linters
+lint: check-migrations backend-lint admin-lint ## All linters
 
 fmt: ## Format backend code
 	cd backend && uv run ruff format . && uv run ruff check --fix .

@@ -88,10 +88,17 @@ create table app.stock_items (
   tenant_id   uuid not null references app.tenants (id),
   name        text not null check (length(trim(name)) between 1 and 120),
   unit        app.stock_unit not null,
+  -- Display unit chosen per item, as in the stock wireframe (S7, O2): '0,8 L', '0,4 kg', '180 g'.
+  display_unit text check (display_unit in ('g', 'kg', 'ml', 'L', 'pcs')),
   is_active   boolean not null default true,
   created_at  timestamptz not null default now(),
   unique (tenant_id, name),
-  unique (id, tenant_id)
+  unique (id, tenant_id),
+  constraint display_unit_fits check (
+    display_unit is null
+    or (unit = 'g' and display_unit in ('g', 'kg'))
+    or (unit = 'ml' and display_unit in ('ml', 'L'))
+    or (unit = 'pcs' and display_unit = 'pcs'))
 );
 
 -- Per-outlet stock level and low-stock threshold. on_hand is a cached sum of

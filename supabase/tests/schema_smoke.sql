@@ -31,6 +31,7 @@ insert into app.tenants (id, name, type) values
 insert into app.outlets (id, tenant_id, name) values
   ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-00000000000a', 'Bandung - Dago'),
   ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-00000000000b', 'Jakarta');
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000f1', 'rina@kopisenja.id');
 insert into app.users (id, tenant_id, email, display_name, role) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-00000000000a', 'rina@kopisenja.id', 'Rina', 'staff');
 insert into app.tables (id, tenant_id, outlet_id, name, capacity) values

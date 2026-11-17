@@ -39,6 +39,33 @@ Makefile            dev / test / lint shortcuts (`make help`)
 Frontend screens and the backend endpoints they use must match the wireframes; note the screen
 code (e.g. `O2`, `S1`, `M1`) in the route/component file and in the endpoint's router.
 
+## Accounts and roles
+
+- **Platform admin** invites every new owner from the command line (no screen):
+
+  ```bash
+  cd backend
+  uv run python -m app.cli invite-owner --email owner@cafe.id --invited-by you@platform
+  ```
+
+  The owner gets a Supabase invite email, sets a password, signs in with app role
+  `owner_pending`, and creates the business on O1. Needs `SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, and `DATABASE_URL`.
+- **Owner** invites staff from O4 (Staf & Akses). There is no public sign-up.
+
+## Database and tests
+
+```bash
+make up          # docker compose Postgres + RabbitMQ
+make db-reset    # schema (shim + migrations), dummy seed, app_backend password
+make check       # migration hygiene, lint, API contract, tests, build
+make db-test TEST_DB_URL=postgresql://postgres:postgres@localhost:5432/empty_db
+```
+
+The API connects as `app_backend` so row-level security always applies. CI
+(`.github/workflows/ci.yml`) runs all of the above against a Postgres 16 service,
+including backend integration tests (`TEST_DATABASE_URL`, `TEST_APP_DATABASE_URL`).
+
 ## Prerequisites
 
 - Python 3.12+ (3.13 recommended) and [uv](https://docs.astral.sh/uv/)

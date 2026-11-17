@@ -71,6 +71,8 @@ Rules:
 | Surface | Credential | Verified by | Tenant/outlet scope |
 |---|---|---|---|
 | `/api/v1/owner/*`, `/api/v1/ops/*` | Supabase access token (asymmetric JWT, short expiry) | JWKS signature, `iss`, `aud`, `exp`, then live `app.users` row (active, tenant matches) | Tenant from token, re-checked live; outlet access checked live (`staff_outlets` or owner) |
+| `/api/v1/me`, `/api/v1/owner/onboarding` for an invited owner | Same token with `app_role = owner_pending`, no `tenant_id` | Same, plus a live open invitation (`app.pending_owner_invitation`) | None until the business is created (O1) |
+| Platform admin (owner invitations) | Service role key + `DATABASE_URL`, CLI only (`app.cli`) | — | Not a tenant user; no API endpoint or screen |
 | `/api/v1/device/*` | Device session token issued at pairing (T-121) | Token hash lookup in `attendance_devices`, not revoked | Fixed to one outlet |
 | `/webhooks/whatsapp` | Meta `X-Hub-Signature-256` | HMAC with the app secret | Outlet resolved from the receiving phone number id |
 | `/healthz`, `/readyz` | None | — | None; no tenant data |

@@ -5,6 +5,7 @@ Plain SQL migrations in Supabase CLI format. They target Supabase Postgres but a
 | Path | Purpose |
 |---|---|
 | `migrations/` | Schema, in order. Never edit a migration that has run on a shared environment; add a new one. |
+| `tests/rls.sql` | RLS isolation, privileges, token hook (T-005, T-113). |
 | `tests/schema_smoke.sql` | Constraint tests (append-only, no double booking, one open shift/bill/attendance record, cross-tenant FKs, PB1 setting). Runs in a transaction and rolls back. |
 | `seed.sql` | Dummy data only (NFR1). |
 | `config.toml` | Local Supabase CLI config. Hand-written; verify against `supabase init` before first use. |
@@ -31,4 +32,6 @@ supabase link --project-ref <ref> && supabase db push   # hosted project (after 
 - Money is `bigint` whole rupiah. PB1 rate is `pb1_rate_bps` (1000 = 10%), off by default.
 - Instants are `timestamptz`; outlets default to `Asia/Jakarta` (WIB).
 - Append-only tables (`ledger_entries`, `stock_movements`, `order_events`, `reservation_events`, `attendance_events`) reject UPDATE and DELETE with a trigger.
-- Not yet included: RLS policies and grants (T-005), `app_backend` role, auth hook, and the FK from `app.users.id` to `auth.users` (T-113).
+- RLS is enabled on every `app` table (T-005). The API and workers connect as `app_backend` (no BYPASSRLS, owns nothing) and set `app.tenant_id`, `app.user_id`, `app.actor`, `app.device_outlet_id` per transaction (T-113). Cross-tenant lookups exist only as SECURITY DEFINER functions: token hook, outlet-by-phone resolver, due-job claim, owner invitations.
+- Append-only tables have no UPDATE/DELETE grant for `app_backend`; stock levels (`outlet_stock`) are read-only and change only through `stock_movements`.
+- `tests/rls.sql` covers tenant/outlet isolation, privileges, and the token hook; `tests/supabase_shim.sql` stands in for Supabase roles and `auth.users` on plain PostgreSQL.

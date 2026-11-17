@@ -12,8 +12,8 @@ Every list/action response for an order includes **`allowed_actions`**, computed
 
 | Purpose | Method & path | Notes |
 |---|---|---|
-| Current user, role, assigned outlets, outlet switcher | `GET /me` | `{user, role, tenant, outlets:[{id,name,timezone,order_prefix,payment_mode}]}`. Drives the sidebar (Owner vs Staff) and "Outlet: … ▾". |
-| Login | Supabase Auth (not our API) | O1 errors: deactivated → `account_inactive` from the token hook; uninvited → Supabase sign-in fails (public sign-up disabled). |
+| Current user, role, assigned outlets, outlet switcher | `GET /me` ✅ implemented | `{user, role: owner\|staff\|owner_pending, onboarding_required, tenant, outlets:[{id,name,timezone,order_prefix,payment_mode}]}`. Drives the sidebar (Owner vs Staff) and "Outlet: … ▾". `owner_pending` (invited owner without a business) → show O1 "Buat profil bisnis". |
+| Login | Supabase Auth (not our API) | O1 errors: deactivated → `account_inactive`; never invited → `account_not_invited` (both from the token hook; public sign-up disabled). Owners are invited by the platform admin CLI (`app.cli invite-owner`), staff by the owner (O4). |
 
 ## Owner screens
 
@@ -98,6 +98,8 @@ Staff calling it → `403` (AC7.7).
 | Aturan reservasi | `GET/PUT /owner/outlets/{id}/reservation-settings` | `is_enabled, bookable_from, bookable_until, default_duration_minutes, booking_window_days, max_party_size, reminder_offset_minutes, cancellation_cutoff_minutes`. Hold 15 min is fixed (shown read-only). |
 
 ### O9 · Laporan Cashflow & Pengeluaran (T-041, T-042, T-043)
+
+The sidebar item **Pengeluaran** opens this screen until its own detailed wireframe exists (product owner, 2026-11-17); it uses the same endpoints below. Add a new section here when that wireframe arrives.
 
 | Card / action | Endpoint | Fields |
 |---|---|---|

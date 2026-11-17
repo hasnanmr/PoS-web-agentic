@@ -17,7 +17,8 @@ Decisions recorded from the product owner on 2026-11-17:
 |---|---|---|
 | Bisnis | `tenant` | A business that subscribes to the platform. Type: restaurant or cafe (dropshipper is Phase 3). |
 | Outlet | `outlet` | One physical branch of a tenant. Owns prices, PB1 setting, payment mode, QRIS, WhatsApp number, cash drawers, tables, stock, reservation settings, time zone. |
-| Owner | `owner` | Tenant administrator. Sees all outlets of the tenant. |
+| Admin platform | — (CLI only) | Operator of the platform. Invites every new owner (decision 2026-11-17). Not a tenant user; no screen. |
+| Owner | `owner` | Tenant administrator. Sees all outlets of the tenant. Before creating the business the invited owner has app role `owner_pending`. |
 | Staf | `staff` | Invited user assigned to one or more outlets. Sees only assigned outlets. |
 | Menu / item | `product` | A menu item, shared across the tenant's outlets. Price is per outlet. |
 | Add-on | `addon_group`, `addon_option` | Group (e.g. Ukuran) with up to 10 options; single or multiple choice; required or optional. Options can add price and recipe changes. |
@@ -48,7 +49,8 @@ Decisions recorded from the product owner on 2026-11-17:
 ## 2. Money, tax, and rounding
 
 - **Currency:** IDR only. Stored as `bigint` whole rupiah. No decimals anywhere in money columns or API payloads.
-- **Display:** `Rp` + thousands separator `.` (e.g. `Rp92.400`), as in the wireframes. Formatting only happens at the edge (UI, WhatsApp text).
+- **Display:** `Rp`, a space, and `.` as thousands separator (e.g. `Rp 92.400`, negative `− Rp 350.000`), as in the wireframes. Formatting only happens at the edge (UI, WhatsApp text); `app.core.money.format_rupiah`.
+- **Quantities:** stored in base units (g, ml, pcs); shown in the item's display unit as in the stock wireframe (`0,8 L`, `0,4 kg`, `180 g`), comma as decimal separator; `app.core.units.format_quantity`.
 - **No rounding of totals:** the customer pays the exact total. Cash change = amount received − total, exact to the rupiah.
 - **PB1 setting per outlet:** `pb1_enabled` (default `false`) and `pb1_rate_bps` (rate in basis points; 1000 = 10%; allowed 1–1000). Rate is required when enabled.
 - **PB1 calculation:** `pb1 = round_half_up(subtotal × rate_bps / 10000)`, computed with integer arithmetic. The base is the subtotal including add-ons and excluding the delivery fee (FR11.5, US-019). Rounding to the nearest whole rupiah is only needed because a percentage of an integer can produce a fraction; it is not cash rounding.
@@ -73,7 +75,7 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | Enum | Values | Notes |
 |---|---|---|
 | `tenant_type` | `restaurant`, `cafe` | `dropshipper` added in Phase 3 (T-097). |
-| `user_role` | `owner`, `staff` | Also the `app_role` JWT claim (T-113). |
+| `user_role` | `owner`, `staff` | Stored role. The `app_role` JWT claim (T-113) is `owner`, `staff`, or `owner_pending` (invited owner, no tenant yet). |
 | `payment_mode` | `pay_first`, `open_bill` | Dine-in only. Online orders always pay first. |
 | `order_channel` | `whatsapp_online`, `whatsapp_table`, `counter` | FR2.8. |
 | `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in. Counter: dine_in/takeaway. |
@@ -145,7 +147,7 @@ Rules:
 
 Permission matrix as in PRD FR1.5. Key points:
 
-- Staff accounts are invite-only (no public sign-up).
+- Accounts are invite-only (no public sign-up): the platform admin invites owners; owners invite staff.
 - Staff see only assigned outlets; checked live in the database on each request, not from token claims.
 - Owner-only: menu/prices/recipes/recommendations, expenses and reports, outlet/WhatsApp/table/QRIS/PB1/staff settings, attendance report and corrections, tablet pairing.
 - Attendance tablet: device session scoped to one outlet; can only list that outlet's staff and record clock in/out with a selfie.
@@ -164,4 +166,5 @@ Permission matrix as in PRD FR1.5. Key points:
 | 2 | PB1 on open bills: per order vs once per bill | Product owner | T-033 (open bills), T-041 (ledger posting) |
 | 3 | Busy/quiet/crowd thresholds | Development (T-123) | T-123 |
 | 4 | Who delivers (outlet staff vs courier) | Product owner | T-053 copy only |
+| 6 | Detailed wireframe for the Pengeluaran menu (currently uses O9) | Design | Pengeluaran screen; until then the menu opens O9 |
 | 5 | Cross-border data transfer basis | Legal (T-108) | Any real merchant data |

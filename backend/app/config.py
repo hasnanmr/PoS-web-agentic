@@ -15,6 +15,7 @@ from pydantic import (
     AnyHttpUrl,
     Field,
     PostgresDsn,
+    SecretStr,
     ValidationError,
     field_validator,
     model_validator,
@@ -56,6 +57,18 @@ class Settings(BaseSettings):
     supabase_jwt_issuer: str | None = None
     rabbitmq_url: AmqpDsn | None = None
 
+    # Auth (T-006, T-113). Only asymmetric algorithms are accepted; HS* and none never.
+    supabase_jwt_audience: str = "authenticated"
+    jwt_algorithms: Annotated[list[str], NoDecode] = ["ES256", "RS256"]
+    jwks_cache_seconds: int = Field(default=600, ge=30, le=86400)
+    # Service role key: used ONLY for the Supabase Auth admin API (owner invitations by the
+    # platform admin CLI, banning deactivated staff). Never used for tenant data.
+    supabase_service_role_key: SecretStr | None = None
+
+    # Connection pool (transaction pooler, port 6543 on Supabase; Appendix A.1/B.4).
+    db_pool_min_size: int = Field(default=1, ge=0, le=50)
+    db_pool_max_size: int = Field(default=5, ge=1, le=100)
+
     default_timezone: str = "Asia/Jakarta"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
@@ -65,6 +78,7 @@ class Settings(BaseSettings):
         "supabase_jwks_url",
         "supabase_jwt_issuer",
         "rabbitmq_url",
+        "supabase_service_role_key",
         mode="before",
     )
     @classmethod
@@ -92,6 +106,24 @@ class Settings(BaseSettings):
             raise ValueError(f"unknown IANA time zone {value!r}") from exc
         return value
 
+    @field_validator("jwt_algorithms", mode="before")
+    @classmethod
+    def _split_algorithms(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [alg.strip().upper() for alg in value.split(",") if alg.strip()]
+        return value
+
+    @field_validator("jwt_algorithms")
+    @classmethod
+    def _asymmetric_only(cls, value: list[str]) -> list[str]:
+        allowed = {"ES256", "ES384", "ES512", "RS256", "RS384", "RS512", "PS256", "EdDSA"}
+        bad = [alg for alg in value if alg not in allowed]
+        if bad or not value:
+            raise ValueError(
+                f"only asymmetric JWT algorithms are allowed (got {', '.join(bad) or 'none'})"
+            )
+        return value
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -109,6 +141,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _require_in_deployed_envs(self) -> Settings:
+        if self.db_pool_min_size > self.db_pool_max_size:
+            raise ValueError("DB_POOL_MIN_SIZE must not exceed DB_POOL_MAX_SIZE")
         if self.app_env == "local":
             return self
         missing = [name.upper() for name in REQUIRED_OUTSIDE_LOCAL if getattr(self, name) is None]
