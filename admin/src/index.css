@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens extracted from the wireframe (see CLAUDE.md). Change values here only.
+ */
+:root {
+  --pos-primary: #1e4fa3;
+  --pos-primary-soft: #e8effb;
+  --pos-action: #cc4a0a;
+  --pos-accent-orange: #f97316;
+  --pos-page: #f3f6fb;
+  --pos-surface: #ffffff;
+  --pos-border: #e3e8f0;
+  --pos-text: #1b2430;
+  --pos-text-muted: #6b7280;
+  --pos-success: #1e7a4f;
+  --pos-success-soft: #e3f6ec;
+  --pos-warning: #8a6d1f;
+  --pos-warning-soft: #fff4db;
+  --pos-danger: #d93636;
+  --pos-danger-soft: #fdecec;
+  --pos-teal: #0f766e;
+  --pos-teal-soft: #e6f4f2;
+  --pos-sidebar-width: 220px;
+}
+
+@theme inline {
+  --color-primary: var(--pos-primary);
+  --color-primary-soft: var(--pos-primary-soft);
+  --color-action: var(--pos-action);
+  --color-accent-orange: var(--pos-accent-orange);
+  --color-page: var(--pos-page);
+  --color-surface: var(--pos-surface);
+  --color-border: var(--pos-border);
+  --color-text: var(--pos-text);
+  --color-text-muted: var(--pos-text-muted);
+  --color-success: var(--pos-success);
+  --color-success-soft: var(--pos-success-soft);
+  --color-warning: var(--pos-warning);
+  --color-warning-soft: var(--pos-warning-soft);
+  --color-danger: var(--pos-danger);
+  --color-danger-soft: var(--pos-danger-soft);
+  --color-teal: var(--pos-teal);
+  --color-teal-soft: var(--pos-teal-soft);
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  background: var(--pos-page);
+  color: var(--pos-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  overflow-x: hidden;
+}
