@@ -30,10 +30,14 @@ Makefile            dev / test / lint shortcuts (`make help`)
 - [User stories](User-Stories-SME-Automation-Platform.md)
 - [Task breakdown](Task-Breakdown-SME-Automation-Platform.md)
 - [Wireframe traceability](design/WIREFRAME-TRACEABILITY.md) and previews in `design/previews/`
-- [CLAUDE.md](CLAUDE.md): frontend rules and design tokens
+- [CLAUDE.md](CLAUDE.md): frontend and backend rules, design tokens
+- [Domain glossary, rules, and enums](docs/domain/domain-glossary-and-rules.md) (T-001)
+- [API boundaries](docs/architecture/api-boundaries.md) (T-002)
+- [Screen → endpoint map](docs/architecture/screen-endpoint-map.md): backend contract per wireframe screen
+- [Database](supabase/README.md) (T-004)
 
-Frontend screens must match the wireframes; note the screen code (e.g. `O2`, `S1`, `M1`) in
-the route/component file.
+Frontend screens and the backend endpoints they use must match the wireframes; note the screen
+code (e.g. `O2`, `S1`, `M1`) in the route/component file and in the endpoint's router.
 
 ## Prerequisites
 

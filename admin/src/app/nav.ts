@@ -28,7 +28,7 @@ export const ROUTES = {
   paymentReview: { label: 'Review Pembayaran', path: '/payment-review', screen: 'S4', icon: '◎' },
   reservations: { label: 'Reservasi & Meja', path: '/reservations', screen: 'S6', icon: '▣' },
   stock: { label: 'Stok', path: '/stock', screen: 'S7', icon: '▥' },
-  shifts: { label: 'Shift Kasir', path: '/shifts', screen: 'S8', icon: '◐' },
+  shifts: { label: 'Shift Kasir', path: '/shifts', screen: 'S8', icon: '◷' },
   myAttendance: { label: 'Absensi Saya', path: '/my-attendance', screen: 'S9', icon: '⏱' },
   menu: { label: 'Menu & Add-on', path: '/catalog/menu', screen: 'O5', icon: '◫' },
   recipes: { label: 'Resep & Bahan', path: '/catalog/recipes', screen: 'O6', icon: '⚗' },

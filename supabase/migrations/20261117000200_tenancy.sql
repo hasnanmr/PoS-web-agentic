@@ -21,6 +21,12 @@ create table app.outlets (
   whatsapp_phone           text unique check (whatsapp_phone ~ '^\+?[0-9]{8,15}$'),
   whatsapp_phone_number_id text unique,          -- Meta phone number id
   whatsapp_catalog_id      text,
+  -- O3/O12: connection and catalog sync status shown per outlet.
+  whatsapp_status          text not null default 'not_started'
+                           check (whatsapp_status in ('not_started', 'pending_verification', 'connected', 'error')),
+  catalog_synced_at        timestamptz,
+  -- Order number prefix shown as #A-1036 (S2, O11); unique per tenant.
+  order_prefix             text not null default 'A' check (order_prefix ~ '^[A-Z]{1,3}$'),
   payment_mode             app.payment_mode not null default 'pay_first',
   delivery_fee             bigint not null default 0 check (delivery_fee >= 0),
   -- PB1: off by default, rate decided per outlet by the owner (rate still TBD).
@@ -33,6 +39,7 @@ create table app.outlets (
   created_at               timestamptz not null default now(),
   updated_at               timestamptz not null default now(),
   unique (id, tenant_id),
+  unique (tenant_id, order_prefix),
   constraint pb1_rate_required check (not pb1_enabled or pb1_rate_bps is not null)
 );
 create index on app.outlets (tenant_id);
@@ -58,7 +65,6 @@ create table app.reservation_settings (
   max_party_size            integer not null default 10 check (max_party_size between 1 and 100),
   reminder_offset_minutes   integer not null default 120 check (reminder_offset_minutes between 0 and 2880),
   cancellation_cutoff_minutes integer not null default 120 check (cancellation_cutoff_minutes between 0 and 2880),
-  hold_minutes              integer not null default 15 check (hold_minutes between 0 and 120),
   updated_at                timestamptz not null default now(),
   foreign key (outlet_id, tenant_id) references app.outlets (id, tenant_id) on delete cascade
 );
@@ -72,6 +78,8 @@ create table app.users (
   display_name text not null,
   role         app.user_role not null,
   is_active    boolean not null default true,
+  invited_at   timestamptz,
+  invitation_accepted_at timestamptz,   -- null = still 'Diundang' (O4)
   deactivated_at timestamptz,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),

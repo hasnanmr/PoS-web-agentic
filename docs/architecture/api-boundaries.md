@@ -50,8 +50,14 @@ backend/app/
   messaging/    # RabbitMQ topology, publisher, consumer framework (T-110, T-111)
   worker/       # consumers: inbound flows, outbound sender, catalog sync, job handlers
   agent/        # recommendation agent + tool definitions (T-115)
-  settings.py   # environment validation (T-003)
+  config.py     # environment validation (T-003)
+  db.py         # psycopg connection helper (T-003; grows into db/ with RLS context, T-113)
+  logging.py    # JSON-lines logging (T-003)
+  main.py       # FastAPI app factory (T-003)
+  serve.py      # API entrypoint (T-003)
 ```
+
+Packages other than `api/health.py`, `worker/main.py`, and the files above are created by the tasks that need them.
 
 Rules:
 
@@ -89,24 +95,19 @@ Owner-only endpoints check `role = owner` from the live user row, not only the c
 - Pagination: cursor based (`?cursor=…&limit=…`), responses include `next_cursor`.
 - OpenAPI schema generated from FastAPI is the contract; the admin app generates TypeScript types from it (contract check in CI, T-009).
 
-### Endpoint groups (MVP)
+### Endpoints
 
-| Group | Prefix | Role | Main tasks |
-|---|---|---|---|
-| Session | `/api/v1/me` | owner, staff | Current user, role, assigned outlets |
-| Tenant & outlets | `/api/v1/owner/tenant`, `/api/v1/owner/outlets` | owner | T-010, T-011, T-014 |
-| Staff | `/api/v1/owner/staff` | owner | T-012, T-013 |
-| Menu & recipes | `/api/v1/owner/products`, `/addon-groups`, `/stock-items`, `/outlets/{id}/prices` | owner | T-016–T-019 |
-| Stock | `/api/v1/ops/outlets/{id}/stock`, `/stock-movements` | owner, staff | T-020–T-023 |
-| Orders | `/api/v1/ops/outlets/{id}/orders` (+ `/transitions`, `/reversal`) | owner, staff | T-025–T-032 |
-| Bills | `/api/v1/ops/outlets/{id}/bills` | owner, staff | T-033 |
-| Payments | `/api/v1/ops/outlets/{id}/payments`, `/payment-proofs` | owner, staff | T-037, T-038 |
-| Shifts | `/api/v1/ops/outlets/{id}/shifts` | owner, staff | T-039, T-040 |
-| Ledger & reports | `/api/v1/owner/ledger`, `/expenses`, `/reports/*` | owner | T-041–T-043, T-102, T-123 |
-| Tables & reservations | `/api/v1/owner/outlets/{id}/tables`, `/api/v1/ops/outlets/{id}/reservations` | owner / owner, staff | T-057–T-064 |
-| Attendance | `/api/v1/ops/me/attendance` (own history), `/api/v1/owner/attendance` | staff / owner | T-116–T-119 |
-| Device | `/api/v1/device/staff`, `/clock-in`, `/clock-out`, `/selfie-upload-url` | tablet | T-116, T-117, T-121 |
-| WhatsApp setup & queues | `/api/v1/owner/whatsapp`, `/api/v1/owner/dead-letters` | owner | T-100, T-112 |
+The full endpoint list is defined per wireframe screen in [`screen-endpoint-map.md`](screen-endpoint-map.md); that file is the contract. Summary of prefixes:
+
+| Prefix | Who | Screens |
+|---|---|---|
+| `/api/v1/me` | owner, staff | sidebar, outlet switcher |
+| `/api/v1/owner/*` | owner | O1–O14 |
+| `/api/v1/ops/outlets/{outlet_id}/*`, `/api/v1/ops/{orders,bills,payment-proofs,reservations,drawers,shifts}/{id}/*` | owner, staff (assigned outlets) | S1–S9, M1–M6 |
+| `/api/v1/ops/me/attendance*` | staff (own records) | S9, M6 |
+| `/api/v1/device/*` (`pair`, `staff`, `selfies`, `attendance`) | attendance tablet | K0–K4 |
+| `/webhooks/whatsapp` | Meta | — (worker flows W1–W12) |
+| `/healthz`, `/readyz` | none | — |
 
 ## 5. Queue contracts
 

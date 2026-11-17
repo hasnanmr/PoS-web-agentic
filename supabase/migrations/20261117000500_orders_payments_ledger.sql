@@ -13,6 +13,7 @@ create table app.cashier_shifts (
   closed_by        uuid references app.users (id),
   closed_at        timestamptz,
   counted_cash     bigint check (counted_cash >= 0),
+  count_breakdown  jsonb,               -- S8: {"100000": 12, "50000": 6, ..., "coins": 4400}
   expected_cash    bigint,
   difference       bigint,              -- counted - expected; negative = shortage
   unique (id, outlet_id),
@@ -135,6 +136,7 @@ create table app.order_events (
   from_payment     app.payment_status,
   to_payment       app.payment_status,
   reason           text,
+  data             jsonb not null default '{}'::jsonb,   -- e.g. {"method":"cash","amount":70000} or {"ingredients":"waste"}
   actor_type       app.actor_type not null,
   actor_id         uuid,
   created_at       timestamptz not null default now(),

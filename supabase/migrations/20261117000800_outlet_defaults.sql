@@ -5,7 +5,7 @@
 create function app.outlet_defaults() returns trigger
 language plpgsql as $$
 begin
-  insert into app.cash_drawers (tenant_id, outlet_id, name) values (new.tenant_id, new.id, 'Kasir 1');
+  insert into app.cash_drawers (tenant_id, outlet_id, name) values (new.tenant_id, new.id, 'Kasir depan');
   insert into app.reservation_settings (outlet_id, tenant_id) values (new.id, new.tenant_id);
   return new;
 end $$;

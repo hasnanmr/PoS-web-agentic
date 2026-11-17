@@ -12,6 +12,17 @@ Every frontend (admin web app, attendance tablet) screen must match the wirefram
 - Note the screen code (e.g. `S1`, `O3`, `M2`) in the component or route file and in the PR description.
 - Behavior notes written on the canvas (grey "Catatan perilaku" boxes) are requirements, not decoration.
 
+## Backend endpoints must follow the wireframes too
+
+Every backend endpoint used by an admin or tablet screen must serve exactly what that wireframe screen shows and does: same fields, filters, actions, and error states.
+
+- The contract is `docs/architecture/screen-endpoint-map.md` (screen code → method, path, fields). Conventions are in `docs/architecture/api-boundaries.md`.
+- Before building or changing an endpoint, find its screen in the map and the wireframe. Do not add endpoints, fields, or actions that no screen uses (except health/infra endpoints); if a screen needs something the map lacks, update the map in the same change.
+- If a screen needs data the schema cannot provide, add a migration and note it in the map.
+- Order responses include `allowed_actions` computed by the server; the UI only renders those buttons.
+- Mobile screens (M1–M6) reuse the desktop endpoints. WhatsApp screens (W1–W12) are worker flows, not REST.
+- Domain names, enums, and money/time rules come from `docs/domain/domain-glossary-and-rules.md`.
+
 ### Design tokens (extracted from the wireframe)
 
 | Token | Value | Use |

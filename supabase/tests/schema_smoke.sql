@@ -44,8 +44,11 @@ select pg_temp.check(
      from app.outlets where id = '00000000-0000-0000-0000-0000000000a1'),
   'new outlet defaults to WIB, PB1 off, pay first');
 select pg_temp.check(
-  (select count(*) = 1 from app.cash_drawers where outlet_id = '00000000-0000-0000-0000-0000000000a1'),
-  'new outlet gets one cash drawer (AC11.10)');
+  (select count(*) = 1 and min(name) = 'Kasir depan' from app.cash_drawers where outlet_id = '00000000-0000-0000-0000-0000000000a1'),
+  'new outlet gets one cash drawer "Kasir depan" (AC11.10, wireframe O3/S8)');
+select pg_temp.expect_error(
+  $$insert into app.outlets (tenant_id, name) values ('00000000-0000-0000-0000-00000000000a', 'Outlet kedua')$$,
+  'second outlet reusing order prefix A in the same tenant');
 select pg_temp.expect_error(
   $$update app.outlets set pb1_enabled = true where id = '00000000-0000-0000-0000-0000000000a1'$$,
   'PB1 enabled without a rate');

@@ -32,7 +32,7 @@ Decisions recorded from the product owner on 2026-11-17:
 | Open bill | `bill` | A running bill for a table or guest name at open-bill outlets; paid in full once. |
 | Mode pembayaran dine-in | `payment_mode` | Outlet setting: `pay_first` or `open_bill`. Online orders are always pay first. |
 | Bukti bayar | `payment_proof` | Customer's QRIS payment screenshot, reviewed by staff. |
-| Cash drawer | `cash_drawer` | A physical cash drawer at an outlet (e.g. "Kasir 1", "Bar"). Every outlet starts with one. |
+| Cash drawer | `cash_drawer` | A physical cash drawer at an outlet (e.g. "Kasir depan", "Bar"; shown as "Drawer 1 · Kasir depan"). Every outlet starts with one. |
 | Shift kasir | `cashier_shift` | Period a drawer is in use: starting cash → blind count. Not staff scheduling. |
 | Ledger | `ledger_entry` | Append-only financial record per outlet. Corrections are new reversal entries. |
 | Pengeluaran | ledger entry type `expense` | Manual cash expense logged by the owner. |
@@ -130,7 +130,7 @@ Rules:
 
 ## 7. Cash and shifts
 
-- Each new outlet gets one drawer ("Kasir 1"). One open shift per drawer. Cash payments require an open shift and are linked to it.
+- Each new outlet gets one drawer ("Kasir depan"). One open shift per drawer. Cash payments require an open shift and are linked to it.
 - Blind count: staff enter counted cash before seeing expected cash. Expected = starting cash + cash received − cash paid out. Difference posts `cash_shortage` or `cash_surplus` to the ledger.
 
 ## 8. Reservations
