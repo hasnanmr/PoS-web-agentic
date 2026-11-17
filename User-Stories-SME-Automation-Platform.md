@@ -415,7 +415,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Cash, QRIS, revenue, delivery fee, dan PB1 ditampilkan terpisah.
   - Batas hari mengikuti zona waktu masing-masing outlet.
   - Staff tidak dapat melihat angka cashflow owner.
-- **Traceability:** FR3.3, FR7.2, AC3.4, AC7.1
+  - Laporan menampilkan kas masuk, kas keluar, dan kas bersih beserta perubahan terhadap periode sebelumnya, pengeluaran per outlet, dan daftar pengeluaran terbaru.
+- **Traceability:** FR3.3, FR7.2, AC3.4–AC3.5, AC7.1
 
 ### US-033 — Menggunakan dashboard admin sesuai peran
 
@@ -662,16 +663,20 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 ### US-053 — Clock in dan clock out staf
 
-**Sebagai** staf, **saya ingin** mencatat jam masuk dan jam pulang dari aplikasi, **sehingga** kehadiran saya tercatat tanpa buku absen.
+**Sebagai** staf, **saya ingin** mencatat jam masuk dan jam pulang di tablet absensi outlet dengan foto selfie, **sehingga** kehadiran saya tercatat tanpa buku absen dan terbukti saya berada di outlet.
 
 - **Fase/Prioritas:** MVP (Phase 1 dan pilot) / P0
 - **Acceptance criteria:**
-  - Staf clock in dan clock out dari admin app (mobile 360 px maupun desktop) untuk outlet yang ditugaskan; waktu ditampilkan dalam zona waktu outlet.
-  - Satu staf hanya memiliki satu catatan terbuka; clock in kedua ditolak, dan clock in di outlet yang tidak ditugaskan ditolak, termasuk lewat API langsung.
+  - Clock in dan clock out hanya bisa dilakukan di tablet absensi outlet (US-055); waktu ditampilkan dalam zona waktu outlet.
+  - Di tablet, staf memilih namanya (tanpa PIN) dari daftar staf yang ditugaskan ke outlet itu, lalu mengambil selfie dengan kamera depan; catatan hanya tersimpan bersama foto tersebut.
+  - Jika kamera tidak tersedia atau foto dibatalkan, tidak ada yang tercatat dan tablet meminta selfie ulang.
+  - Satu staf hanya memiliki satu catatan terbuka; clock in kedua ditolak. Staf yang tidak ditugaskan ke outlet itu tidak muncul di daftar, dan permintaan API langsung untuk outlet lain ditolak.
+  - Clock in atau clock out dari HP staf sendiri atau admin app tidak tersedia; di admin app staf hanya melihat riwayatnya sendiri, termasuk selfie-nya.
   - Clock out tanpa catatan terbuka ditolak; setelah clock out, durasi ditampilkan.
-  - Jika staf belum clock out sampai jam tutup outlet ditambah masa tenggang (default 2 jam, diatur owner per outlet), catatan ditandai "perlu dikoreksi". Sistem tidak mengarang jam pulang, jam kerjanya belum dihitung, dan staf dapat clock in lagi.
+  - Sebelum clock in pertama, staf melihat pemberitahuan bahwa selfie disimpan 30 hari dan hanya dilihat owner dan dirinya sendiri.
+  - Jika staf belum clock out sampai jam tutup outlet ditambah masa tenggang (default 1 jam, diatur owner per outlet), catatan ditandai "perlu dikoreksi". Sistem tidak mengarang jam pulang, jam kerjanya belum dihitung, dan staf dapat clock in lagi.
   - Staf hanya melihat catatan kehadirannya sendiri.
-- **Traceability:** FR5.1, FR5.3, AC5.1–AC5.3, AC5.5
+- **Traceability:** FR5.1, FR5.3, FR5.7, AC5.1–AC5.3, AC5.5, AC5.6, AC5.8
 
 ### US-054 — Melihat dan mengoreksi kehadiran staf
 
@@ -679,12 +684,38 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP (Phase 1 dan pilot) / P0
 - **Acceptance criteria:**
-  - Owner melihat kehadiran semua staf per outlet, staf, dan rentang tanggal: jam kerja per hari, total, dan catatan yang ditandai.
+  - Owner melihat kehadiran semua staf per outlet, staf, dan rentang tanggal: jam kerja per hari, total, catatan yang ditandai, serta selfie clock in dan clock out untuk memeriksa apakah orangnya sesuai.
   - Batas hari mengikuti zona waktu masing-masing outlet.
   - Koreksi atau pengisian jam pulang yang hilang wajib disertai alasan; nilai asli tetap dapat dilihat, dan owner, waktu, serta alasan dicatat.
   - Staf tidak dapat membuka laporan ini atau mengoreksi catatan, termasuk lewat API langsung.
   - Perhitungan gaji dan lembur tidak termasuk MVP.
-- **Traceability:** FR5.4, AC5.4–AC5.5
+- **Traceability:** FR5.4, FR5.7, AC5.4–AC5.5, AC5.8
+
+### US-055 — Memasang tablet absensi di outlet
+
+**Sebagai** owner, **saya ingin** menghubungkan tablet di outlet sebagai perangkat absensi, **sehingga** staf hanya bisa absen saat benar-benar berada di outlet.
+
+- **Fase/Prioritas:** MVP (Phase 1 dan pilot) / P0
+- **Acceptance criteria:**
+  - Owner membuat kode pairing sekali pakai per outlet di admin app; tablet yang memasukkan kode itu tetap login sebagai outlet tersebut.
+  - Sesi tablet hanya bisa menampilkan staf outlet itu dan mencatat clock in/out; order, laporan, pengaturan, dan data outlet lain ditolak.
+  - Owner melihat daftar tablet per outlet beserta aktivitas terakhirnya dan dapat mencabut tablet kapan saja; tablet yang dicabut langsung ditolak dan harus di-pairing ulang dengan kode baru.
+  - Satu outlet boleh punya lebih dari satu tablet.
+- **Traceability:** FR5.6, AC5.7
+
+### US-056 — Melihat jam ramai, jam sepi, dan keramaian outlet
+
+**Sebagai** owner, **saya ingin** melihat jam ramai dan jam sepi serta seberapa ramai tiap outlet saat ini, **sehingga** saya dapat mengatur staf, stok, dan promo sesuai kondisi outlet.
+
+- **Fase/Prioritas:** MVP / P1
+- **Acceptance criteria:**
+  - Dashboard menampilkan order per jam untuk outlet dan periode terpilih, dalam jam buka dan zona waktu outlet.
+  - Jam ditandai ramai jika order ≥ 130% rata-rata per jam, dan sepi jika ≤ 60%.
+  - Peta keramaian hari × jam memakai rata-rata order per jam selama 4 minggu terakhir.
+  - Tiap outlet menampilkan keramaian saat ini: meja terisi dari total meja, jumlah order aktif, dan status Ramai (≥ 75% meja terisi), Sepi (≤ 25%), atau Normal.
+  - Filter "Semua jam / Jam ramai / Jam sepi" membatasi revenue, jumlah order, komposisi kanal, dan metode bayar ke order pada jam tersebut; stok dan keramaian saat ini tidak terpengaruh.
+  - Staf tidak dapat melihat tampilan ini, termasuk lewat API langsung.
+- **Traceability:** FR7.5–FR7.8, AC7.4–AC7.7
 
 ## Traceability ringkas
 
@@ -694,9 +725,9 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | FR2 Order intake & WhatsApp catalog | US-008–US-015, US-034, US-042 |
 | FR3 Cashflow | US-030–US-032, US-045 |
 | FR4 Menu, stock, inventory | US-005–US-008, US-014, US-021, US-045 |
-| FR5 Staff attendance (MVP) and scheduling (Phase 3) | US-046, US-053–US-054 |
+| FR5 Staff attendance (MVP) and scheduling (Phase 3) | US-046, US-053–US-055 |
 | FR6 WhatsApp bot | US-015, US-036–US-037, US-042–US-045, US-052 |
-| FR7 Admin web app | US-003, US-033–US-035 |
+| FR7 Admin web app | US-003, US-033–US-035, US-056 |
 | FR8 Recommendations | US-028–US-029, US-052 |
 | FR9 Reservations | US-022–US-027, US-043 |
 | FR10 Order lifecycle | US-004, US-015–US-021, US-034 |
