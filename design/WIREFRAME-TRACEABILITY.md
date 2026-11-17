@@ -1,0 +1,193 @@
+# Wireframe Traceability — SME POS
+
+This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME-POS-Wireframe.figcraft) to the user stories in [User-Stories-SME-Automation-Platform.md](../User-Stories-SME-Automation-Platform.md) and the tasks in [Task-Breakdown-SME-Automation-Platform.md](../Task-Breakdown-SME-Automation-Platform.md).
+
+- **Baseline:** PRD v0.10, US-001–US-054, T-001–T-120.
+- **Open the file:** FigCraft (`figcraft SME-POS-Wireframe.figcraft`). PNG previews of each page are in [`previews/`](previews/).
+- **Labels:** every screen on the canvas has a label above it in the form `Code · Name — US-xxx · T-xxx`, matching the tables below.
+- **Fidelity:** low-to-mid fidelity wireframes. The colours follow the agreed reference (light sidebar, navy primary `#1E4FA3`, light-blue background `#F3F6FB`). Copy is in Bahasa Indonesia, as in the product.
+
+## Pages
+
+| Page | Contents | Preview |
+|---|---|---|
+| 00 · Sitemap & Flow | Sitemap per role, user flows A–H, and a story-to-screen coverage table | [00-sitemap-flow.png](previews/00-sitemap-flow.png) |
+| 01 · Admin — Owner | O1–O14 | [01-admin-owner.png](previews/01-admin-owner.png) |
+| 02 · Admin — Staff Ops | S1–S9 | [02-admin-staff.png](previews/02-admin-staff.png) |
+| 03 · WhatsApp Customer | W1–W12 (MVP), A1–A2 (Phase 2) | [03-whatsapp-customer.png](previews/03-whatsapp-customer.png) |
+| 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
+| 99 · Components | `Sidebar/Owner`, `Sidebar/Staff` | — |
+
+## Screen → user story → task
+
+### Owner (web admin)
+
+| Screen | User stories | Tasks |
+|---|---|---|
+| O1 Login (invite-only) & Buat Bisnis | US-001, US-002, US-003, US-008 | T-006, T-010, T-011, T-024, T-066 |
+| O2 Dashboard | US-032, US-033 | T-043, T-071 |
+| O3 Bisnis & Outlet (PB1, payment mode, QRIS, cash drawers, attendance grace period) | US-002, US-017, US-018, US-019, US-020, US-053 | T-011, T-014, T-039, T-066, T-118 |
+| O4 Staf & Akses (staff invitation, access matrix) | US-003, US-033 | T-006, T-012, T-013, T-066 |
+| O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
+| O6 Resep & Bahan | US-006, US-007 | T-019, T-021, T-022, T-066 |
+| O7 Rekomendasi (owner's picks & tags) | US-028, US-029 | T-073, T-074 |
+| O8 Meja & Aturan Reservasi (+ table QR) | US-013, US-022 | T-054, T-057 |
+| O9 Laporan Cashflow & Pengeluaran | US-030, US-031, US-032 | T-041, T-042, T-043 |
+| O10 Laporan Cash Count | US-018 | T-040, T-102 |
+| O11 Audit Log | US-004, US-016, US-021 | T-031, T-101 |
+| O12 WhatsApp Setup & Template | US-002, US-008, US-015, US-036 | T-045, T-051, T-084, T-100 |
+| O13 Dead-letter & Antrean Pesan | US-036, US-037, US-050 | T-081, T-112 |
+| O14 Kehadiran Staf & Koreksi | US-053, US-054 | T-118, T-119 |
+
+### Staff (web admin)
+
+| Screen | User stories | Tasks |
+|---|---|---|
+| S1 Counter / POS (dine-in, takeaway) | US-011, US-018, US-019, US-020, US-034 | T-038, T-067 |
+| S2 Order Board | US-013, US-014, US-015, US-016 | T-030, T-031, T-068 |
+| S3 Detail Order & Reversal | US-004, US-016, US-021 | T-031, T-032, T-068 |
+| S4 Review Pembayaran QRIS | US-017, US-021 | T-036, T-037, T-068 |
+| S5 Open Bills | US-013, US-020 | T-033, T-068 |
+| S6 Reservasi & Meja (today) | US-024, US-026, US-027 | T-062, T-063, T-064, T-070 |
+| S7 Stok & Pergerakan | US-006, US-007 | T-020, T-022, T-069 |
+| S8 Shift Kasir & Blind Count | US-018, US-030 | T-039, T-040, T-070 |
+| S9 Absensi Saya (clock in / out) | US-053 | T-116, T-117 |
+
+### Customer (WhatsApp)
+
+| Screen | User stories | Tasks |
+|---|---|---|
+| W1 Menu utama (list message) | US-009 | T-049, T-050 |
+| W2 Katalog & keranjang | US-008, US-010 | T-051, T-052 |
+| W3 Add-on setelah cart | US-011 | T-052 |
+| W4 Pickup / Delivery | US-012 | T-053 |
+| W5 Ringkasan & Confirm (+ sold out) | US-011, US-014, US-019 | T-027, T-028, T-053 |
+| W6 Pembayaran QRIS & bukti bayar | US-017, US-021 | T-034, T-036 |
+| W7 Notifikasi status & pembatalan (templates) | US-015, US-017, US-021 | T-034, T-055, T-084 |
+| W8 Order dari QR meja | US-013, US-020 | T-033, T-054 |
+| W9 Rekomendasi + AI (MVP, 30-second fallback) | US-028, US-029, US-052 | T-073, T-074, T-115 |
+| W10 Reservasi meja | US-023, US-025 | T-060, T-061 |
+| W11 Reservasi Saya (cancel / reschedule) | US-025 | T-061 |
+| W12 Consent membership & Data Saya | US-039, US-040, US-041 | T-076, T-077, T-106 |
+| A1 Order teks bebas oleh AI (Phase 2) | US-042 | T-087, T-091 |
+| A2 Reservasi teks bebas oleh AI (Phase 2) | US-043 | T-088, T-091 |
+
+### Mobile 360 px
+
+| Screen | User stories | Tasks |
+|---|---|---|
+| M1 Order Board | US-016, US-035 | T-068, T-072 |
+| M2 Counter | US-034, US-035 | T-067, T-072 |
+| M3 Open Bill | US-020, US-035 | T-068, T-072 |
+| M4 Reservasi hari ini | US-026, US-027, US-035 | T-070, T-072 |
+| M5 Stok | US-006, US-007, US-035 | T-069, T-072 |
+| M6 Absensi | US-035, US-053 | T-072, T-117 |
+
+Role-aware navigation (`Sidebar/Owner`, `Sidebar/Staff`) covers US-003 and US-033 through T-013 and T-072.
+
+## User story → screens
+
+Every MVP story has at least one screen, except the backend-only stories marked "—".
+
+| Story | Screens |
+|---|---|
+| US-001 | O1 |
+| US-002 | O1, O3, O5, O12 |
+| US-003 | O1, O4, sidebars |
+| US-004 | S3, O11 |
+| US-005 | O5 |
+| US-006 | O6, S7, M5 |
+| US-007 | O6, S7, M5, O2 |
+| US-008 | O1, O5, O12, W2 |
+| US-009 | W1 |
+| US-010 | W2 |
+| US-011 | W3, W5, S1 |
+| US-012 | W4 |
+| US-013 | W8, O8, S2, S5 |
+| US-014 | W5, S2 |
+| US-015 | W7, S2, O12 |
+| US-016 | S2, S3, O11, M1 |
+| US-017 | W6, S4, O3 |
+| US-018 | S1, S8, O3, O10 |
+| US-019 | O3, S1, W5 |
+| US-020 | S5, W8, S1, O3, M3 |
+| US-021 | S3, S4, W6, W7, O11 |
+| US-022 | O8 |
+| US-023 | W10 |
+| US-024 | S6 |
+| US-025 | W10, W11 |
+| US-026 | S6, M4 |
+| US-027 | S6, M4 |
+| US-028 | O7, W9 |
+| US-029 | W9, O7 |
+| US-030 | O9, S8 |
+| US-031 | O9 |
+| US-032 | O2, O9 |
+| US-033 | O2, O4, sidebars |
+| US-034 | S1, M2 |
+| US-035 | M1–M6 |
+| US-036 | O12, O13 |
+| US-037 | O13 |
+| US-038 | — (tenant isolation, backend: T-005, T-015, T-113) |
+| US-039 | W12 (data location shown in the consent message) |
+| US-040 | W12 |
+| US-041 | W12 |
+| US-049 | — (hosting: T-079, T-105, T-108, T-109, T-114) |
+| US-050 | O13 |
+| US-051 | — (scheduled jobs: T-104; the results show in W7, S6 and O14) |
+| US-052 | W9 |
+| US-053 | S9, M6, O3 |
+| US-054 | O14 |
+| US-042 (Phase 2) | A1 |
+| US-043 (Phase 2) | A2 |
+| US-044, US-045 (Phase 2) | Not drawn yet |
+| US-046–US-048 (Phase 3) | Not drawn yet |
+
+## UI tasks → screens
+
+Tasks that build a screen or a WhatsApp flow, and where to find them.
+
+| Task | Screens |
+|---|---|
+| T-050 Main menu list message | W1 |
+| T-051 Catalog sync | W2, O5, O12 |
+| T-052 Cart intake + add-on collection | W2, W3 |
+| T-053 Order summary, pickup/delivery, confirm | W4, W5 |
+| T-054 Table QR | W8, O8 |
+| T-036 QRIS payment request + screenshot intake | W6, S4 |
+| T-034 Unpaid-order timeout | W6, W7, S2 |
+| T-055 Order notifications + templates | W7 |
+| T-060 WhatsApp reservation flow | W10 |
+| T-061 Reservation confirmation, reminder, Reservasi Saya | W10, W11 |
+| T-066 Owner onboarding, settings, staff, menu, recipe, prices | O1, O3, O4, O5, O6 |
+| T-067 Counter order screen | S1, M2 |
+| T-068 Order board, payment review, reversal, open bills | S2, S3, S4, S5, M1, M3 |
+| T-069 Stock screens | S7, M5 |
+| T-070 Reservation/table view and cashier shift | S6, S8, M4 |
+| T-071 Owner dashboard | O2 |
+| T-072 Role-aware navigation, 360 px responsive | sidebars, M1–M6 |
+| T-073 Owner picks, best sellers | O7, W9 |
+| T-074 Recommendation product message + add to cart | W9 |
+| T-115 AI-assisted recommendations | W9 |
+| T-076 Consent and membership | W12 |
+| T-077 Data Saya flow | W12 |
+| T-100 Per-outlet WhatsApp onboarding | O12 |
+| T-101 Audit log screen | O11 |
+| T-102 Cash count report | O10 |
+| T-112 Dead-letter visibility and replay | O13 |
+| T-117 Staff clock in/out screen | S9, M6 |
+| T-118 Missing clock-out flag + grace-period setting | O3, O14, S9 |
+| T-119 Owner attendance report and corrections | O14 |
+| T-087, T-088 Phase 2 free-text order and reservation | A1, A2 |
+
+## Decisions reflected in the wireframes
+
+- Counter orders are **dine-in or takeaway** only; "walk-in" appears only as table occupancy for guests without a reservation (S6, M4).
+- AI in the MVP is limited to **Rekomendasi** (W9): read-only suggestions, an immediate "Sebentar ya…" reply, and a fallback to owner's picks + best sellers after an error or 30 seconds. Free-text ordering and booking are Phase 2 (A1, A2).
+- Staff accounts are **invite-only**; there is no public sign-up (O1, O4).
+- Attendance: a forgotten clock-out is flagged "perlu dikoreksi" without inventing a time; the owner corrects it with a required reason (S9, M6, O14).
+
+## Open points
+
+- Attendance verification (own login vs outlet QR or location check) is still open in the PRD. If a check is added, S9 and M6 need a scan or location step.
+- Phase 2 screens for US-044 (FAQ, upsell) and US-045 (forecast, restock suggestions), and all Phase 3 screens, are not drawn yet.
