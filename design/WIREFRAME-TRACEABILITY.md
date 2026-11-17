@@ -2,7 +2,7 @@
 
 This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME-POS-Wireframe.figcraft) to the user stories in [User-Stories-SME-Automation-Platform.md](../User-Stories-SME-Automation-Platform.md) and the tasks in [Task-Breakdown-SME-Automation-Platform.md](../Task-Breakdown-SME-Automation-Platform.md).
 
-- **Baseline:** PRD v0.12, US-001–US-056, T-001–T-124.
+- **Baseline:** PRD v0.13, US-001–US-056, T-001–T-124.
 - **Open the file:** FigCraft (`figcraft SME-POS-Wireframe.figcraft`). PNG previews of each page are in [`previews/`](previews/).
 - **Labels:** every screen on the canvas has a label above it in the form `Code · Name — US-xxx · T-xxx`, matching the tables below.
 - **Fidelity:** low-to-mid fidelity wireframes. The colours follow the agreed reference (light sidebar, navy primary `#1E4FA3`, light-blue background `#F3F6FB`). Copy is in Bahasa Indonesia, as in the product.
@@ -194,7 +194,7 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-118 Missing clock-out flag + grace-period setting | O3, O14, S9 |
 | T-119 Owner attendance report, selfies and corrections | O14 |
 | T-121 Outlet attendance tablet pairing and device session | K0, K4, O3 |
-| T-122 Selfie storage, signed links, 90-day deletion | K2, K3, O14, S9 |
+| T-122 Selfie storage, signed links, 30-day deletion | K2, K3, O14, S9 |
 | T-087, T-088 Phase 2 free-text order and reservation | A1, A2 |
 
 ## Decisions reflected in the wireframes
@@ -202,10 +202,10 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 - Counter orders are **dine-in or takeaway** only; "walk-in" appears only as table occupancy for guests without a reservation (S6, M4).
 - AI in the MVP is limited to **Rekomendasi** (W9): read-only suggestions, an immediate "Sebentar ya…" reply, and a fallback to owner's picks + best sellers after an error or 30 seconds. Free-text ordering and booking are Phase 2 (A1, A2).
 - Staff accounts are **invite-only**; there is no public sign-up (O1, O4).
-- Attendance is recorded only on the outlet's paired tablet (K0–K4): the staff member taps their name and takes a required selfie, so they must be at the outlet. Staff phones and the admin app only show their own history (S9, M6). Selfies are private, visible to the owner and the staff member, and deleted after 90 days.
-- A forgotten clock-out is flagged "perlu dikoreksi" without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
+- Attendance is recorded only on the outlet's paired tablet (K0–K4): the staff member taps their name and takes a required selfie, so they must be at the outlet. Staff phones and the admin app only show their own history (S9, M6). No PIN is needed. Selfies are private, visible to the owner and the staff member, and deleted after 30 days.
+- A forgotten clock-out is flagged "perlu dikoreksi" 1 hour after closing time (default) without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
 
 ## Open points
 
-- Still open in the PRD: selfie retention (90 days proposed), whether staff also enter a short PIN on the tablet, and the 2-hour grace period.
+- Busy, quiet, and crowded thresholds on O2 are placeholders; the final values will be set during development (T-123).
 - Phase 2 screens for US-044 (FAQ, upsell) and US-045 (forecast, restock suggestions), and all Phase 3 screens, are not drawn yet.

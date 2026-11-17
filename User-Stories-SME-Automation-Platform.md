@@ -668,13 +668,13 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 - **Fase/Prioritas:** MVP (Phase 1 dan pilot) / P0
 - **Acceptance criteria:**
   - Clock in dan clock out hanya bisa dilakukan di tablet absensi outlet (US-055); waktu ditampilkan dalam zona waktu outlet.
-  - Di tablet, staf memilih namanya dari daftar staf yang ditugaskan ke outlet itu, lalu mengambil selfie dengan kamera depan; catatan hanya tersimpan bersama foto tersebut.
+  - Di tablet, staf memilih namanya (tanpa PIN) dari daftar staf yang ditugaskan ke outlet itu, lalu mengambil selfie dengan kamera depan; catatan hanya tersimpan bersama foto tersebut.
   - Jika kamera tidak tersedia atau foto dibatalkan, tidak ada yang tercatat dan tablet meminta selfie ulang.
   - Satu staf hanya memiliki satu catatan terbuka; clock in kedua ditolak. Staf yang tidak ditugaskan ke outlet itu tidak muncul di daftar, dan permintaan API langsung untuk outlet lain ditolak.
   - Clock in atau clock out dari HP staf sendiri atau admin app tidak tersedia; di admin app staf hanya melihat riwayatnya sendiri, termasuk selfie-nya.
   - Clock out tanpa catatan terbuka ditolak; setelah clock out, durasi ditampilkan.
-  - Sebelum clock in pertama, staf melihat pemberitahuan bahwa selfie disimpan 90 hari dan hanya dilihat owner dan dirinya sendiri.
-  - Jika staf belum clock out sampai jam tutup outlet ditambah masa tenggang (default 2 jam, diatur owner per outlet), catatan ditandai "perlu dikoreksi". Sistem tidak mengarang jam pulang, jam kerjanya belum dihitung, dan staf dapat clock in lagi.
+  - Sebelum clock in pertama, staf melihat pemberitahuan bahwa selfie disimpan 30 hari dan hanya dilihat owner dan dirinya sendiri.
+  - Jika staf belum clock out sampai jam tutup outlet ditambah masa tenggang (default 1 jam, diatur owner per outlet), catatan ditandai "perlu dikoreksi". Sistem tidak mengarang jam pulang, jam kerjanya belum dihitung, dan staf dapat clock in lagi.
   - Staf hanya melihat catatan kehadirannya sendiri.
 - **Traceability:** FR5.1, FR5.3, FR5.7, AC5.1–AC5.3, AC5.5, AC5.6, AC5.8
 
