@@ -9,6 +9,7 @@ This backlog breaks down the 48 user stories in [User-Stories-SME-Automation-Pla
 - Phase 2 agent features can only call validated application tools; they cannot write directly to stock or ledger tables.
 - Tasks in the same wave can run in parallel after their dependencies are complete.
 - `P0` is required for the relevant release; `P1` is important follow-up work; `P2` is expansion.
+- Task IDs are stable. Tasks added after the first version use T-100 and up, and some tasks moved to a different wave; IDs were not renumbered so existing tracker issues keep their keys.
 
 ## Wave 0 — Product and technical foundation
 
@@ -23,6 +24,10 @@ This backlog breaks down the 48 user stories in [User-Stories-SME-Automation-Pla
 | T-007 | Build shared money, tax, rounding, inventory-unit, and local-timezone utilities. | US-011, US-012, US-019, US-022 | T-001, T-004 | P0 |
 | T-008 | Create a standard actor/audit context for named users, system jobs, and `agent`, including timestamp and reason fields. | US-004, US-006, US-016, US-030 | T-004, T-006 | P0 |
 | T-009 | Add CI checks, migration checks, unit-test framework, API contract checks, and seed data for local development. | All | T-003, T-004 | P0 |
+| T-079 | Provision Indonesia-region database, backups, and object storage (menu photos, QRIS images, payment screenshots) for every environment. | US-039 | T-003 | P0 |
+| T-104 | Build scheduled/delayed job infrastructure (e.g. RabbitMQ delayed messages or a DB-backed scheduler) with at-least-once delivery, idempotent handlers, and late-job handling; used for unpaid-order timeout, reservation reminders, no-show release, and anonymization. | US-021, US-025, US-027, US-041 | T-003, T-004 | P0 |
+| T-105 | Set up infrastructure as code, a staging environment in an Indonesia region, container builds, and continuous deployment with migration steps and rollback. | US-038, US-039 | T-003, T-009, T-079 | P0 |
+| T-106 | Draft the customer privacy notice (PDP Law) with legal review and publish it at a stable URL per tenant. | US-040 | T-001 | P0 |
 
 ## Wave 1 — Tenant, outlet, staff, and configuration
 
@@ -32,14 +37,15 @@ This backlog breaks down the 48 user stories in [User-Stories-SME-Automation-Pla
 | T-011 | Implement outlet CRUD and configuration for address, hours, timezone, WhatsApp number, delivery fee, PB1, payment mode, reservation settings, and QRIS. | US-002, US-019, US-022 | T-005, T-007 | P0 |
 | T-012 | Implement owner-created staff accounts, outlet assignments, deactivation, and login/session rejection after deactivation. | US-003 | T-006, T-011 | P0 |
 | T-013 | Implement permission matrix for owner and staff actions at both API and UI route levels. | US-003, US-033 | T-006, T-012 | P0 |
-| T-014 | Implement secure QRIS image upload, storage metadata, replacement, and outlet-level access. | US-017 | T-011 | P0 |
+| T-014 | Implement secure QRIS image upload, storage metadata, replacement, and outlet-level access. | US-017 | T-011, T-079 | P0 |
 | T-015 | Add API and integration tests for cross-tenant and cross-outlet access attempts, including direct API requests. | US-002, US-003, US-038 | T-005, T-006, T-013 | P0 |
+| T-084 | Create the Meta template library and submit order-update, auto-cancellation, payment-rejected, payment-request, reservation-confirmation, and reservation-reminder templates as early as possible, since Meta's review is outside our control. Keep template names and parameters in a shared registry used by T-055. | US-015, US-021, US-025 | T-001 | P0 |
 
 ## Wave 2 — Menu, add-ons, recipes, and inventory
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-016 | Implement menu item CRUD with required photo, description, active/inactive state, and shared tenant-level data. | US-005 | T-004, T-006 | P0 |
+| T-016 | Implement menu item CRUD with required photo, description, active/inactive state, and shared tenant-level data. | US-005 | T-004, T-006, T-079 | P0 |
 | T-017 | Implement add-on groups and options with required/optional selection rules, price delta, recipe delta, and a maximum of 10 options. | US-005, US-011 | T-016, T-007 | P0 |
 | T-018 | Implement outlet-specific prices for menu items and add-on options. | US-002, US-005 | T-011, T-016, T-017 | P0 |
 | T-019 | Implement ingredients, units, low-stock thresholds, and menu/add-on recipes. | US-006, US-007 | T-016, T-017 | P0 |
@@ -47,7 +53,8 @@ This backlog breaks down the 48 user stories in [User-Stories-SME-Automation-Pla
 | T-021 | Implement transactional recipe expansion and stock deduction/return, including add-ons and row-level/concurrency protection. | US-006, US-014, US-021 | T-019, T-020 | P0 |
 | T-022 | Implement stock projection, low-stock warnings, sold-out calculation, and outlet-specific availability. | US-007, US-010, US-028 | T-020, T-021 | P0 |
 | T-023 | Add tests for exact recipe quantities, add-on ingredient changes, no negative stock, immutable movements, and sold-out recovery after restock. | US-005–US-007, US-014 | T-020–T-022 | P0 |
-| T-024 | Seed editable sample menu, sample photos, prices, and add-ons for every new tenant/outlet. | US-008 | T-016–T-018 | P0 |
+| T-024 | Seed editable sample menu, sample photos, prices, and add-ons for every new tenant/outlet. | US-008 | T-016–T-018, T-107 | P0 |
+| T-107 | Prepare sample menu content: items, descriptions, recipes, add-ons, and photos with usage rights that meet Meta catalog image rules. | US-008 | T-001 | P1 |
 
 ## Wave 3 — Order and bill domain
 
@@ -62,17 +69,15 @@ This backlog breaks down the 48 user stories in [User-Stories-SME-Automation-Pla
 | T-031 | Implement status transition validation and immutable order event history with actor, timestamp, and reason where required. | US-004, US-016 | T-008, T-030 | P0 |
 | T-032 | Implement cancellation and paid-order reversal workflows, including stock return versus waste behavior and refund ledger hooks. | US-004, US-021 | T-020, T-030, T-031 | P0 |
 | T-033 | Implement open bills per table or guest name, one open bill per table, order attachment, running total, duration, and full-bill close. | US-020 | T-025, T-027, T-030 | P0 |
-| T-034 | Implement configurable unpaid-order timeout, screenshot timer pause, automatic cancellation, stock reversal, and customer notification. | US-015, US-021 | T-030, T-032, T-047 | P0 |
-| T-035 | Add concurrency and transition tests for last-stock orders, invalid status changes, open-bill uniqueness, and mode changes preserving existing order flow. | US-014, US-016, US-020 | T-028–T-034 | P0 |
+| T-035 | Add concurrency and transition tests for last-stock orders, invalid status changes, open-bill uniqueness, and mode changes preserving existing order flow. | US-014, US-016, US-020 | T-028–T-033 | P0 |
 
 ## Wave 4 — Payments, cashier shifts, ledger, and reports
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-036 | Implement QRIS payment instruction message with outlet QRIS image, exact total, and screenshot request. | US-017 | T-014, T-027 | P0 |
-| T-037 | Implement payment screenshot attachment, staff payment-review queue, merchant-account confirmation, and paid action. | US-017 | T-036, T-030 | P0 |
+| T-037 | Implement the payment-proof model, `proof_submitted` payment status, staff payment-review queue, merchant-account confirmation step, mark-paid action, and reject-proof action (required reason, immediate cancellation with stock reversal, no ledger entry, customer notification hook); actor and time recorded on both. Customer screenshot intake from WhatsApp is in T-036. | US-017 | T-014, T-030, T-032 | P0 |
 | T-038 | Implement cash payment capture, payment-method validation, amount received, change due, and online cash restriction. | US-018 | T-025, T-027 | P0 |
-| T-039 | Implement cashier shift open/close, starting cash, one active shift per drawer, and payment/refund linkage. | US-018 | T-038 | P0 |
+| T-039 | Implement owner-configured cash drawers per outlet (one created by default with each outlet), cashier shift open/close per drawer, starting cash, one active shift per drawer, and payment/refund linkage. | US-018 | T-038 | P0 |
 | T-040 | Implement blind end-of-shift cash count, expected-cash calculation, difference, actor tracking, and shortage/surplus ledger entries. | US-018, US-030 | T-039 | P0 |
 | T-041 | Implement append-only ledger posting for revenue, PB1, delivery fee, cash/QRIS payment, refund, expense, cash difference, and reversal. | US-019, US-030 | T-008, T-027, T-032, T-037–T-040 | P0 |
 | T-042 | Implement owner-only manual expense entry with outlet, amount, description, date, and actor. | US-031 | T-006, T-041 | P0 |
@@ -84,17 +89,20 @@ This backlog breaks down the 48 user stories in [User-Stories-SME-Automation-Pla
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
 | T-045 | Configure Meta WhatsApp Cloud API/BSP credentials, webhook verification, signature validation, and outlet-number mapping. | US-002, US-036 | T-011 | P0 |
+| T-100 | Build per-outlet WhatsApp onboarding: Meta Embedded Signup or BSP flow, business verification status, phone number registration, catalog creation and linking, and setup status shown to the owner. | US-002, US-036 | T-011, T-045 | P0 |
 | T-046 | Implement inbound webhook persistence and RabbitMQ publishing with immediate acknowledgement. | US-036 | T-045, T-008 | P0 |
 | T-047 | Implement outbound WhatsApp worker, retry policy, failure handling, and dead-letter visibility. | US-015, US-036 | T-046 | P0 |
 | T-048 | Implement processed-message store and idempotent worker behavior for webhook retries and RabbitMQ redelivery. | US-037 | T-046 | P0 |
 | T-049 | Implement conversation state for main menu, active order, active reservation, and safe restart/recovery behavior. | US-009–US-011, US-023 | T-046, T-048 | P0 |
-| T-050 | Implement main menu buttons: Pesan, Rekomendasi, and conditional Reservasi. | US-009 | T-049 | P0 |
-| T-051 | Implement catalog sync for item metadata, photos, outlet prices, active state, and unavailable/sold-out state. | US-008, US-010 | T-016–T-018, T-022, T-047 | P0 |
+| T-050 | Implement the main menu list message (Pesan, Rekomendasi, Data Saya, plus Reservasi and Reservasi Saya when reservations are enabled) and the "menu" keyword that returns to it from any flow without creating anything. | US-009 | T-049 | P0 |
+| T-051 | Implement catalog sync for item metadata, photos, outlet prices, active state, and unavailable/sold-out state. | US-008, US-010 | T-016–T-018, T-022, T-047, T-100 | P0 |
 | T-052 | Implement catalog cart intake and post-cart add-on collection through reply buttons/list messages. | US-010, US-011 | T-017, T-049, T-051 | P0 |
 | T-053 | Implement WhatsApp order summary, pickup/delivery selection, address capture, explicit confirmation, and order creation call. | US-011, US-012, US-014 | T-026–T-029, T-049, T-052 | P0 |
 | T-054 | Implement table QR generation with outlet number, table identifier, and optional rotating token validation. | US-013 | T-011, T-045 | P0 |
-| T-055 | Implement order confirmation, status notifications, shared notification templates, and approved-template selection outside the 24-hour window. | US-015, US-025 | T-047, T-053 | P0 |
-| T-056 | Add end-to-end WhatsApp tests for online, table QR, pickup, delivery, add-ons, sold-out confirmation, duplicate messages, and template fallback. | US-009–US-015, US-037 | T-048–T-055 | P0 |
+| T-036 | Implement the QRIS payment request (outlet QRIS image, exact total, screenshot request) and inbound screenshot intake: download Meta media to storage, attach it to the order via T-037, and stop the unpaid timer. | US-017 | T-014, T-027, T-037, T-047, T-049 | P0 |
+| T-034 | Implement configurable unpaid-order timeout, screenshot timer pause, automatic cancellation, stock reversal, and customer notification. | US-015, US-021 | T-030, T-032, T-036, T-047, T-104 | P0 |
+| T-055 | Implement order confirmation, status notifications, shared notification templates, and approved-template selection outside the 24-hour window. | US-015, US-025 | T-047, T-053, T-084 | P0 |
+| T-056 | Add end-to-end WhatsApp tests for online, table QR, pickup, delivery, add-ons, sold-out confirmation, duplicate messages, unpaid timeout, and template fallback. | US-009–US-015, US-037 | T-034, T-036, T-048–T-055 | P0 |
 
 ## Wave 6 — Reservations and tables
 
@@ -104,40 +112,41 @@ This backlog breaks down the 48 user stories in [User-Stories-SME-Automation-Pla
 | T-058 | Implement timezone-aware availability calculation and smallest-fitting-table assignment. | US-022, US-023 | T-007, T-057 | P0 |
 | T-059 | Add database-level exclusion/locking rule preventing overlapping reservations, including concurrent requests. | US-024 | T-057, T-058 | P0 |
 | T-060 | Implement structured WhatsApp reservation flow: party size, date, available time, review, and confirmation. | US-023 | T-049, T-058, T-059 | P0 |
-| T-061 | Implement reservation confirmation, reminder scheduling, cancellation, and reschedule cutoff enforcement. | US-025 | T-055, T-060 | P0 |
+| T-061 | Implement reservation confirmation, reminder scheduling, and the Reservasi Saya flow (list upcoming bookings, cancel, reschedule) with cutoff enforcement. | US-025 | T-055, T-060, T-104 | P0 |
 | T-062 | Implement staff reservation board with phone/in-person booking, table reassignment, seated/completed/cancelled/no-show states, and event audit. | US-026 | T-006, T-057, T-060 | P0 |
 | T-063 | Implement walk-in table occupancy and availability blocking. | US-027 | T-057, T-058, T-062 | P0 |
-| T-064 | Implement 15-minute post-booking hold, automatic no-show, table release, and seated-before-deadline behavior. | US-027 | T-061, T-062 | P0 |
+| T-064 | Implement 15-minute post-booking hold, automatic no-show, table release, and seated-before-deadline behavior. | US-027 | T-061, T-062, T-104 | P0 |
 | T-065 | Add reservation tests for capacity limits, timezone display, double-booking, reminders, cutoff, walk-ins, reassignment, and no-show release. | US-022–US-027 | T-057–T-064 | P0 |
 
 ## Wave 7 — Admin application and recommendations
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-066 | Build owner onboarding, outlet settings, staff management, QRIS upload, menu, add-on, recipe, and price screens. | US-001–US-006, US-017, US-019 | T-010–T-019 | P0 |
-| T-067 | Build staff counter order screen with dine-in, takeaway, walk-in, add-ons, table selection, payment, and order submission. | US-034 | T-026–T-030, T-038 | P0 |
-| T-068 | Build order board with payment review, lifecycle actions, cancellation/reversal, and open-bills view. | US-016–US-021 | T-030–T-044 | P0 |
+| T-066 | Build owner onboarding, outlet settings (including cash drawers), staff management, QRIS upload, menu, add-on, recipe, and price screens. | US-001–US-006, US-017, US-019 | T-010–T-019 | P0 |
+| T-067 | Build staff counter order screen with dine-in, takeaway, walk-in, add-ons, table selection, payment, and order submission. | US-034 | T-026–T-030, T-033, T-038, T-039, T-057 | P0 |
+| T-068 | Build order board with payment review, lifecycle actions, cancellation/reversal, and open-bills view. | US-016–US-021 | T-030–T-033, T-037–T-039 | P0 |
 | T-069 | Build stock, stock movement, low-stock, and sold-out screens. | US-006, US-007 | T-020–T-023 | P0 |
 | T-070 | Build reservation/table view and cashier shift screens. | US-018, US-026, US-027 | T-039, T-062–T-064 | P0 |
 | T-071 | Build owner dashboard for outlet-level and combined sales, cashflow, PB1, payment method, and stock summaries. | US-032, US-033 | T-041–T-043 | P0 |
 | T-072 | Build role-aware navigation and responsive layouts for 360 px mobile width through desktop. | US-003, US-033, US-035 | T-006, T-066–T-071 | P0 |
-| T-073 | Implement owner picks and tags, outlet best-seller query for the last 30 days, sold-out filtering, de-duplication, and 30-item limit. | US-028 | T-016, T-022, T-041 | P0 |
+| T-073 | Implement owner picks and tags, outlet best-seller query for the last 30 days, sold-out filtering, de-duplication, and 30-item limit. | US-028 | T-016, T-022, T-026 | P0 |
 | T-074 | Implement WhatsApp recommendation product messages and add-to-cart handoff. | US-029 | T-051, T-073, T-052 | P0 |
-| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074 | P0 |
+| T-101 | Build the owner audit log screen for order reversals and status changes, filterable by outlet, staff member, and date, showing order, actor, time, and reason. | US-004 | T-031, T-032, T-066 | P0 |
+| T-102 | Build the owner cash count report: every shift's starting cash, expected cash, counted cash, difference, and who counted, per outlet. | US-018 | T-040, T-071 | P0 |
+| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102 | P0 |
 
 ## Wave 8 — Membership, compliance, and MVP hardening
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-076 | Implement customer/contact, consent, privacy-notice link, and business-wide membership state across outlets. | US-040 | T-004, T-045, T-049 | P0 |
-| T-077 | Implement WhatsApp opt-out flow and delete/anonymize personal data without changing orders, ledger, or stock history. | US-041 | T-076, T-041 | P0 |
-| T-078 | Ensure personal data is absent from append-only ledger and stock tables; add automated privacy regression tests. | US-040, US-041 | T-077 | P0 |
-| T-079 | Provision Indonesia-region database, backup, object storage, and payment-screenshot storage. | US-039 | T-003, T-014 | P0 |
+| T-076 | Implement customer/contact, consent, privacy-notice link, and business-wide membership state across outlets. | US-040 | T-004, T-045, T-049, T-106 | P0 |
+| T-077 | Implement the Data Saya flow (membership status, end membership) and delete/anonymize personal data without changing orders, ledger, or stock history. | US-041 | T-076, T-041 | P0 |
+| T-103 | Implement the scheduled anonymization job for customers who declined membership, run once their order is completed/cancelled or their booking is finished. | US-040, US-041 | T-076, T-077, T-104 | P0 |
+| T-078 | Ensure personal data is absent from append-only ledger and stock tables; add automated privacy regression tests. | US-040, US-041 | T-077, T-103 | P0 |
 | T-080 | Add security hardening: secret management, token expiry, webhook verification, upload validation, rate limiting, and audit-log protection. | US-003, US-036, US-038, US-039 | T-006, T-008, T-014, T-045 | P0 |
 | T-081 | Add queue metrics, structured logs, correlation IDs, retry/DLQ dashboards, and alerts for failed messages/catalog updates. | US-008, US-036, US-037 | T-047, T-048 | P0 |
-| T-082 | Run performance, concurrency, tenant-isolation, backup-restore, and failure-recovery tests against MVP acceptance criteria. | US-014, US-024, US-030, US-037–US-039 | T-015, T-035, T-044, T-056, T-065, T-075, T-078–T-081 | P0 |
+| T-082 | Run performance, concurrency, tenant-isolation, backup-restore, and failure-recovery tests against MVP acceptance criteria. | US-014, US-024, US-030, US-037–US-039 | T-015, T-035, T-044, T-056, T-065, T-075, T-078, T-080, T-081, T-103, T-105 | P0 |
 | T-083 | Execute full UAT with owner, cashier/waiter, and customer scenarios; triage defects and produce release checklist. | All MVP stories | T-082 | P0 |
-| T-084 | Create Meta template library and submit order-update, reservation-confirmation, and reservation-reminder templates early enough for approval. | US-015, US-025 | T-055 | P0 |
 
 ## MVP release gates
 
@@ -180,15 +189,23 @@ The MVP is ready for release only when:
 
 The shortest dependency path to a usable MVP is:
 
-`T-001 → T-004 → T-005/T-006 → T-016–T-022 → T-025–T-031 → T-036–T-044 → T-045–T-056 → T-057–T-065 → T-066–T-075 → T-076–T-084`
+`T-001 → T-004 → T-005/T-006 → T-016–T-022 → T-025–T-033 → T-037–T-041 → T-045–T-053 → T-036/T-034 → T-055 → T-066–T-072 → T-076–T-078/T-103 → T-082 → T-083`
+
+Two external dependencies run alongside it and can block release regardless of engineering progress, so start them early:
+
+- Meta template approval (T-084), started in Wave 1.
+- Per-outlet WhatsApp number and catalog onboarding (T-100), including Meta business verification.
 
 The following work can proceed in parallel once the foundation is ready:
 
+- Platform and infrastructure: T-079, T-104, T-105
 - Tenant/staff administration: T-010–T-015
 - Menu and inventory: T-016–T-024
 - Admin shell and screens: T-066–T-072
-- WhatsApp infrastructure: T-045–T-049
-- Reservation domain: T-057–T-059
+- WhatsApp infrastructure: T-045–T-049, T-100
+- Reservations: T-057–T-065 (not on the order critical path; needs T-055 and T-104 only for reminders and no-show release)
+- Recommendations: T-073–T-074
+- Legal and content: T-106, T-107
 
 ## Suggested issue labels
 

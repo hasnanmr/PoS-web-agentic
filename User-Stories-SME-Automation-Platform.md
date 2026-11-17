@@ -28,8 +28,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Setiap outlet memiliki alamat, jam buka, zona waktu, nomor WhatsApp, katalog, tabel, QRIS, pengaturan reservasi, PB1, mode pembayaran dine-in, dan biaya delivery flat sendiri.
-  - Harga, add-on, resep, dan owner's picks dapat digunakan bersama oleh seluruh outlet.
+  - Setiap outlet memiliki alamat, jam buka, zona waktu, nomor WhatsApp, katalog, meja, cash drawer, QRIS, pengaturan reservasi, PB1, mode pembayaran dine-in, dan biaya delivery flat sendiri.
+  - Item menu, add-on, resep, dan owner's picks digunakan bersama oleh seluruh outlet; harga item dan opsi add-on diatur per outlet.
   - Perubahan pengaturan outlet A tidak memengaruhi outlet B.
 - **Traceability:** FR1.2, FR2.10, AC1.2, AC2.11
 
@@ -70,7 +70,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Setiap grup add-on memiliki maksimal 10 opsi.
   - Grup dapat bersifat required/optional dan memilih satu atau beberapa opsi.
   - Harga dan ketersediaan mengikuti outlet tempat order dibuat.
-- **Traceability:** FR4.1, FR4.6, FR4.8, FR4.9, AC4.5–AC4.8
+- **Traceability:** FR2.11, FR4.1, FR4.8, FR4.9, AC4.5, AC4.6, AC4.8
 
 ### US-006 — Mengelola resep dan pergerakan stok
 
@@ -112,13 +112,15 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 ### US-009 — Menampilkan menu utama WhatsApp
 
-**Sebagai** pelanggan, **saya ingin** melihat pilihan Pesan, Rekomendasi, dan Reservasi dari chat outlet, **sehingga** saya dapat memilih kebutuhan saya dengan cepat.
+**Sebagai** pelanggan, **saya ingin** melihat semua pilihan layanan dari chat outlet, **sehingga** saya dapat memilih kebutuhan saya dengan cepat.
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Outlet dengan reservasi aktif menampilkan tepat tiga pilihan: `Pesan`, `Rekomendasi`, `Reservasi`.
-  - Outlet tanpa reservasi hanya menampilkan `Pesan` dan `Rekomendasi`.
-- **Traceability:** FR2.0, AC2.1
+  - Menu utama berupa list message.
+  - Outlet dengan reservasi aktif menampilkan tepat: `Pesan`, `Rekomendasi`, `Reservasi`, `Reservasi Saya`, `Data Saya`.
+  - Outlet tanpa reservasi hanya menampilkan `Pesan`, `Rekomendasi`, dan `Data Saya`.
+  - Mengetik "menu" kapan saja menampilkan menu utama lagi tanpa membuat apa pun dari alur yang belum selesai.
+- **Traceability:** FR2.0, AC2.1, AC2.14
 
 ### US-010 — Menjelajah katalog dan membuat cart
 
@@ -209,9 +211,11 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 - **Acceptance criteria:**
   - Bot mengirim gambar QRIS outlet, total tepat termasuk PB1, dan meminta screenshot.
   - Screenshot dilampirkan ke order dan membuat order menunggu pemeriksaan.
+  - Setelah screenshot masuk, payment status menjadi `proof_submitted`.
   - Staf hanya dapat menandai paid setelah mengecek transaksi di akun merchant QRIS, bukan berdasarkan screenshot saja.
   - Ledger dibuat saat payment ditandai paid dan menyimpan aktor serta waktu.
-- **Traceability:** FR11.1–FR11.3, AC11.1–AC11.3
+  - Jika dana tidak ditemukan, staf menolak bukti bayar dengan alasan wajib; order langsung dibatalkan, bahan dikembalikan dengan reversal movement, tidak ada ledger entry, dan pelanggan diberi tahu untuk menghubungi outlet.
+- **Traceability:** FR10.1, FR11.1–FR11.3, FR11.10, AC11.1–AC11.3, AC11.9
 
 ### US-018 — Menerima pembayaran cash dan mengelola shift kasir
 
@@ -221,9 +225,11 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 - **Acceptance criteria:**
   - Counter dan dine-in dapat memilih cash atau QRIS; online tidak menawarkan cash.
   - Pembayaran cash meminta nominal diterima dan menampilkan kembalian.
-  - Cash hanya dapat diterima jika shift kasir terbuka; satu drawer hanya memiliki satu shift aktif.
+  - Owner mengatur cash drawer per outlet; outlet baru otomatis memiliki satu drawer.
+  - Cash hanya dapat diterima jika shift kasir terbuka; satu drawer hanya memiliki satu shift aktif, dan setiap drawer dihitung terpisah di akhir shift.
   - End-of-shift menggunakan blind count, membandingkan cash aktual dengan ekspektasi, mencatat selisih dan penghitung, lalu mem-post shortage/surplus ke ledger.
-- **Traceability:** FR11.4, FR11.6–FR11.8, AC11.4, AC11.6–AC11.8
+  - Owner dapat melihat laporan cash count setiap shift beserta selisihnya.
+- **Traceability:** FR11.4, FR11.6–FR11.8, AC11.4, AC11.6–AC11.8, AC11.10
 
 ### US-019 — Menghitung PB1 dengan benar
 
@@ -305,7 +311,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 - **Acceptance criteria:**
   - Konfirmasi dikirim segera dengan outlet, tanggal, waktu, dan party size.
   - Reminder dikirim sesuai konfigurasi outlet; pesan di luar jendela 24 jam memakai template Meta.
-  - Pembatalan/reschedule diizinkan sampai cancellation cutoff.
+  - Pembatalan/reschedule dilakukan dari `Reservasi Saya` di menu utama dan diizinkan sampai cancellation cutoff.
   - Setelah cutoff, bot menolak perubahan dan mengarahkan pelanggan menghubungi outlet.
 - **Traceability:** FR9.4–FR9.5, AC9.5–AC9.6
 
@@ -425,7 +431,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Counter, order board, open bills, stok, dan reservasi dapat digunakan pada viewport 360 px.
   - Tidak ada tindakan utama yang memerlukan horizontal scrolling.
   - MVP membutuhkan koneksi internet dan tidak menyediakan offline mode.
-- **Traceability:** FR7.3, NFR7, AC7.2
+- **Traceability:** FR7.3, NFR7, AC7.2, ACN9
 
 ## Epic H — WhatsApp, keamanan, dan ketahanan sistem
 
@@ -463,7 +469,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Endpoint FastAPI selain webhook menolak token hilang, invalid, atau expired.
   - Record operasional membawa tenant_id dan outlet_id.
   - Service API dan worker bersifat stateless, containerized, memakai pooled PostgreSQL connections, dan dapat diskalakan tanpa redesign schema/arsitektur.
-- **Traceability:** NFR2, NFR5, ACN2, ACN6
+- **Traceability:** NFR2, NFR5, NFR6, ACN2, ACN6, ACN8
 
 ### US-039 — Memenuhi data residency dan auditability
 
@@ -496,6 +502,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
+  - Membership dapat diakhiri dari `Data Saya` di menu utama.
   - Nama, nomor WhatsApp, alamat, dan data personal lain dihapus atau dianonimkan.
   - Order, total ledger, dan riwayat keuangan tetap utuh dengan customer anonim.
   - Data personal hanya disimpan pada customer tables, bukan ledger atau stock movement.
@@ -584,7 +591,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Tenant dapat menggunakan tipe bisnis dropshipper.
   - Sistem menyediakan integrasi yang direncanakan untuk Shopee, Tokopedia, dan TikTok Shop.
   - Order marketplace memakai prinsip auditability, tenant isolation, dan duplicate-safe processing yang sama.
-- **Traceability:** FR1.1, Scope, FR5/Phase 3, roadmap Phase 3
+- **Traceability:** FR1.1, Scope item 15, §10 Phase 3
 
 ## Traceability ringkas
 
@@ -602,7 +609,14 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | FR10 Order lifecycle | US-004, US-015–US-021, US-034 |
 | FR11 Payments & tax | US-017–US-020, US-047 |
 | FR12 Membership & consent | US-040–US-041 |
-| NFR1–NFR8 | US-030, US-036–US-039, US-014 |
+| NFR1 Data residency | US-039 |
+| NFR2 Multi-tenancy | US-038 |
+| NFR3 Auditability | US-030, US-039 |
+| NFR4 Reliability | US-008, US-036 |
+| NFR5 Security | US-038 |
+| NFR6 Scalability | US-038 |
+| NFR7 Connectivity | US-035 |
+| NFR8 Duplicate-safe processing | US-014, US-037 |
 
 ## Definition of Done umum
 

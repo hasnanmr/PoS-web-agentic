@@ -1,12 +1,13 @@
 # Product Requirements Document (PRD)
 ## [Product Name TBD] — SME Business Automation Platform (Indonesia)
 
-**Status:** Draft v0.6
-**Date:** September 13, 2026
+**Status:** Draft v0.7
+**Date:** November 17, 2026
 **Prepared by:** Hasnan
 **Market:** Indonesia (UMKM — restaurants and cafes first; marketplace dropshippers in Phase 3)
 
 **Change log**
+- **v0.7** — Staff can reject a payment proof when the money hasn't arrived; the order is then cancelled straight away. Added payment status `proof_submitted`. The WhatsApp main menu is now a list message that includes My Reservations and My Data, and typing "menu" brings it back at any time. Cash drawers are configured per outlet (one by default), and each cashier shift belongs to one drawer. How PB1 is calculated on open bills is an open question. Added acceptance criteria for NFR6 (scalability) and NFR7 (connectivity). Pooled database connections and queue monitoring are now part of the MVP, not Phase 3. Agent restock and cashflow suggestions must show the data behind them, and suggested staff schedules only take effect once the owner approves.
 - **v0.6** — Added Given/When/Then acceptance criteria for every MVP requirement, the non-functional requirements, and the Phase 2 agent guardrails. The AI agent can never restock or reorder on its own. Delivery uses a flat fee per outlet. Unpaid-order timer stops once the customer sends payment proof.
 - **v0.5** — Dine-in payment mode (pay first or open bill) is set per outlet by the owner. MVP starts every tenant with a sample menu pushed to the WhatsApp catalog. Added end-of-shift cash count, a 15-minute table hold for reservations, and ordering for non-members. Split bills and reservation deposits are out of scope.
 - **v0.4** — WhatsApp ordering moved to the WhatsApp catalog, with one WhatsApp number and catalog per outlet. Added open bills for dine-in, cash payments, per-outlet prices, menu add-ons, and duplicate-safe message processing.
@@ -104,7 +105,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 
 ### 5.1 Business, outlets & staff
 - **FR1.1** — System shall onboard a new tenant business with a profile (name, type: restaurant/cafe). The dropshipper type is Phase 3. *[Deterministic · MVP]*
-- **FR1.2** — A tenant has one or more outlets. Each outlet has its own address, opening hours, time zone, WhatsApp number and catalog, menu prices, dine-in payment mode, flat delivery fee, PB1 setting, static QRIS code, tables, stock levels, and reservation settings. Menu items, add-ons, recipes, and owner's picks are shared across the tenant's outlets. *[Deterministic · MVP]*
+- **FR1.2** — A tenant has one or more outlets. Each outlet has its own address, opening hours, time zone, WhatsApp number and catalog, menu prices, dine-in payment mode, flat delivery fee, PB1 setting, static QRIS code, cash drawers, tables, stock levels, and reservation settings. Menu items, add-ons, recipes, and owner's picks are shared across the tenant's outlets. *[Deterministic · MVP]*
 - **FR1.3** — Owner creates a staff account using a dedicated email address the owner has set up for that staff member, assigns it to one or more outlets, and can deactivate it. Staff cannot self-register. *[Deterministic · MVP]*
 - **FR1.4** — Staff log in with that email and a password, and only see data for the outlets they are assigned to. *[Deterministic · MVP]*
 - **FR1.5** — Access is role-based (owner vs. staff), as shown in the table below. *[Deterministic · MVP]*
@@ -113,14 +114,14 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 | Action | Owner | Staff |
 |---|---|---|
 | Enter orders at the counter and move orders through their statuses | ✓ | ✓ |
-| Open and close bills; take cash payments and mark QRIS payments as received | ✓ | ✓ |
+| Open and close bills; take cash payments; mark QRIS payments as received or reject the payment proof | ✓ | ✓ |
 | Open and close a cashier shift, including the end-of-shift cash count | ✓ | ✓ |
 | Record stock movements (restock, waste, adjustment) | ✓ | ✓ |
 | Reverse an order (reason required, logged — FR1.6) | ✓ | ✓ |
 | Handle reservations on the day (seat, no-show, walk-in tables) | ✓ | ✓ |
 | Edit menu, add-ons, prices, recipes, and recommendations | ✓ | — |
 | Log expenses, view cashflow and reports | ✓ | — |
-| Manage outlets (including dine-in payment mode and delivery fee), WhatsApp numbers, tables, QRIS codes, PB1 settings, and staff accounts | ✓ | — |
+| Manage outlets (including dine-in payment mode, delivery fee, and cash drawers), WhatsApp numbers, tables, QRIS codes, PB1 settings, and staff accounts | ✓ | — |
 
 **Acceptance criteria**
 - **AC1.1** (FR1.1) — **Given** a business name and a type of restaurant or cafe, **when** the tenant is created, **then** it exists with its creator as owner, and "dropshipper" is not an available type.
@@ -132,7 +133,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **AC1.7** (FR1.6) — **Given** a staff member reverses an order, **when** they submit without a reason, **then** the reversal is blocked; **when** they submit with a reason, **then** the owner's audit log shows the order, the staff member, the time, and the reason.
 
 ### 5.2 Sales / order intake (WhatsApp)
-- **FR2.0** — When a customer messages an outlet's WhatsApp number, the bot shows a main menu with up to three reply buttons: **Pesan** (order), **Rekomendasi** (recommendations), and **Reservasi** (book a table). Reservasi appears only if the outlet has reservations enabled. *[Deterministic · MVP]*
+- **FR2.0** — When a customer messages an outlet's WhatsApp number, the bot shows a main menu as a list message with these rows: **Pesan** (order), **Rekomendasi** (recommendations), **Reservasi** (book a table), **Reservasi Saya** (view, cancel, or reschedule upcoming bookings), and **Data Saya** (membership status and ending membership). Reservasi and Reservasi Saya appear only if the outlet has reservations enabled. Typing "menu" at any point shows the main menu again. *[Deterministic · MVP]*
 - **FR2.1** — Customer browses the outlet's menu in its WhatsApp catalog — photos, descriptions, and that outlet's prices — and adds items to the WhatsApp cart. Sold-out items show as unavailable. *[Deterministic · MVP]*
 - **FR2.2** — When the customer sends the cart, the bot asks for add-ons for each item that has them, using reply buttons (up to 3 options) or list messages (up to 10 options), then shows an order summary (items, add-ons, subtotal, PB1, delivery fee if any, total) for the customer to confirm. Add-ons are collected in this step because the WhatsApp cart can't hold them. *[Deterministic · MVP]*
 - **FR2.3** — Placing an order checks and deducts ingredient stock for its items and add-ons (FR4.6) and starts the order lifecycle (§5.10). Online orders wait for payment first; dine-in orders follow the outlet's payment mode (FR10.8). The sale is posted to the ledger when payment is confirmed (FR11.3, FR11.4). *[Deterministic · MVP]*
@@ -147,7 +148,8 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR2.12** — Each new tenant starts with a sample menu (items, photos, per-outlet prices, and add-ons) in our system, pushed to each outlet's WhatsApp catalog through the same sync as FR2.11. The owner replaces it with the real menu. *[Deterministic · MVP]*
 
 **Acceptance criteria**
-- **AC2.1** (FR2.0) — **Given** a customer with no order or booking in progress, **when** they message an outlet that has reservations enabled, **then** the bot replies with exactly three buttons: Pesan, Rekomendasi, Reservasi; at an outlet with reservations disabled, only Pesan and Rekomendasi appear.
+- **AC2.1** (FR2.0) — **Given** a customer with no order or booking in progress, **when** they message an outlet that has reservations enabled, **then** the bot replies with a list message with exactly these rows: Pesan, Rekomendasi, Reservasi, Reservasi Saya, Data Saya; at an outlet with reservations disabled, only Pesan, Rekomendasi, and Data Saya appear.
+- **AC2.14** (FR2.0) — **Given** a customer in the middle of any flow (ordering, booking, add-on selection), **when** they type "menu", **then** the bot shows the main menu, and nothing is created from the unfinished flow.
 - **AC2.2** (FR2.1) — **Given** a customer taps Pesan, **when** they open the catalog, **then** it shows every active menu item with its photo, description, and that outlet's price, and sold-out items are marked unavailable.
 - **AC2.3** (FR2.2) — **Given** a cart containing an item with a required add-on group, **when** the customer sends the cart, **then** the bot asks for that group before showing the summary and doesn't continue until an option is chosen; optional groups can be skipped.
 - **AC2.4** (FR2.2) — **Given** add-ons are chosen, **when** the bot shows the summary, **then** it lists each item with quantity and add-ons, the subtotal, PB1, the delivery fee (delivery orders only), and the total, all matching the outlet's prices and settings; no order exists until the customer taps Confirm.
@@ -165,7 +167,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR3.1** — Every sale, refund, reversal, or manual expense creates an append-only ledger entry for its outlet; entries are never overwritten or deleted, only reversed with a new entry. Payment entries record the method (cash or QRIS). *[Deterministic · MVP]*
 - **FR3.2** — Owner can log a manual cash expense via the admin app. *[Deterministic · MVP]*
 - **FR3.3** — Owner sees daily/weekly/monthly cashflow summaries and trends, per outlet and across all outlets, with cash and QRIS totals, and PB1 collected, shown separately. *[Deterministic · MVP]*
-- **FR3.4** — System flags unusual cashflow patterns (e.g. an expense spike) for owner review. *[Agent · Phase 2]*
+- **FR3.4** — System flags unusual cashflow patterns (e.g. an expense spike) for owner review, showing the ledger entries that triggered the flag. Flags are advisory and never change the ledger. *[Agent · Phase 2]*
 
 **Acceptance criteria**
 - **AC3.1** (FR3.1) — **Given** any ledger entry, **when** anyone — owner, staff, the agent, or a direct API call — tries to edit or delete it, **then** the attempt is rejected; a correction can only be added as a new reversal entry that references the original.
@@ -177,7 +179,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR4.1** — Owner can add and edit menu items, add-ons, ingredients, recipes, and per-outlet prices. Owner and staff can record stock movements (restock, waste, adjustment); stock levels are never edited directly, only changed through movements (FR4.2). *[Deterministic · MVP]*
 - **FR4.2** — Every stock change (sale, cancellation, restock, waste, adjustment) is logged per outlet as an append-only movement with the user who made it, never an overwrite. *[Deterministic · MVP]*
 - **FR4.3** — Admin app shows current ingredient stock per outlet and low-stock warnings against a configurable threshold. *[Deterministic · MVP]*
-- **FR4.4** — System suggests restock quantities/timing based on historical sales velocity. Suggestions are advisory only: the agent can never record a restock, change stock, or place an order with a supplier. The owner decides and records any restock (FR4.1). *[Agent · Phase 2]*
+- **FR4.4** — System suggests restock quantities/timing based on historical sales velocity. Suggestions are advisory only: the agent can never record a restock, change stock, or place an order with a supplier. Each suggestion shows the data it is based on (e.g. recent sales velocity and current stock) so the owner can review it. The owner decides and records any restock (FR4.1). *[Agent · Phase 2]*
 - **FR4.5** — Each menu item has a recipe listing its ingredients, quantities, and units (e.g. *Es Kopi Susu* = 18 g coffee beans + 150 ml milk + 20 ml palm sugar syrup + 1 cup). Items sold as-is (e.g. bottled water) use a one-ingredient recipe. *[Deterministic · MVP]*
 - **FR4.6** — When an order is placed, all ingredients for its items and add-ons are checked and deducted in a single database transaction, so two customers can never both get the last portion. *[Deterministic · MVP]*
 - **FR4.7** — A menu item is marked sold out at an outlet — and shown as unavailable in the catalog and left out of recommendations — when any ingredient is too low for one portion. An add-on option is likewise unavailable when its ingredients run low. *[Deterministic · MVP]*
@@ -196,7 +198,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 
 ### 5.5 Manpower / staff (Phase 3)
 - **FR5.1** — System records staff shifts and attendance. *[Deterministic · Phase 3]*
-- **FR5.2** — System suggests shift schedules based on historical demand patterns. *[Agent · Phase 3]*
+- **FR5.2** — System suggests shift schedules based on historical demand patterns. Suggestions are advisory: a schedule or staff assignment changes only once the owner approves it. *[Agent · Phase 3]*
 
 ### 5.6 WhatsApp bot / chatbot
 - **FR6.1** — Integration via the official Meta WhatsApp Cloud API or an authorized Business Solution Provider (BSP). *[Deterministic/infra · MVP]*
@@ -239,7 +241,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR9.2** — Customer can book through a structured WhatsApp flow: party size → date → available time → confirm. The system assigns the smallest free table that fits the party. *[Deterministic · MVP]*
 - **FR9.3** — A table can never be double-booked for overlapping times; this is enforced at the database level, not only in application code. *[Deterministic · MVP]*
 - **FR9.4** — System sends a booking confirmation immediately and a reminder at the outlet's configured time before the booking; reminders outside the 24-hour window use a pre-approved template. *[Deterministic · MVP]*
-- **FR9.5** — Customer can cancel or reschedule a booking via WhatsApp up to the outlet's cancellation cutoff before the booking time. *[Deterministic · MVP]*
+- **FR9.5** — Customer can cancel or reschedule a booking via WhatsApp, from **Reservasi Saya** in the main menu (FR2.0), up to the outlet's cancellation cutoff before the booking time. *[Deterministic · MVP]*
 - **FR9.6** — Staff can view the day's reservations per table in the admin app, add bookings taken by phone or in person, reassign tables, and mark a booking as seated, completed, cancelled, or no-show. Every status change records who made it. *[Deterministic · MVP]*
 - **FR9.7** — Staff can mark a table as occupied by walk-in guests so it isn't offered for overlapping bookings. *[Deterministic · MVP]*
 - **FR9.8** — Reservation times are stored and shown in the outlet's local time zone (WIB/WITA/WIT). *[Deterministic · MVP]*
@@ -272,7 +274,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
   | `completed` | Handed over and paid |
   | `cancelled` | Stopped before completion |
 
-  Payment status: `unpaid` → `paid` → `refunded` (only through a reversal).
+  Payment status: `unpaid` → `proof_submitted` (customer sent a payment screenshot; waiting for staff to check) → `paid` → `refunded` (only through a reversal). A rejected proof (FR11.10) cancels the order and leaves the payment `unpaid`.
 
   - **Online orders (paid first):** `pending_payment` → `confirmed` → `preparing` → `ready` → `out_for_delivery` (delivery only) → `completed`. An online order can't be prepared until it is paid.
   - **Dine-in orders at pay-first outlets:** `pending_payment` → `confirmed` → `preparing` → `ready` → `completed`. The order can't be prepared until it is paid.
@@ -280,7 +282,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
   - **Takeaway and walk-in counter orders:** `confirmed` → `preparing` → `ready` → `completed` — completed only once paid.
 - **FR10.2** — Staff move orders through their statuses from an order board in the admin app; every change records who made it and when. *[Deterministic · MVP]*
 - **FR10.3** — Customer gets a WhatsApp update when their order is confirmed, ready, out for delivery, or cancelled. *[Deterministic · MVP]*
-- **FR10.4** — Unpaid pay-first orders (online, and dine-in at pay-first outlets) are cancelled automatically after a configurable time per outlet; their ingredients go back into stock and the customer is notified. The timer stops once the customer sends a payment screenshot, so an order waiting for staff to verify payment is never cancelled automatically. *[Deterministic · MVP]*
+- **FR10.4** — Unpaid pay-first orders (online, and dine-in at pay-first outlets) are cancelled automatically after a configurable time per outlet; their ingredients go back into stock and the customer is notified. The timer stops once the customer sends a payment screenshot, so an order waiting for staff to verify payment is never cancelled automatically. If staff reject the proof, the order is cancelled straight away (FR11.10). *[Deterministic · MVP]*
 - **FR10.5** — Cancelling an unpaid order returns its ingredients to stock with a reversal movement. Reversing a paid order requires a reason (FR1.6), creates a refund entry in the ledger, and either returns the ingredients to stock (not yet prepared) or records them as waste (already prepared). The refund itself is paid back to the customer manually, outside the system. *[Deterministic · MVP]*
 - **FR10.6** — At open-bill outlets, dine-in orders go on an **open bill** for a table, or for a guest name when there's no table. Orders from the table QR code or the counter are added to the bill without paying first, and a table has at most one open bill. When the guests are done, staff close the bill: the customer pays the total (including PB1) by cash or QRIS, all orders on the bill become `completed`, and the sale is posted to the ledger. A bill is always paid in full by one payer; there are no split bills. *[Deterministic · MVP]*
 - **FR10.7** — Staff see all open bills for their outlet, with running totals and how long each has been open. *[Deterministic · MVP]*
@@ -302,27 +304,30 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR11.1** — Owner uploads each outlet's static QRIS code in the admin app. *[Deterministic · MVP]*
 - **FR11.2** — After an online order — or a dine-in order at a pay-first outlet — is placed through WhatsApp, the bot sends the outlet's QRIS image and the exact total (including PB1), and asks the customer to pay that amount and send the payment screenshot in the chat. Because the QRIS is static, the customer types the amount into their payment app. *[Deterministic · MVP]*
 - **FR11.3** — Staff check that the payment arrived in the outlet's QRIS merchant account, then mark the order paid in the admin app, with the customer's screenshot attached to the order. Only then is the sale posted to the ledger. Staff must never mark an order paid based on the screenshot alone. *[Deterministic · MVP]*
+- **FR11.10** — If staff can't find the payment in the merchant account, they reject the payment proof with a required reason. The order is cancelled straight away, its ingredients go back into stock with a reversal movement, and the customer is told the payment couldn't be verified and asked to contact the outlet. The rejection records who did it, when, and the reason. If the money turns up later, the outlet refunds it or re-enters the order manually. *[Deterministic · MVP]*
 - **FR11.4** — Dine-in orders (pay-first or open bill) and takeaway/walk-in counter orders can be paid by cash at the counter or with the outlet's QRIS; staff record which method was used. QRIS payments are confirmed the same way as FR11.3. Online orders can't be paid in cash. *[Deterministic · MVP]*
 - **FR11.5** — Owner sets the PB1 rate per outlet, or turns PB1 off for outlets not registered for it. PB1 is calculated on the subtotal (including add-ons, excluding the delivery fee), rounded to the nearest rupiah, shown as a separate line in the order or bill summary, and posted to the ledger separately from revenue. *[Deterministic · MVP]*
 - **FR11.6** — For cash payments, staff enter the amount received and the system shows the change due. *[Deterministic · MVP]*
-- **FR11.7** — Staff open a cashier shift for their outlet's cash drawer by entering the starting cash. Only one shift can be open per drawer, cash payments can't be taken without an open shift, and every cash payment and cash refund during the shift is linked to it. *[Deterministic · MVP]*
+- **FR11.7** — Owner sets up each outlet's cash drawers (e.g. "Kasir 1", "Bar"); every new outlet gets one drawer by default, so a single-counter outlet needs no setup. Staff open a cashier shift for a drawer by entering the starting cash. Only one shift can be open per drawer, cash payments can't be taken without an open shift, and every cash payment and cash refund during the shift is linked to it. *[Deterministic · MVP]*
 - **FR11.8** — At the end of the shift, staff count the cash in the drawer and enter the amount before seeing what the system expects. The system compares it with the expected cash (starting cash + cash received − cash paid out), records the difference and who counted, and posts any shortage or surplus to the ledger. The owner sees every shift's count and difference. *[Deterministic · MVP]*
 - **FR11.9** — Payments are confirmed automatically through a payment gateway (dynamic QRIS), removing the manual check in FR11.3. *[Deterministic · Phase 3]*
 
 **Acceptance criteria**
 - **AC11.1** (FR11.1, FR11.2) — **Given** outlet A's QRIS image is uploaded, **when** a pay-first order with a Rp55.000 total is placed through WhatsApp, **then** the bot sends outlet A's QRIS image and the amount Rp55.000, and asks for the payment screenshot.
-- **AC11.2** (FR11.2) — **Given** an order waiting for payment, **when** the customer sends an image in the chat, **then** it is attached to that order and the order shows on the staff order board as waiting for payment check.
+- **AC11.2** (FR11.2) — **Given** an order waiting for payment, **when** the customer sends an image in the chat, **then** it is attached to that order, the payment status becomes `proof_submitted`, and the order shows on the staff order board as waiting for payment check.
 - **AC11.3** (FR11.3) — **Given** an order with a screenshot attached, **when** staff mark it paid, **then** the payment status becomes `paid`, the payment records the staff member and time, and the ledger entries are created at that moment — not when the screenshot arrived.
 - **AC11.4** (FR11.4) — **Given** a counter or dine-in order, **when** staff take payment, **then** they must choose cash or QRIS and the choice is saved; **given** an online order, **then** cash is not offered.
 - **AC11.5** (FR11.5) — **Given** PB1 is 10% at outlet A and off at outlet B, **when** a Rp50.000 order is placed at each, **then** outlet A's summary shows PB1 Rp5.000 and outlet B's shows no PB1 line; at outlet A, PB1 is posted to the ledger as its own entry.
 - **AC11.6** (FR11.6) — **Given** a Rp47.000 total, **when** staff enter Rp50.000 cash received, **then** the change due shows Rp3.000; an amount below Rp47.000 can't be recorded as full payment.
 - **AC11.7** (FR11.7) — **Given** no shift is open at outlet A's drawer, **when** staff try to take a cash payment, **then** they are asked to open a shift first; **when** a shift is already open, **then** a second one can't be opened for the same drawer.
 - **AC11.8** (FR11.8) — **Given** a shift with Rp200.000 starting cash, Rp850.000 cash received, and Rp30.000 cash paid out, **when** staff enter a count of Rp1.010.000, **then** they did not see the expected amount before entering it, the system records expected Rp1.020.000 and a difference of −Rp10.000 with the staff member's name, posts a Rp10.000 shortage to the ledger, and the owner sees the shift in the cash count report.
+- **AC11.9** (FR11.10) — **Given** an order in `proof_submitted`, **when** staff reject the proof without a reason, **then** it is blocked; **when** they reject it with a reason, **then** the order becomes `cancelled`, the payment stays `unpaid`, ingredients are returned with a reversal movement, no ledger entry is created, the customer gets one message saying the payment couldn't be verified, and the order history shows the staff member, time, and reason.
+- **AC11.10** (FR11.7) — **Given** a new outlet, **when** it is created, **then** it has one cash drawer; **given** outlet A has drawers Kasir 1 and Bar, **when** staff open a shift on each, **then** both are allowed, each cash payment is linked to the shift of the drawer it was taken at, and each drawer gets its own end-of-shift count.
 
 ### 5.12 Customer membership & data consent
 - **FR12.1** — On a customer's first message to any of a business's outlets, the bot asks for consent to keep their data as a member of that business (name, WhatsApp number, delivery addresses, order and booking history), with a link to the privacy notice. *[Deterministic · MVP]*
 - **FR12.2** — A member's personal data is kept for as long as their membership (consent) is active. *[Deterministic · MVP]*
-- **FR12.3** — A customer can end their membership at any time from WhatsApp. Their personal data is then deleted or anonymized; orders and ledger entries stay, linked to an anonymized customer record, so financial history remains intact (FR3.1). *[Deterministic · MVP]*
+- **FR12.3** — A customer can end their membership at any time from WhatsApp, through **Data Saya** in the main menu (FR2.0). Their personal data is then deleted or anonymized; orders and ledger entries stay, linked to an anonymized customer record, so financial history remains intact (FR3.1). *[Deterministic · MVP]*
 - **FR12.4** — Personal data lives only in customer tables and is never copied into ledger or stock records, so anonymization never has to modify append-only data. *[Deterministic · MVP]*
 - **FR12.5** — A customer who declines membership can still order and book a table. Their personal data is kept only until that order or booking is finished, then anonymized. *[Deterministic · MVP]*
 
@@ -353,6 +358,8 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **ACN5** (NFR4) — **Given** a webhook with an invalid signature, **when** it arrives, **then** it is rejected and nothing is queued.
 - **ACN6** (NFR5) — **Given** an API request with a missing, expired, or invalid token, **when** it reaches any FastAPI endpoint other than the webhook, **then** it is rejected.
 - **ACN7** (NFR8) — **Given** a customer's Confirm tap, **when** Meta delivers that same message twice, or a worker crashes after processing it and RabbitMQ redelivers it, **then** there is exactly one order, one stock deduction, and one set of ledger entries.
+- **ACN8** (NFR6) — **Given** the API and workers are running, **when** either is scaled from one instance to several, or one instance is restarted during traffic, **then** no request or conversation fails because of state held in a single instance, and every database connection goes through the connection pool.
+- **ACN9** (NFR7) — **Given** an outlet's device has lost its internet connection, **when** staff try to submit an order, payment, or stock movement, **then** the app shows that it is offline and nothing is saved partially or queued for later; once the connection is back, staff can submit again normally.
 
 ---
 
@@ -384,7 +391,7 @@ flowchart LR
 
 ## 8. Data model (high-level entities)
 
-`tenants` · `outlets` (WhatsApp number, catalog, payment mode, delivery fee) · `users` · `staff_outlets` · `products` (menu items) · `addon_groups` · `addon_options` · `outlet_prices` (menu items and add-on options) · `product_tags` · `stock_items` (ingredients) · `recipe_items` · `stock_movements` · `bills` (open bills) · `orders` (channel, outlet, optional table or bill, order status, payment status) · `order_items` · `order_item_addons` · `order_events` (status changes and reversals, with actor and reason) · `payments` (cash or QRIS) · `cashier_shifts` (starting cash, counted cash, difference) · `ledger_entries` · `tables` · `reservations` · `reservation_events` · `whatsapp_contacts` · `customer_consents` · `conversations` · `messages` · `processed_messages` (duplicate check) · `staff_shifts` (Phase 3) · `attendance` (Phase 3)
+`tenants` · `outlets` (WhatsApp number, catalog, payment mode, delivery fee) · `users` · `staff_outlets` · `products` (menu items) · `addon_groups` · `addon_options` · `outlet_prices` (menu items and add-on options) · `product_tags` · `stock_items` (ingredients) · `recipe_items` · `stock_movements` · `bills` (open bills) · `orders` (channel, outlet, optional table or bill, order status, payment status) · `order_items` · `order_item_addons` · `order_events` (status changes and reversals, with actor and reason) · `payments` (cash or QRIS) · `payment_proofs` (customer screenshots, review result, reviewer, rejection reason) · `cash_drawers` · `cashier_shifts` (drawer, starting cash, counted cash, difference) · `ledger_entries` · `tables` · `reservations` · `reservation_events` · `whatsapp_contacts` · `customer_consents` · `conversations` · `messages` · `processed_messages` (duplicate check) · `staff_shifts` (Phase 3) · `attendance` (Phase 3)
 
 Every operational record (stock movements, bills, orders, payments, ledger entries, tables, reservations) carries both `tenant_id` and `outlet_id`.
 
@@ -409,10 +416,10 @@ Every operational record (stock movements, bills, orders, payments, ledger entri
 
 | Phase | Focus |
 |---|---|
-| **0 — Foundation** | Tenant, outlet, and staff accounts with RLS and role permissions; schema for menu, add-ons, per-outlet prices, recipes, stock, orders, bills, payments, ledger, tables, and reservations; FastAPI CRUD; React admin with menu/recipe/stock management and counter order screen |
-| **1 — Deterministic WhatsApp flows** | WhatsApp number and catalog setup per outlet, with catalog sync and a sample menu; RabbitMQ-backed, duplicate-safe webhook processing; main menu (Pesan / Rekomendasi / Reservasi); catalog ordering with add-on follow-up (online + table QR), pickup or flat-fee delivery; order lifecycle with per-outlet dine-in payment mode (pay first or open bill), sold-out handling, static QRIS and cash payments with end-of-shift cash count, and PB1; rule-based recommendations; table reservations with reminders and 15-minute hold; membership consent; order board and reservations view in admin. Start the WhatsApp template approval process in parallel (order updates, reservation confirmation/reminder), since Meta's review queue is outside our control |
+| **0 — Foundation** | Tenant, outlet, and staff accounts with RLS and role permissions; pooled Postgres connections; schema for menu, add-ons, per-outlet prices, recipes, stock, orders, bills, payments, ledger, tables, and reservations; FastAPI CRUD; React admin with menu/recipe/stock management and counter order screen |
+| **1 — Deterministic WhatsApp flows** | WhatsApp number and catalog setup per outlet, with catalog sync and a sample menu; RabbitMQ-backed, duplicate-safe webhook processing; main menu (Pesan / Rekomendasi / Reservasi); catalog ordering with add-on follow-up (online + table QR), pickup or flat-fee delivery; order lifecycle with per-outlet dine-in payment mode (pay first or open bill), sold-out handling, static QRIS and cash payments with end-of-shift cash count, and PB1; rule-based recommendations; table reservations with reminders and 15-minute hold; membership consent; order board and reservations view in admin; queue monitoring and alerts for failed messages and catalog updates. Start the WhatsApp template approval process in parallel (order updates, reservation confirmation/reminder), since Meta's review queue is outside our control |
 | **2 — Agent layer** | LangChain-based free-text ordering and booking (always confirmed by the customer), conversational recommendations, FAQ handling, upsell + forecast/restock suggestions (advisory only — the agent never changes stock) — all gated through deterministic tool calls |
-| **3 — Scale & expansion** | Connection pooling and observability, staff/manpower module, payment gateway (dynamic QRIS with automatic confirmation), dropshipper vertical, marketplace integrations |
+| **3 — Scale & expansion** | Capacity scaling for larger tenants, staff/manpower module, payment gateway (dynamic QRIS with automatic confirmation), dropshipper vertical, marketplace integrations |
 
 The MVP (Phases 0–1) alone is a shippable, revenue-generating product and doubles as the fallback the bot degrades to if the agent layer misbehaves. A phase is complete when every acceptance criterion for its requirements passes.
 
@@ -438,7 +445,7 @@ The MVP (Phases 0–1) alone is a shippable, revenue-generating product and doub
 - **Trust in AI suggestions:** Owners may be wary of AI-driven restock or scheduling suggestions. Mitigation: the agent is advisory-only for stock — it suggests, and the owner decides and records any restock (FR4.4). Customer-facing agent actions (orders, bookings) always require the customer's confirmation.
 - **Regulatory drift:** Indonesia's PDP Law implementing regulations were still being finalized as of 2026 — the architecture should stay flexible enough to tighten data handling if requirements change.
 - **Connectivity:** The web app requires internet at every outlet (NFR7). If an outlet's connection drops, staff can't enter counter orders, close bills, confirm payments, or record stock until it's restored.
-- **Fake payment proof:** Static QRIS gives no automatic payment notification, so a customer could send an edited or reused screenshot. Mitigation: staff confirm every payment against the merchant account, never the screenshot alone (FR11.3).
+- **Fake payment proof:** Static QRIS gives no automatic payment notification, so a customer could send an edited or reused screenshot. Mitigation: staff confirm every payment against the merchant account, never the screenshot alone (FR11.3), and reject the proof — cancelling the order — when the money isn't there (FR11.10).
 - **Manual payment checks at peak hours:** Confirming each QRIS payment by hand can slow staff down when busy. Mitigation: payment gateway with automatic confirmation in Phase 3.
 - **Unpaid open bills:** Dine-in guests pay at the end, so they could leave without paying. Mitigation: staff see every open bill and how long it has been open (FR10.7), and owners can switch an outlet to pay-first mode (FR10.8).
 - **Missing cash:** Cash is easier to lose or take than QRIS payments. Mitigation: a blind end-of-shift cash count, with every difference recorded and shown to the owner (FR11.8).
@@ -452,6 +459,7 @@ The MVP (Phases 0–1) alone is a shippable, revenue-generating product and doub
 - Product name / branding — **TBD**
 - Monetization model (subscription tiers, per-transaction fee, free tier for early adopters) — **TBD**
 - Concrete success-metric targets and timeline milestones — **TBD**, needs business-side input
+- PB1 on open bills — calculated per order and added up, or once on the bill subtotal when the bill is closed? This affects rounding, the bill summary, and how PB1 is posted to the ledger (FR10.6, FR11.5, AC10.8). — **TBD**
 - Delivery — who delivers (outlet staff or a courier the customer books)? The fee is a flat amount per outlet (FR2.6). — **TBD**
 
 ---
