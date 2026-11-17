@@ -1,6 +1,6 @@
 # Task Breakdown — SME Business Automation Platform
 
-This backlog breaks down the 54 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
+This backlog breaks down the 56 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
 
 ## Delivery assumptions
 
@@ -90,7 +90,7 @@ This backlog breaks down the 54 user stories in [User-Stories-SME-Automation-Pla
 | T-040 | Implement blind end-of-shift cash count, expected-cash calculation, difference, actor tracking, and shortage/surplus ledger entries. | US-018, US-030 | T-039 | P0 |
 | T-041 | Implement append-only ledger posting for revenue, PB1, delivery fee, cash/QRIS payment, refund, expense, cash difference, and reversal. | US-019, US-030 | T-008, T-027, T-032, T-037–T-040 | P0 |
 | T-042 | Implement owner-only manual expense entry with outlet, amount, description, date, and actor. | US-031 | T-006, T-041 | P0 |
-| T-043 | Implement daily, weekly, monthly cashflow summaries and trends per outlet and across outlets, using outlet-local day boundaries. | US-032 | T-041, T-042, T-007 | P0 |
+| T-043 | Implement daily, weekly, monthly cashflow summaries and trends per outlet and across outlets, using outlet-local day boundaries, with cash in, cash out, and net cash compared against the previous period of the same length, expenses per outlet, and a recent-expenses list. | US-032 | T-041, T-042, T-007 | P0 |
 | T-044 | Add financial integrity tests ensuring ledger values are created only at confirmed payment and cannot be edited/deleted. | US-018–US-032 | T-040–T-043 | P0 |
 
 ## Wave 5 — WhatsApp integration and deterministic flows
@@ -143,12 +143,16 @@ This backlog breaks down the 54 user stories in [User-Stories-SME-Automation-Pla
 | T-115 | Implement AI-assisted recommendations in the Rekomendasi flow: a minimal LangChain gateway with prompt versioning; read-only tools for menu, tags, outlet availability, and 30-day sales; suggestions limited to active, available items at outlet prices with owner's picks first; selected items handed to the T-074 add-to-cart flow; an immediate acknowledgement message ("Sebentar ya, lagi cariin rekomendasi…") is sent before the AI call starts, because a reply can take up to 30 seconds; errors or a 30-second timeout fall back to the T-073 rule-based message; tool calls logged with actor `agent`; a small evaluation set covering sold-out items, price accuracy, and prompt injection. | US-052 | T-008, T-049, T-073, T-074 | P0 |
 | T-101 | Build the owner audit log screen for order reversals and status changes, filterable by outlet, staff member, and date, showing order, actor, time, and reason. | US-004 | T-031, T-032, T-066 | P0 |
 | T-102 | Build the owner cash count report: every shift's starting cash, expected cash, counted cash, difference, and who counted, per outlet. | US-018 | T-040, T-071 | P0 |
-| T-116 | Build the attendance domain: `attendance_records` and append-only `attendance_events` (clock in, clock out, flag, correction) with outlet-local times, one open record per staff member, an assigned-outlet check, RLS, and API endpoints for clock in, clock out, and own history. | US-053 | T-005, T-006, T-007, T-008, T-011, T-012 | P0 |
-| T-117 | Build the staff clock in/out screen: one-tap clock in or out, current status and elapsed time, outlet picker for staff assigned to several outlets, and own history. Works at 360 px, and shows an offline message without queueing submissions (NFR7). | US-053 | T-072, T-116 | P0 |
+| T-116 | Build the attendance domain: `attendance_records` and append-only `attendance_events` (clock in, clock out, flag, correction) with outlet-local times, one open record per staff member, the tablet and the selfie stored with each clock-in and clock-out (a photo is required), RLS, and API endpoints for clock in and clock out (attendance tablet session only) and own history (staff session). | US-053 | T-005, T-006, T-007, T-008, T-011, T-012, T-121 | P0 |
+| T-117 | Build the attendance tablet screens: staff list for the outlet, selfie capture with the front camera (retake, camera-denied state), clock in or out confirmation with time and duration, first-use privacy notice, and an offline message without queueing submissions (NFR7). Also build the staff's own attendance history in the admin app (read-only, with their selfies) at 360 px. | US-053 | T-072, T-116, T-121, T-122 | P0 |
 | T-118 | Add the missing-clock-out check on the `scheduled_jobs` scheduler (job type `attendance_flag`, run at outlet closing time plus the owner-set grace period): flag the record "needs correction" without inventing a clock-out time, and re-check that the record is still open before acting. Add the grace-period setting to outlet settings. | US-053 | T-011, T-104, T-116 | P0 |
-| T-119 | Build the owner attendance report and correction screens: filter by outlet, staff member, and date range; hours per day and in total; flagged records; correction with a required reason that keeps the original values; outlet-local day boundaries. | US-054 | T-072, T-116, T-118 | P0 |
-| T-120 | Add attendance tests: one open record per staff member, clock in at an unassigned outlet by direct API call, staff seeing only their own records, WIB/WITA/WIT day boundaries, flagging after worker downtime, and the correction audit trail. | US-053, US-054 | T-116–T-119 | P0 |
-| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119 | P0 |
+| T-119 | Build the owner attendance report and correction screens: filter by outlet, staff member, and date range; hours per day and in total; flagged records; clock-in and clock-out selfies for each record; correction with a required reason that keeps the original values; outlet-local day boundaries. | US-054 | T-072, T-116, T-118, T-122 | P0 |
+| T-120 | Add attendance tests: one open record per staff member, clock in without a selfie, clock in for an unassigned outlet and from a staff token by direct API call, a tablet session opening other admin data, a revoked tablet, staff seeing only their own records and selfies, selfie deletion after 90 days, WIB/WITA/WIT day boundaries, flagging after worker downtime, and the correction audit trail. | US-053, US-054, US-055 | T-116–T-119, T-121, T-122 | P0 |
+| T-121 | Build outlet attendance tablets: owner-generated one-time pairing code per outlet, a device account and session scoped to one outlet that can only list that outlet's staff and record attendance (enforced in the API and RLS), a device list with last activity, and revocation that rejects the tablet on its next request. Add the pairing and device list to outlet settings. | US-055 | T-006, T-011, T-113 | P0 |
+| T-122 | Store attendance selfies in a private Supabase Storage bucket: upload from the tablet with size and type checks, short-lived signed URLs for the owner and the staff member only, and a scheduled `attendance_photo_purge` job that deletes photos after 90 days while keeping the records. | US-053, US-054 | T-079, T-104, T-116 | P0 |
+| T-123 | Implement busyness queries for the owner: orders per hour per outlet and period (outlet-local time, opening hours only) with busy (≥ 130% of the hourly average) and quiet (≤ 60%) marking, the day-by-hour average over the last 4 weeks, current crowd per outlet (occupied tables, active orders, Ramai/Normal/Sepi status), and the hour-group filter for dashboard figures. Owner-only at the API. Include tests for time zones, thresholds, and totals. | US-056 | T-007, T-013, T-026, T-030, T-057, T-063 | P1 |
+| T-124 | Build the owner dashboard busyness views (wireframe O2): hour-group filter in the header, day-by-hour busyness map, current crowd per outlet, and orders-per-hour chart with busy and quiet hours marked. | US-056 | T-071, T-123 | P1 |
+| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119, T-124 | P0 |
 
 ## Wave 8 — Membership, compliance, and MVP hardening
 
@@ -291,6 +295,7 @@ Business timers have variable delays (the unpaid timeout is configured per outle
 | `no_show_release` | Reservation confirmed (T-064) | Booking time + 15 min | US-027 |
 | `anonymize_declined` | Order completed or cancelled, or booking finished (T-103) | Immediately after the end event | US-040, US-041 |
 | `attendance_flag` | Staff member clocks in (T-118) | Outlet closing time + grace period | US-053 |
+| `attendance_photo_purge` | Selfie stored (T-122) | Photo time + 90 days | US-053 |
 
 ### A.5 Consumer rules
 
