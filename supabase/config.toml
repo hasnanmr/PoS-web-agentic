@@ -40,9 +40,9 @@ enable_signup = false
 enable_confirmations = true
 
 # Custom access token hook adds tenant_id and app_role claims (T-113).
-# Enable once the function app.custom_access_token_hook exists.
+# The function is created by migration 20261117000900_auth_roles_hook.sql.
 [auth.hook.custom_access_token]
-enabled = false
+enabled = true
 uri = "pg-functions://postgres/app/custom_access_token_hook"
 
 [storage]

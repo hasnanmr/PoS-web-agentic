@@ -31,7 +31,7 @@ def test_readyz_with_reachable_database(monkeypatch: pytest.MonkeyPatch) -> None
         calls.append(url)
 
     monkeypatch.setattr(db, "ping", fake_ping)
-    client = make_client(database_url="postgresql://pos:pos@localhost:5432/pos")
+    client = make_client(database_url="postgresql://pos@localhost:5432/pos")
     response = client.get("/readyz")
     assert response.status_code == 200
     assert response.json()["checks"] == {"database": "ok"}
@@ -40,7 +40,7 @@ def test_readyz_with_reachable_database(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_readyz_with_unreachable_database_returns_503() -> None:
     # Port 1 on localhost refuses connections immediately.
-    client = make_client(database_url="postgresql://pos:pos@127.0.0.1:1/pos")
+    client = make_client(database_url="postgresql://pos@127.0.0.1:1/pos")
     response = client.get("/readyz")
     assert response.status_code == 503
     assert response.json() == {"status": "unavailable", "checks": {"database": "error"}}

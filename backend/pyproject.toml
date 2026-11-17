@@ -5,8 +5,11 @@ description = "SME POS + WhatsApp ordering platform: API service and WhatsApp wo
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.163.2",
+    "psycopg-pool>=3.2",
     "psycopg[binary]>=3.3.9",
     "pydantic-settings>=2.16.3",
+    "pyjwt[crypto]>=2.10",
+    "tzdata>=2026.6",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -14,6 +17,7 @@ dependencies = [
 dev = [
     "httpx2>=2.16.2",
     "pytest>=9.2.0",
+    "pytest-asyncio>=0.25",
     "ruff>=0.17.5",
 ]
 
@@ -23,6 +27,8 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100
@@ -32,4 +38,4 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "N", "S", "ASYNC", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]
+"tests/**" = ["S101", "S105", "S106", "S608"]  # S608: SQL built from constant test UUIDs
