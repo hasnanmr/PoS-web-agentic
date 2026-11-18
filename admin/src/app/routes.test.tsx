@@ -1,0 +1,51 @@
+import { render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
+import { describe, expect, it } from 'vitest'
+import type { Role } from './nav'
+import { RoleProvider } from './role'
+import { AppRoutes } from './routes'
+
+function renderAt(path: string, role: Role) {
+  return render(
+    <RoleProvider initial={role}>
+      <MemoryRouter initialEntries={[path]}>
+        <AppRoutes />
+      </MemoryRouter>
+    </RoleProvider>,
+  )
+}
+
+describe('app shell', () => {
+  it('owner lands on the dashboard with all four groups', () => {
+    renderAt('/', 'owner')
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: 'Navigasi utama' })
+    for (const heading of ['OPERASIONAL', 'KATALOG', 'KEUANGAN (OWNER)', 'PENGATURAN']) {
+      expect(within(nav).getByRole('group', { name: heading })).toBeInTheDocument()
+    }
+    expect(within(nav).queryByText(/hanya untuk owner/)).not.toBeInTheDocument()
+  })
+
+  it('staff is redirected away from owner pages and sees the footer note', () => {
+    renderAt('/finance/cashflow', 'staff')
+    expect(screen.getByRole('heading', { level: 1, name: 'Order Board' })).toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: 'Navigasi utama' })
+    expect(within(nav).queryByRole('group', { name: 'KATALOG' })).not.toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: /Absensi Saya/ })).toBeInTheDocument()
+    expect(
+      within(nav).getByText(/Menu, harga, laporan & pengaturan hanya untuk owner\./),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the mobile bottom nav', () => {
+    renderAt('/orders', 'staff')
+    const bottom = screen.getByRole('navigation', { name: 'Navigasi bawah' })
+    expect(within(bottom).getAllByRole('link').map((a) => a.textContent)).toEqual([
+      '≡Order',
+      '⊞Counter',
+      '⊟Bill',
+      '▣Reservasi',
+      '▥Stok',
+    ])
+  })
+})
