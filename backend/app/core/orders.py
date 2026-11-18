@@ -619,21 +619,34 @@ async def _items(conn: AsyncConnection, order_ids: list[UUID]) -> dict[UUID, lis
     return out
 
 
-async def _payment_methods(conn: AsyncConnection, orders: list[dict[str, Any]]) -> dict[UUID, str]:
+async def _payment_methods(
+    conn: AsyncConnection, orders: list[dict[str, Any]]
+) -> dict[UUID, dict[str, Any]]:
+    """Per order: the payment that settled it (its own, or its bill's), with whether a QRIS
+    payment has been cross-checked against the receiving account (S2 "Cek →"). A QRIS
+    payment accepted from a proof in S4 was checked there."""
     ids = [o["id"] for o in orders]
     bill_ids = [o["bill_id"] for o in orders if o["bill_id"]]
     cur = await conn.execute(
-        "select order_id, bill_id, method::text from app.payments"
-        " where order_id = any(%s) or bill_id = any(%s)",
+        """
+        select p.order_id, p.bill_id, p.id, p.method::text,
+               c.payment_id is not null
+                 or exists (select 1 from app.payment_proofs pp
+                            where pp.order_id = p.order_id and pp.status = 'accepted')
+        from app.payments p
+        left join app.qris_checks c on c.payment_id = p.id
+        where p.order_id = any(%s) or p.bill_id = any(%s)
+        """,
         (ids, bill_ids),
     )
-    by_order: dict[UUID, str] = {}
-    by_bill: dict[UUID, str] = {}
-    for order_id, bill_id, method in await cur.fetchall():
+    by_order: dict[UUID, dict[str, Any]] = {}
+    by_bill: dict[UUID, dict[str, Any]] = {}
+    for order_id, bill_id, payment_id, method, checked in await cur.fetchall():
+        info = {"payment_id": payment_id, "method": method, "checked": bool(checked)}
         if order_id:
-            by_order[order_id] = method
+            by_order[order_id] = info
         else:
-            by_bill[bill_id] = method
+            by_bill[bill_id] = info
     return {o["id"]: by_order.get(o["id"]) or by_bill.get(o["bill_id"]) for o in orders}  # type: ignore[misc]
 
 
@@ -644,7 +657,7 @@ def _summary(items: list[dict[str, Any]]) -> str:
 async def detail(conn: AsyncConnection, order_id: UUID) -> dict[str, Any]:
     order = await _load(conn, order_id)
     items = (await _items(conn, [order_id])).get(order_id, [])
-    method = (await _payment_methods(conn, [order])).get(order_id)
+    payment = (await _payment_methods(conn, [order])).get(order_id)
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         """
@@ -666,7 +679,7 @@ async def detail(conn: AsyncConnection, order_id: UUID) -> dict[str, Any]:
             "role": e.pop("actor_role"),
         }
     return {
-        **_card(order, items, method),
+        **_card(order, items, payment),
         "items": items,
         "subtotal": order["subtotal"],
         "pb1_rate_bps": order["pb1_rate_bps"],
@@ -677,7 +690,17 @@ async def detail(conn: AsyncConnection, order_id: UUID) -> dict[str, Any]:
     }
 
 
-def _card(order: dict[str, Any], items: list[dict[str, Any]], method: str | None) -> dict[str, Any]:
+def _card(
+    order: dict[str, Any], items: list[dict[str, Any]], payment: dict[str, Any] | None
+) -> dict[str, Any]:
+    method = payment["method"] if payment else None
+    # Only a paid QRIS order still waiting for the cross-check offers "qris_check".
+    qris_checked = (
+        payment["checked"]
+        if payment and method == "qris" and order["payment_status"] == "paid"
+        else None
+    )
+    order = {**order, "qris_unchecked": qris_checked is False}
     return {
         "id": order["id"],
         "order_no": order_label(order["order_prefix"], order["order_no"]),
@@ -687,6 +710,8 @@ def _card(order: dict[str, Any], items: list[dict[str, Any]], method: str | None
         "status": order["status"],
         "payment_status": order["payment_status"],
         "payment_method": method,
+        "payment_id": payment["payment_id"] if payment else None,
+        "qris_checked": qris_checked,
         "table": order["table_name"],
         "customer_name": order.get("guest_name"),
         "item_summary": _summary(items),

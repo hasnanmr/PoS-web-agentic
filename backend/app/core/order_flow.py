@@ -66,7 +66,8 @@ def next_statuses(order: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def allowed_actions(order: Mapping[str, Any]) -> list[str]:
-    """Target statuses plus `cancel` (unpaid) or `reversal` (paid)."""
+    """Target statuses plus `cancel` (unpaid) or `reversal` (paid), and `qris_check` for a
+    paid QRIS order that staff have not yet matched against the receiving account."""
     if order["status"] in FINAL and order["payment_status"] != "paid":
         return []
     actions = list(next_statuses(order)) if order["status"] not in FINAL else []
@@ -74,6 +75,9 @@ def allowed_actions(order: Mapping[str, Any]) -> list[str]:
         actions.append("cancel")
     if order["payment_status"] == "paid" and order["status"] != "cancelled":
         actions.append("reversal")
+        # S2 "Cek →": a QRIS payment not yet found in the receiving account (PoC demo).
+        if order.get("qris_unchecked"):
+            actions.append("qris_check")
     return actions
 
 

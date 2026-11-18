@@ -10,6 +10,7 @@ import { useLoad } from '../lib/useLoad'
 import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, LinkButton, Loading, Select, TextInput } from '../ui/kit'
+import { QrisPayPanel } from '../ui/QrisImage'
 
 function duration(iso: string, now = Date.now()): string {
   const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
@@ -220,6 +221,7 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
         </label>
       )}
       {method === 'cash' && !shift && !drawerAmbiguous && <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka.</p>}
+      {method === 'qris' && b.orders.length > 0 && <QrisPayPanel outletId={outlet.id} amount={b.total} />}
       <p className="mt-2 text-[11px] text-text-muted">Split bill tidak didukung di MVP.</p>
       {error && <div className="mt-2"><Alert>{error}</Alert></div>}
       <Button variant="action" className="mt-3 w-full" disabled={!canPay || busy} onClick={async () => {

@@ -44,7 +44,7 @@ Staff calling it → `403` (AC7.7).
 | Outlet picker, + Tambah outlet | `GET /owner/outlets`, `POST /owner/outlets` ✅ | New outlet gets default drawer and reservation settings. |
 | Umum + Order, pajak & pembayaran | `GET/PATCH /owner/outlets/{id}` ✅ | `name, address, timezone (WIB/WITA/WIT), whatsapp_phone, whatsapp_status, catalog_synced_at, pb1_enabled, pb1_rate_bps, payment_mode, delivery_fee, unpaid_timeout_minutes, attendance_grace_minutes`. "Simpan perubahan" sends one PATCH. `GET` also returns `opening_hours` (shown as "Sen–Min 08:00 – 22:00"). |
 | Jam buka (atur per hari) | `PUT /owner/outlets/{id}/opening-hours` ✅ | `[{weekday, opens_at, closes_at}]`. |
-| QRIS statis | `POST /owner/outlets/{id}/qris` (returns signed upload URL), `GET` (signed view URL + uploaded_at) | PNG/JPG, max 2 MB. |
+| QRIS statis | `PUT /owner/outlets/{id}/qris?filename=` ✅ (raw PNG/JPG body), `GET /owner/outlets/{id}/qris` ✅ → `image:{filename, content_type, size, uploaded_at}\|null`; image bytes: `GET /ops/outlets/{id}/qris/image` ✅ (staff of the outlet too) | PNG/JPG (checked by file signature), max 2 MB, owner only (`outlet_qris`, RLS). **PoC demo:** stored in the database (migration `20261118000500`), not Supabase Storage; the move to a signed-URL bucket (`outlets.qris_image_path`) is a follow-up. Shown to the customer at S1 and S5 (below). |
 | Cash drawer | `GET/POST /owner/outlets/{id}/drawers`, `PATCH/DELETE /owner/drawers/{id}` ✅ | `name` (max 40), `has_open_shift`; delete refused while a shift is open (`shift_open`) or for the last drawer (`last_drawer`). |
 | Tablet absensi | `GET /owner/outlets/{id}/attendance-devices` (`name, last_seen_at, revoked_at`), `POST /owner/outlets/{id}/attendance-pairing-codes` → `{code (6 digits), expires_at (10 min)}`, `POST /owner/attendance-devices/{id}/revoke` | Tenggang lupa clock out = `attendance_grace_minutes` above. |
 
@@ -189,7 +189,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | Product grid, search, category tabs, Owner's picks | `GET /ops/outlets/{id}/menu?q=&category=&owner_picks=` ✅ | `[{product_id, name, price, photo_url, sold_out, sold_out_reason ("Bahan tidak cukup"), addon_groups:[{…, options:[{id, name, price, available}]}]}]`. |
 | Table dropdown (Dine-in) | `GET /ops/outlets/{id}/tables` ✅ (always includes `open_bill`; no query parameters) | `[{id, name, area, open_bill:{id, total}?}]`. |
 | Live totals | `POST /ops/outlets/{id}/quotes` ✅ | Items + add-ons + order type → `subtotal, pb1_rate_bps, pb1_amount, total` (server is the only source of PB1). |
-| Buat order & terima bayar (F9) | `POST /ops/outlets/{id}/orders` (`Idempotency-Key`) ✅ | `type: dine_in\|takeaway, table_id?, items[{product_id, quantity, addon_option_ids[]}], payment: {method: cash, cash_received, drawer_id?} \| {method: qris} \| {to_open_bill: true}`. Errors: `item_sold_out` (names the item), `shift_not_open`, `cash_insufficient`, `addon_required`, `addon_invalid`, `idempotency_key_reused` (same key, different body or user). `drawer_id` is required (422, `details.field = "drawer_id"`) when several shifts are open and none is the cashier's own. Response includes `change_due`; a replayed key returns 200 with `Idempotent-Replay`. Dine-in at an open-bill outlet must use `{to_open_bill: true}` with a `table_id`; the order joins the table's open bill (opened if needed). |
+| Buat order & terima bayar (F9) (QRIS shows the outlet's static QRIS + amount, PoC) | `POST /ops/outlets/{id}/orders` (`Idempotency-Key`) ✅ | `type: dine_in\|takeaway, table_id?, items[{product_id, quantity, addon_option_ids[]}], payment: {method: cash, cash_received, drawer_id?} \| {method: qris} \| {to_open_bill: true}`. Errors: `item_sold_out` (names the item), `shift_not_open`, `cash_insufficient`, `addon_required`, `addon_invalid`, `idempotency_key_reused` (same key, different body or user). `drawer_id` is required (422, `details.field = "drawer_id"`) when several shifts are open and none is the cashier's own. Response includes `change_due`; a replayed key returns 200 with `Idempotent-Replay`. Dine-in at an open-bill outlet must use `{to_open_bill: true}` with a `table_id`; the order joins the table's open bill (opened if needed). |
 
 ### S2 / M1 · Order Board (T-030, T-068)
 
@@ -199,6 +199,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | ↻ live | same endpoint polled (MVP), `?since=` for deltas | SSE can replace polling later without changing the payload. |
 | Card buttons (Mulai siapkan, Tandai ready, Out for delivery, Selesai) | `POST /ops/orders/{id}/transitions` ✅ | `to_status`. Refused with `invalid_transition` if not in `allowed_actions`. |
 | Cek → (proof_submitted) | opens S4 | |
+| QRIS belum dicek · Cek → (PoC demo) | `POST /ops/orders/{id}/qris-check` ✅ | `merchant_account_checked: true` (422 otherwise). Cards carry `payment_id` and `qris_checked` (`true`/`false` for a paid QRIS order, else `null`); the server adds `qris_check` to `allowed_actions` while a paid QRIS payment is unchecked, also on completed orders in `done_today`. A QRIS payment taken at S1 or at bill close (S5) is recorded at once, so the order goes to the kitchen; staff later match it against the receiving account. One check per payment (`qris_checks`, append-only): a bill's payment is checked once for all its orders. `already_checked` / `not_checkable` (409). Audit `payment.qris_checked`. A proof accepted in S4 counts as checked. Not drawn on the wireframe: the badge, button and dialog reuse the S4 copy ("⚠ Jangan konfirmasi hanya dari screenshot…", "Saya sudah menemukan transaksi ini di akun merchant QRIS"), product owner decision 2026-11-18. |
 
 ### S3 · Detail Order & Reversal (T-031, T-032)
 
@@ -225,7 +226,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | Bill cards + mode badge | `GET /ops/outlets/{id}/bills` ✅ (open bills only; no query parameters) | `payment_mode`, `[{id, table?, guest_name?, running_total, order_count, opened_at}]`. |
 | + Buka bill | `POST /ops/outlets/{id}/bills` ✅ | `table_id` or `guest_name`. `conflict` if the table already has an open bill. |
 | Bill detail | `GET /ops/bills/{id}` ✅ | `orders:[{order_no, channel, created_at, items, line_total}]`, `subtotal, pb1_amount, total`. |
-| Tutup bill & bayar | `POST /ops/bills/{id}/close` (`Idempotency-Key`) ✅ | `method: cash\|qris, cash_received?, drawer_id?` → `change_due`. Full payment only. `drawer_id` is required (422) when several shifts are open and none is the cashier's own. A closed bill returns its snapshot (subtotal, PB1, total). |
+| Tutup bill & bayar (QRIS shows the outlet's static QRIS + amount, PoC) | `POST /ops/bills/{id}/close` (`Idempotency-Key`) ✅ | `method: cash\|qris, cash_received?, drawer_id?` → `change_due`. Full payment only. `drawer_id` is required (422) when several shifts are open and none is the cashier's own. A closed bill returns its snapshot (subtotal, PB1, total). |
 | Batalkan bill kosong | `POST /ops/bills/{id}/void` ✅ | No body, 204. `bill_not_empty` (409) when orders are on it; `bill_not_open` when already closed. For a wrong table or a guest who left. |
 
 ### S6 / M4 · Reservasi & Meja (T-062, T-063, T-064)
@@ -296,5 +297,7 @@ WhatsApp flows, not REST endpoints. They use the same core functions (quote, cre
 Added to T-004 when this map was written: `outlets.order_prefix` (#A-1036), `outlets.whatsapp_status`, `outlets.catalog_synced_at` (O3/O12), `users.invited_at`, `users.invitation_accepted_at` ("Diundang", O4), `cashier_shifts.count_breakdown` (S8), `order_events.data` (S3 timeline), default drawer name "Kasir depan" (O3/S8); removed configurable hold minutes (O8 shows 15 minutes fixed).
 
 Wave 4 (migration `20261118000400`): `payment_proofs.merchant_checked_at` (S4 merchant-account step, required on accepted proofs), one reversal per ledger entry (unique `reverses_entry_id`), and a restrictive policy so only an owner (or the system) can insert `expense`/`reversal` ledger rows (O9).
+
+PoC demo (migration `20261118000500`): `outlet_qris` (O3 static QRIS image per outlet; staff read, owner writes) and `qris_checks` (S2 cross-check of a QRIS payment against the receiving account; one per payment, append-only).
 
 Still needed later: a WhatsApp template registry table (O12, T-084).

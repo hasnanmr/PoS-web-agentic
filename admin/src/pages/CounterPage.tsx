@@ -14,6 +14,7 @@ import type { MenuItem, OrderCreated, Quote, ShiftRow, TableRow } from '../lib/t
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Loading, Select, TextInput } from '../ui/kit'
+import { QrisPayPanel } from '../ui/QrisImage'
 
 interface CartLine {
   key: string
@@ -279,6 +280,7 @@ export default function CounterPage() {
               <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka. <Link to={ROUTES.shifts.path} className="text-primary hover:underline">Buka shift</Link></p>
             )}
           </div>
+          {effectiveMethod === 'qris' && total > 0 && outlet && <QrisPayPanel outletId={outlet.id} amount={total} />}
           {effectiveMethod === 'cash' && (
             <div className="mt-3 space-y-2 text-[12px]">
               <label className="flex items-center justify-between gap-2">
@@ -330,10 +332,12 @@ function PayButton({ active, disabled, onClick, children }: {
 function AddonModal({ item, onClose, onAdd }: { item: MenuItem; onClose: () => void; onAdd: (ids: string[]) => void }) {
   const [chosen, setChosen] = useState<Record<string, string[]>>({})
   const missing = item.addon_groups.some((g) => g.is_required && !(chosen[g.id]?.length))
-  function toggle(groupId: string, optionId: string, single: boolean) {
+  // A single-choice group can be emptied again by clicking the chosen option, unless it is
+  // required. (A checked radio fires no change event, so radios toggle on click.)
+  function toggle(groupId: string, optionId: string, single: boolean, required: boolean) {
     setChosen((c) => {
       const current = c[groupId] ?? []
-      if (single) return { ...c, [groupId]: current[0] === optionId ? [] : [optionId] }
+      if (single) return { ...c, [groupId]: current[0] === optionId && !required ? [] : [optionId] }
       return { ...c, [groupId]: current.includes(optionId) ? current.filter((x) => x !== optionId) : [...current, optionId] }
     })
   }
@@ -350,8 +354,13 @@ function AddonModal({ item, onClose, onAdd }: { item: MenuItem; onClose: () => v
             <div className="space-y-1">
               {g.options.map((o) => (
                 <label key={o.id} className={`flex items-center gap-2 text-[13px] ${o.available ? '' : 'text-text-muted'}`}>
-                  <input type={g.selection === 'single' ? 'radio' : 'checkbox'} name={g.id} disabled={!o.available}
-                    checked={(chosen[g.id] ?? []).includes(o.id)} onChange={() => toggle(g.id, o.id, g.selection === 'single')} />
+                  {g.selection === 'single' ? (
+                    <input type="radio" name={g.id} disabled={!o.available} checked={(chosen[g.id] ?? []).includes(o.id)}
+                      onChange={() => {}} onClick={() => toggle(g.id, o.id, true, g.is_required)} />
+                  ) : (
+                    <input type="checkbox" name={g.id} disabled={!o.available} checked={(chosen[g.id] ?? []).includes(o.id)}
+                      onChange={() => toggle(g.id, o.id, false, g.is_required)} />
+                  )}
                   <span className="flex-1">{o.name}</span>
                   <span className="text-[12px]">{o.available ? `+${formatRupiah(o.price)}` : 'unavailable'}</span>
                 </label>

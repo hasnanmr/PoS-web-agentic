@@ -10,12 +10,14 @@ from datetime import datetime, time
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app import db
 from app.auth.deps import OwnerOnly
 from app.core import outlets as core
+from app.core import qris
+from app.core.errors import ValidationFailedError
 
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: outlets"])
 
@@ -179,3 +181,64 @@ async def delete_drawer(drawer_id: UUID, request: Request, owner: OwnerOnly) -> 
     async with db.transaction(request.app.state.db_pool, ctx) as conn:
         await core.delete_drawer(conn, ctx, drawer_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# O3 · QRIS statis outlet (PoC demo: stored in the database) -------------------------------
+
+
+class QrisImage(BaseModel):
+    filename: str
+    content_type: str
+    size: int
+    uploaded_at: datetime
+
+
+class QrisStatus(BaseModel):
+    image: QrisImage | None
+
+
+@router.get("/outlets/{outlet_id}/qris")
+async def get_qris(outlet_id: UUID, request: Request, owner: OwnerOnly) -> QrisStatus:
+    """O3 "qris-dago.png · diunggah 2 Nov 2026" (null until one is uploaded). The image itself:
+    `GET /ops/outlets/{id}/qris/image`."""
+    async with db.transaction(request.app.state.db_pool, owner.actor()) as conn:
+        await core.get_outlet(conn, outlet_id)  # 404 for an outlet the owner cannot see
+        meta = await qris.image_meta(conn, outlet_id)
+    return QrisStatus(image=QrisImage(**meta) if meta else None)
+
+
+@router.put(
+    "/outlets/{outlet_id}/qris",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "image/png": {"schema": {"type": "string", "format": "binary"}},
+                "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
+            },
+        }
+    },
+)
+async def put_qris(
+    outlet_id: UUID,
+    request: Request,
+    owner: OwnerOnly,
+    filename: str = Query(default="qris", max_length=200),
+) -> QrisStatus:
+    """O3 "⇪ Ganti gambar": the raw PNG/JPG as the request body (max 2 MB)."""
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > qris.MAX_BYTES:
+        raise ValidationFailedError("the image is larger than 2 MB", {"field": "image"})
+    data = await request.body()
+    ctx = owner.actor()
+    async with db.transaction(request.app.state.db_pool, ctx) as conn:
+        await core.get_outlet(conn, outlet_id)
+        meta = await qris.save_image(
+            conn,
+            ctx,
+            outlet_id,
+            filename=filename,
+            content_type=request.headers.get("content-type", ""),
+            data=data,
+        )
+    return QrisStatus(image=QrisImage(**meta))

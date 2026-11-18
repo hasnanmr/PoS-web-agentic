@@ -1,14 +1,16 @@
 // Wireframe O3 — Bisnis & Outlet (T-011, T-039 drawers, T-066).
 // Endpoints: GET/POST /owner/outlets, GET/PATCH /owner/outlets/{id},
 // PUT /owner/outlets/{id}/opening-hours, drawers under /owner/outlets/{id}/drawers.
-// Not yet here: QRIS statis card (T-014) and tablet pairing (T-121); they come with those tasks.
+// QRIS statis card (T-014, PoC demo): PUT/GET /owner/outlets/{id}/qris, image from
+// GET /ops/outlets/{id}/qris/image. Not yet here: tablet pairing (T-121).
 import { useState, type ReactNode } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
-import { hhmm, summarizeHours, timeAgo, WEEKDAYS } from '../lib/format'
-import { TIMEZONE_LABEL, type Drawer, type OpeningHours, type OutletDetail, type Timezone } from '../lib/types'
+import { formatDay, hhmm, localDay, summarizeHours, timeAgo, WEEKDAYS } from '../lib/format'
+import { TIMEZONE_LABEL, type Drawer, type OpeningHours, type OutletDetail, type QrisStatus, type Timezone } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
+import { useQrisImage } from '../lib/useQrisImage'
 import { Alert, Button, Card, FieldRow, LinkButton, Loading, Select, StatusDot, TextInput } from '../ui/kit'
 
 type Draft = Omit<OutletDetail, 'id' | 'order_prefix' | 'whatsapp_status' | 'catalog_synced_at' | 'is_active'>
@@ -225,10 +227,72 @@ export default function BusinessPage() {
                 </label>
               </div>
             </Card>
+
+            <QrisCard outletId={detail.data.id} timezone={detail.data.timezone} />
           </div>
         )}
       </div>
     </>
+  )
+}
+
+// O3 "QRIS statis outlet" (PoC demo): one PNG/JPG per outlet, max 2 MB. Shown at the counter
+// and when a bill is closed; the copy follows the canvas.
+function QrisCard({ outletId, timezone }: { outletId: string; timezone: string }) {
+  const { api } = useSession()
+  const status = useLoad(() => api.get<QrisStatus>(`/owner/outlets/${outletId}/qris`), outletId)
+  const [version, setVersion] = useState(0)
+  const { url } = useQrisImage(status.data?.image ? outletId : undefined, version)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const image = status.data?.image
+
+  async function upload(file: File) {
+    setError(undefined)
+    if (!['image/png', 'image/jpeg'].includes(file.type)) return setError('Hanya PNG/JPG, maks 2 MB.')
+    if (file.size > 2 * 1024 * 1024) return setError('Gambar lebih dari 2 MB.')
+    setBusy(true)
+    try {
+      await api.upload(`/owner/outlets/${outletId}/qris?filename=${encodeURIComponent(file.name)}`, file, file.type)
+      await status.reload()
+      setVersion((v) => v + 1)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card title="QRIS statis outlet">
+      <FieldRow label="Gambar QRIS" htmlFor="qris-file">
+        <div className="flex items-start gap-3">
+          <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-page">
+            {url ? <img src={url} alt="QRIS outlet" className="h-full w-full object-contain" />
+              : <span className="text-[11px] text-text-muted">▦</span>}
+          </div>
+          <div className="text-[12px]">
+            {status.loading && !status.data ? <Loading /> : image ? (
+              <p>{image.filename} · diunggah {formatDay(localDay(image.uploaded_at, timezone))} {localDay(image.uploaded_at, timezone).slice(0, 4)}</p>
+            ) : (
+              <p className="text-text-muted">Belum ada gambar QRIS.</p>
+            )}
+            <Note>Dikirim bot ke pelanggan saat pembayaran.</Note>
+            <Note>Hanya PNG/JPG, maks 2 MB.</Note>
+            <label className="mt-2 inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-surface px-3 font-semibold hover:bg-page">
+              {busy ? 'Mengunggah…' : image ? '⇪ Ganti gambar' : '⇪ Unggah gambar'}
+              <input id="qris-file" type="file" accept="image/png,image/jpeg" className="sr-only" disabled={busy}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) void upload(file)
+                }} />
+            </label>
+          </div>
+        </div>
+      </FieldRow>
+      {error && <div className="mt-2"><Alert>{error}</Alert></div>}
+    </Card>
   )
 }
 
