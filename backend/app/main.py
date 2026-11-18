@@ -16,6 +16,8 @@ from app import db
 from app.api import health
 from app.api.errors import install_error_handlers
 from app.api.v1 import me
+from app.api.v1.ops import bills as ops_bills
+from app.api.v1.ops import orders as ops_orders
 from app.api.v1.ops import stock as ops_stock
 from app.api.v1.owner import catalog, onboarding, outlets, staff
 from app.auth.principal import PgUserDirectory, UserDirectory
@@ -108,6 +110,8 @@ def create_app(
     app.include_router(staff.router)
     app.include_router(catalog.router)
     app.include_router(ops_stock.router)
+    app.include_router(ops_orders.router)
+    app.include_router(ops_bills.router)
 
     logger.info(
         "api configured",

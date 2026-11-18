@@ -164,6 +164,17 @@ async def update_outlet(
     if not changes:
         return
     before = await get_outlet(conn, outlet_id)
+    if any(f in changes and changes[f] != before.get(f) for f in ("pb1_enabled", "pb1_rate_bps")):
+        # A bill's PB1 is computed when it closes; changing the rate while a bill is open
+        # would make the bill disagree with the orders already taken on it.
+        cur = await conn.execute(
+            "select exists (select 1 from app.bills where outlet_id = %s and status = 'open')",
+            (outlet_id,),
+        )
+        if (await cur.fetchone())[0]:  # type: ignore[index]
+            raise ConflictError(
+                "bills_open", "close or void the open bills before changing PB1", {"field": "pb1"}
+            )
     assignments = ", ".join(f"{field} = %s" for field in changes)
     try:
         async with conn.transaction():

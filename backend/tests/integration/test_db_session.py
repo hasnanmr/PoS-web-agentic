@@ -140,13 +140,13 @@ async def test_directory_uses_live_row(pool) -> None:
 async def test_audit_writer_records_actor(pool) -> None:
     ctx = ActorContext.for_user(TA, OWNER).with_reason("tes audit")
     async with db.transaction(pool, ctx) as conn:
-        audit_id = await record_audit(
+        await record_audit(
             conn, ctx, action="outlet.updated", entity_type="outlet", entity_id=A1, outlet_id=A1
         )
         cur = await conn.execute(
             "select actor_type::text, actor_id, reason, data->>'correlation_id' "
-            "from app.audit_events where id = %s",
-            (audit_id,),
+            "from app.audit_events where data->>'correlation_id' = %s",
+            (ctx.correlation_id,),
         )
         row = await cur.fetchone()
     assert row == ("user", OWNER, "tes audit", ctx.correlation_id)
