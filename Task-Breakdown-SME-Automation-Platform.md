@@ -1,6 +1,6 @@
 # Task Breakdown — SME Business Automation Platform
 
-This backlog breaks down the 56 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
+This backlog breaks down the 61 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
 
 ## Delivery assumptions
 
@@ -92,6 +92,13 @@ This backlog breaks down the 56 user stories in [User-Stories-SME-Automation-Pla
 | T-042 | Implement owner-only manual expense entry with outlet, amount, description, date, and actor. | US-031 | T-006, T-041 | P0 |
 | T-043 | Implement daily, weekly, monthly cashflow summaries and trends per outlet and across outlets, using outlet-local day boundaries, with cash in, cash out, and net cash compared against the previous period of the same length, expenses per outlet, and a recent-expenses list. | US-032 | T-041, T-042, T-007 | P0 |
 | T-044 | Add financial integrity tests ensuring ledger values are created only at confirmed payment and cannot be edited/deleted. | US-018–US-032 | T-040–T-043 | P0 |
+| T-125 | Create the purchase-order schema: `suppliers` (tenant-level), `purchase_orders` (outlet, supplier, number per outlet such as `PO-A-0012`, payment term `pay_later`/`pay_in_advance`, due date or expected delivery date, total, goods status, payment status, cancellation with reason), `purchase_order_lines` (stock item or free-text item, quantity in the item's unit, unit price), `purchase_order_receipts` and receipt lines, and `purchase_order_payments` (date, amount, method, linked ledger entry, optional cashier shift); add `transfer` to the payment method enum and a PO reference on ledger entries and stock movements; RLS (owner-only for POs, prices, and payments; assigned staff may read item names and quantities and insert receipts through a definer function), append-only receipts and payments. | US-057–US-061 | T-004, T-005, T-041 | P0 |
+| T-126 | Implement the PO service and owner API: supplier CRUD, create PO with lines, cancel (reason required; refused once paid or received), record payments for pay-later POs (instalments, never above the amount owed) and the full payment for pay-in-advance POs, each posting one `expense` ledger entry on the payment date with method, PO number, and supplier; cash payments optionally linked to an open shift so the blind count's expected cash includes them; `Idempotency-Key` on create and payment; audit events. | US-057, US-058, US-059 | T-041, T-042, T-125 | P0 |
+| T-127 | Implement goods receipt for POs: owner or assigned staff record received quantities per line and the delivery date; ingredient lines create restock movements referencing the PO (converted to base units), free-text lines add no stock; partial deliveries allowed, over-receipt refused; staff endpoints return items and quantities only. | US-060 | T-020, T-125 | P0 |
+| T-128 | Add purchase-order figures to reports: supplier debt (total owed on pay-later POs, overdue count, due in the next 7 days by outlet-local date) and goods paid for but not yet received, on the cashflow report and owner dashboard, kept separate from cash out; PO payments appear in expenses per outlet and the recent-expenses list with their PO number. | US-061 | T-043, T-126, T-127 | P1 |
+| T-129 | Design the Pengeluaran wireframes in figcraft: the screen with tabs **Pengeluaran** (direct expenses) and **Purchase Order** (list with filters, create PO with payment term, PO detail with lines, deliveries, payments, cancel), the record-payment and record-receipt dialogs, the staff "Terima barang" view without prices, mobile 360 px, and the supplier debt cards on O2/O9; update `design/WIREFRAME-TRACEABILITY.md` and `docs/architecture/screen-endpoint-map.md`. | US-031, US-057–US-061 | — | P0 |
+| T-130 | Build the Pengeluaran screen with both tabs, the PO create/detail/payment/cancel flows, supplier management, the staff goods-receipt view, and the supplier debt cards, following the T-129 wireframes. | US-031, US-057–US-061 | T-072, T-126, T-127, T-128, T-129 | P0 |
+| T-131 | Add PO tests: pay-later instalments and overpayment refusal, overdue by outlet time zone, pay-in-advance shown as waiting for goods, partial and over-receipt, restock movements in base units, cash payment lowering a shift's expected cash, cancellation rules, ledger cash-basis (no entry at PO creation or receipt), and staff refused from prices, payments, and debt through the API. | US-057–US-061 | T-126–T-128 | P0 |
 
 ## Wave 5 — WhatsApp integration and deterministic flows
 
@@ -152,7 +159,7 @@ This backlog breaks down the 56 user stories in [User-Stories-SME-Automation-Pla
 | T-122 | Store attendance selfies in a private Supabase Storage bucket: upload from the tablet with size and type checks, short-lived signed URLs for the owner and the staff member only, and a scheduled `attendance_photo_purge` job that deletes photos after 30 days while keeping the records. | US-053, US-054 | T-079, T-104, T-116 | P0 |
 | T-123 | Implement busyness queries for the owner: orders per hour per outlet and period (outlet-local time, opening hours only) with busy (≥ 130% of the hourly average) and quiet (≤ 60%) marking, the day-by-hour average over the last 4 weeks, current crowd per outlet (occupied tables, active orders, Ramai/Normal/Sepi status), and the hour-group filter for dashboard figures. Owner-only at the API. Include tests for time zones, thresholds, and totals. | US-056 | T-007, T-013, T-026, T-030, T-057, T-063 | P1 |
 | T-124 | Build the owner dashboard busyness views (wireframe O2): hour-group filter in the header, day-by-hour busyness map, current crowd per outlet, and orders-per-hour chart with busy and quiet hours marked. | US-056 | T-071, T-123 | P1 |
-| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119, T-124 | P0 |
+| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119, T-124, T-130 | P0 |
 
 ## Wave 8 — Membership, compliance, and MVP hardening
 
@@ -164,7 +171,7 @@ This backlog breaks down the 56 user stories in [User-Stories-SME-Automation-Pla
 | T-078 | Ensure personal data is absent from append-only ledger and stock tables; add automated privacy regression tests. | US-040, US-041 | T-077, T-103 | P0 |
 | T-080 | Add security hardening: secret management, token expiry, webhook verification, upload validation, rate limiting, and audit-log protection. | US-003, US-036, US-038, US-039 | T-006, T-008, T-014, T-045 | P0 |
 | T-081 | Add queue metrics (RabbitMQ management API), structured logs, correlation IDs, retry/DLQ dashboards, and alerts for dead-lettered messages, queue backlog, and failed catalog updates. | US-008, US-036, US-037, US-050 | T-047, T-048, T-112 | P0 |
-| T-082 | Run performance, concurrency, tenant-isolation, backup-restore, and failure-recovery tests against MVP acceptance criteria. | US-014, US-024, US-030, US-037–US-039 | T-015, T-035, T-044, T-056, T-065, T-075, T-078, T-080, T-081, T-103, T-105, T-120 | P0 |
+| T-082 | Run performance, concurrency, tenant-isolation, backup-restore, and failure-recovery tests against MVP acceptance criteria. | US-014, US-024, US-030, US-037–US-039 | T-015, T-035, T-044, T-056, T-065, T-075, T-078, T-080, T-081, T-103, T-105, T-120, T-131 | P0 |
 | T-083 | Execute full UAT with owner, cashier/waiter, and customer scenarios; triage defects and produce release checklist. | All MVP stories | T-082 | P0 |
 
 ## MVP release gates
@@ -222,6 +229,7 @@ The following work can proceed in parallel once the foundation is ready:
 - Platform and infrastructure: T-079, T-104, T-105, T-108–T-114
 - Tenant/staff administration: T-010–T-015
 - Menu and inventory: T-016–T-024
+- Purchase orders and supplier debt: T-125–T-131 (after the ledger, T-041; not on the order critical path)
 - Admin shell and screens: T-066–T-072
 - WhatsApp infrastructure: T-045–T-049, T-100
 - Reservations: T-057–T-065 (not on the order critical path; needs T-055 and T-104 only for reminders and no-show release)

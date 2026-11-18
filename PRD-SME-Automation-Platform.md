@@ -1,12 +1,13 @@
 # Product Requirements Document (PRD)
 ## [Product Name TBD] — SME Business Automation Platform (Indonesia)
 
-**Status:** Draft v0.13
+**Status:** Draft v0.14
 **Date:** November 18, 2026
 **Prepared by:** Hasnan
 **Market:** Indonesia (UMKM — restaurants and cafes first; marketplace dropshippers in Phase 3)
 
 **Change log**
+- **v0.14** — Expenses now include purchase orders (PO) to suppliers, on a new Purchase Order tab next to direct expenses (FR3.5–FR3.10, FR4.10, AC3.6–AC3.13, AC4.9). A PO is either **pay later** (goods arrive first, the outlet owes the supplier until a due date and may pay in instalments) or **pay in advance** (paid when ordered, goods delivered days later). The ledger stays cash-based: an expense is posted only when money is paid, never when a PO is created or goods arrive. Goods received from a PO add stock through restock movements, and staff can record a delivery at their outlet without seeing prices. The cashflow report adds supplier debt (with overdue POs) and goods paid for but not yet received, shown apart from cash out. Short deliveries, supplier returns, and taxes on purchases are open questions.
 - **v0.13** — Attendance details decided: selfies are kept for 30 days, staff do not enter a PIN on the attendance tablet (they tap their name and take a selfie), and a missing clock-out is flagged 1 hour after the outlet's closing time by default. The busy, quiet, and crowded thresholds stay as defaults and will be finalised during development.
 - **v0.12** — The owner dashboard now shows how busy each outlet is: orders per hour with busy and quiet hours marked, a day-by-hour busyness map, and how crowded each outlet is right now (occupied tables and active orders). The owner can filter the dashboard to busy hours or quiet hours (FR7.5–FR7.8, AC7.4–AC7.7). The cashflow report adds the change against the previous period, expenses per outlet, and a list of recent expenses (FR3.3, AC3.5). The thresholds for busy, quiet, and crowded are defaults that still need business input.
 - **v0.11** — Attendance is recorded only on the outlet's attendance tablet: the owner pairs a tablet to the outlet, the tablet stays signed in as that outlet, and a staff member picks their name and takes a selfie to clock in or out (FR5.1, FR5.6, FR5.7, AC5.1–AC5.2, AC5.6–AC5.8). Clocking in from a staff member's own phone or the admin app is no longer possible; staff still see their own history in the admin app. Selfies are kept in private storage, shown only to the owner and to the staff member for their own records, and there is no face recognition in the MVP. This closes the attendance verification question.
@@ -87,7 +88,7 @@ Phases are defined in §10: **MVP = Phases 0–1**, **Phase 2 = agent layer**, *
 4. Payments via static QRIS (staff-confirmed) and cash for dine-in/counter orders, with an end-of-shift cash count; PB1 tax
 5. Menu recommendations via WhatsApp: owner's picks and best sellers, plus AI-assisted suggestions when the customer describes what they want (the only AI feature in the MVP)
 6. Table reservations via WhatsApp (table-based, deterministic)
-7. Cashflow ledger (deterministic, append-only)
+7. Cashflow ledger (deterministic, append-only), with direct expenses and purchase orders to suppliers (pay later or pay in advance)
 8. Menu with per-outlet prices and add-ons; stock with ingredient recipes (deterministic, append-only movements)
 9. Customer membership & data consent (PDP Law)
 10. Owner/staff admin web app (React + TypeScript), including a counter order screen, order board with open bills, reservations/table view, staff clock in/out with a selfie on a paired outlet tablet, with an owner attendance report, and role-based access
@@ -123,6 +124,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 | Open and close bills; take cash payments; mark QRIS payments as received or reject the payment proof | ✓ | ✓ |
 | Open and close a cashier shift, including the end-of-shift cash count | ✓ | ✓ |
 | Record stock movements (restock, waste, adjustment) | ✓ | ✓ |
+| Record goods received for a purchase order at an assigned outlet (items and quantities only, no prices) | ✓ | ✓ |
 | Reverse an order (reason required, logged — FR1.6) | ✓ | ✓ |
 | Handle reservations on the day (seat, no-show, walk-in tables) | ✓ | ✓ |
 | Clock in and out with a selfie on the attendance tablet of an assigned outlet | — | ✓ |
@@ -130,7 +132,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 | Pair or revoke an outlet attendance tablet | ✓ | — |
 | View attendance of all staff and correct attendance records (reason required) | ✓ | — |
 | Edit menu, add-ons, prices, recipes, and recommendations | ✓ | — |
-| Log expenses, view cashflow and reports | ✓ | — |
+| Log expenses, create and cancel purchase orders, record supplier payments, view cashflow and reports | ✓ | — |
 | Manage outlets (including dine-in payment mode, delivery fee, and cash drawers), WhatsApp numbers, tables, QRIS codes, PB1 settings, and staff accounts | ✓ | — |
 
 **Acceptance criteria**
@@ -177,6 +179,12 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR3.1** — Every sale, refund, reversal, or manual expense creates an append-only ledger entry for its outlet; entries are never overwritten or deleted, only reversed with a new entry. Payment entries record the method (cash or QRIS). *[Deterministic · MVP]*
 - **FR3.2** — Owner can log a manual cash expense via the admin app. *[Deterministic · MVP]*
 - **FR3.3** — Owner sees daily/weekly/monthly cashflow summaries and trends, per outlet and across all outlets, with cash and QRIS totals, and PB1 collected, shown separately. The report also shows cash in, cash out, and net cash with the change against the previous period of the same length, expenses per outlet, and the most recent expenses. *[Deterministic · MVP]*
+- **FR3.5** — Owner keeps a supplier list for the business (name, optional phone number, and note) and creates purchase orders (PO) for one outlet and one supplier: order date, lines (an ingredient from the stock list or a free-text item, quantity, unit, and unit price in whole rupiah), and the total. Each PO has a number per outlet (e.g. `PO-A-0012`). Prices include any tax charged by the supplier; purchase tax is not tracked separately in the MVP. *[Deterministic · MVP]*
+- **FR3.6** — Every PO has one payment term, chosen when it is created: **pay later** (bayar mundur/tempo) with a due date, or **pay in advance** (bayar di muka) with an expected delivery date. Creating a PO never posts to the ledger. *[Deterministic · MVP]*
+- **FR3.7** — For a pay-later PO, the owner records one or more payments (date, amount, method: cash or bank transfer) until the PO total is paid; a payment can never exceed the amount still owed. A pay-later PO with money still owed after its due date is **overdue**. *[Deterministic · MVP]*
+- **FR3.8** — For a pay-in-advance PO, the owner records the full payment when the PO is created (or before any goods arrive); the PO then waits for delivery. *[Deterministic · MVP]*
+- **FR3.9** — Each supplier payment posts one append-only `expense` ledger entry for the PO's outlet on the payment date, with the method, PO number, and supplier, so cash out in the cashflow report counts money actually paid. A cash payment can be taken from an open cashier shift's drawer, which then lowers that shift's expected cash (FR11.8); otherwise it is paid outside the drawer. A PO with no payment and no goods received can be cancelled with a required reason; payments and receipts can't be edited or deleted. *[Deterministic · MVP]*
+- **FR3.10** — The Pengeluaran screen has two tabs: **Pengeluaran** (direct expenses, FR3.2) and **Purchase Order**, which lists POs with filters for not fully paid, overdue, waiting for goods, and done, and shows each PO's lines, deliveries, and payments with who recorded them. The cashflow report and owner dashboard show supplier debt (the total still owed on pay-later POs, with the number overdue and due in the next 7 days) and goods paid for but not yet received, separately from cash out. *[Deterministic · MVP]*
 - **FR3.4** — System flags unusual cashflow patterns (e.g. an expense spike) for owner review, showing the ledger entries that triggered the flag. Flags are advisory and never change the ledger. *[Agent · Phase 2]*
 
 **Acceptance criteria**
@@ -184,6 +192,14 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **AC3.2** (FR3.1) — **Given** an order paid by QRIS, **when** the ledger is checked, **then** it holds separate entries for menu sales, PB1, and the delivery fee (if any), each tagged with the outlet and the payment method QRIS.
 - **AC3.3** (FR3.2) — **Given** the owner logs a Rp50.000 expense for outlet A, **when** it is saved, **then** a ledger entry shows the amount, description, date, outlet, and owner; staff can't open this screen.
 - **AC3.4** (FR3.3) — **Given** a day of recorded sales, payments, and expenses, **when** the owner opens the daily, weekly, or monthly summary for one outlet or all outlets, **then** every figure equals the sum of the matching ledger entries, cash, QRIS, and PB1 are shown separately, and day boundaries follow each outlet's time zone.
+- **AC3.6** (FR3.5, FR3.6) — **Given** the owner creates a pay-later PO at outlet A to supplier "Toko Susu Segar" for 20 L milk at Rp18.000 per L due on 30 November, **when** it is saved, **then** the PO shows number, outlet, supplier, lines, total Rp360.000, and due date, and no ledger entry and no stock movement exist for it.
+- **AC3.7** (FR3.7, FR3.9) — **Given** that PO with Rp360.000 owed, **when** the owner records a Rp200.000 bank transfer on 25 November, **then** an expense entry of −Rp200.000 with method transfer, PO number, and supplier is posted on 25 November and Rp160.000 is still owed; **when** the owner tries to record Rp200.000 more, **then** it is refused; **when** they record Rp160.000, **then** the PO shows paid.
+- **AC3.8** (FR3.7) — **Given** a pay-later PO due on 30 November with money still owed, **when** the owner opens the Purchase Order tab on 1 December (outlet time zone), **then** the PO is marked overdue and appears under the overdue filter.
+- **AC3.9** (FR3.8, FR3.9) — **Given** the owner creates a pay-in-advance PO for 10 kg coffee beans at Rp1.500.000 and records the payment the same day, **when** the cashflow report is opened, **then** −Rp1.500.000 is in cash out on that day, the PO is listed as waiting for goods, and the amount is shown under goods paid for but not yet received until the delivery is recorded.
+- **AC3.10** (FR3.9) — **Given** an open shift on drawer Kasir 1 with Rp500.000 starting cash and no sales, **when** the owner pays Rp100.000 cash for a PO from that drawer, **then** the expense entry is linked to the shift and the shift's expected cash at the count is Rp400.000.
+- **AC3.11** (FR3.9) — **Given** a PO with no payment and nothing received, **when** the owner cancels it without a reason, **then** it is refused; with a reason, **then** it is cancelled with who and when; **given** a PO with any payment or receipt, **then** it can't be cancelled.
+- **AC3.12** (FR3.10) — **Given** pay-later POs at outlets A and B with Rp160.000 and Rp250.000 still owed (B's overdue), **when** the owner opens the cashflow report for all outlets, **then** supplier debt shows Rp410.000 with 1 overdue, and cash out is unchanged by these unpaid amounts.
+- **AC3.13** (FR1.5, FR3.5–FR3.10) — **Given** a staff member, **when** they open the Pengeluaran screen, create or cancel a PO, record a supplier payment, or request PO prices or supplier debt — through the app or the API — **then** it is refused.
 - **AC3.5** (FR3.3) — **Given** the owner opens the cashflow report for 1–17 November, **when** it loads, **then** cash in, cash out, and net cash each show the change against 1–17 October, expenses per outlet add up to the period's total expenses, and the recent-expenses list shows each entry's date, outlet, description, amount, and who recorded it.
 
 ### 5.4 Menu, stock & inventory
@@ -195,6 +211,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR4.6** — When an order is placed, all ingredients for its items and add-ons are checked and deducted in a single database transaction, so two customers can never both get the last portion. *[Deterministic · MVP]*
 - **FR4.7** — A menu item is marked sold out at an outlet — and shown as unavailable in the catalog and left out of recommendations — when any ingredient is too low for one portion. An add-on option is likewise unavailable when its ingredients run low. *[Deterministic · MVP]*
 - **FR4.8** — Each outlet sets its own price for every menu item and add-on option. *[Deterministic · MVP]*
+- **FR4.10** — Owner or staff at the PO's outlet record goods received for a PO: the quantity that arrived for each line, the delivery date, and an optional note. Lines linked to an ingredient add stock through a restock movement that references the PO, converted to the ingredient's base unit; free-text lines add no stock. A PO can be received in several deliveries, and no line can be received beyond its ordered quantity. When every line is fully received the PO is complete for goods; staff see only items and quantities, never prices or amounts. *[Deterministic · MVP]*
 - **FR4.9** — Menu items can have add-on groups, each with up to 10 options — for example *Size*: regular / large (pick one, required) or *Extras*: extra shot, oat milk (pick any, optional). An option can add to the price (or be free) and can add ingredients or change quantities in the item's recipe; those ingredients are checked and deducted with the item (FR4.6). *[Deterministic · MVP]*
 
 **Acceptance criteria**
@@ -205,6 +222,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **AC4.5** (FR4.9) — **Given** the "extra shot" option adds Rp5.000 and 18 g coffee beans, **when** one Es Kopi Susu with extra shot is ordered, **then** the item price includes Rp5.000 and 36 g coffee beans are deducted.
 - **AC4.6** (FR4.9) — **Given** an add-on group with 10 options, **when** the owner tries to add an 11th, **then** it is refused.
 - **AC4.7** (FR4.7) — **Given** 100 ml of milk left at outlet A, **when** stock is updated, **then** every item needing more than 100 ml milk per portion is marked sold out at outlet A only, shown as unavailable in outlet A's catalog, and left out of outlet A's recommendations; after a restock, it becomes available again.
+- **AC4.9** (FR4.10) — **Given** a PO at outlet A for 20 L milk linked to the ingredient Susu UHT, **when** staff record 12 L received, **then** a restock movement of 12.000 ml referencing the PO is added at outlet A, the PO shows 12 of 20 L received and partially received, and staff saw no price; **when** they try to record 10 L more, **then** it is refused; **when** they record 8 L, **then** the PO's goods are complete.
 - **AC4.8** (FR4.8) — **Given** Es Kopi Susu costs Rp25.000 at outlet A and Rp28.000 at outlet B, **when** it is ordered at each outlet, **then** each order uses its own outlet's price.
 
 ### 5.5 Staff attendance (MVP) and scheduling (Phase 3)
@@ -430,9 +448,9 @@ flowchart LR
 
 ## 8. Data model (high-level entities)
 
-`tenants` · `outlets` (WhatsApp number, catalog, payment mode, delivery fee) · `users` · `staff_outlets` · `products` (menu items) · `addon_groups` · `addon_options` · `outlet_prices` (menu items and add-on options) · `product_tags` · `stock_items` (ingredients) · `recipe_items` · `stock_movements` · `bills` (open bills) · `orders` (channel, outlet, optional table or bill, order status, payment status) · `order_items` · `order_item_addons` · `order_events` (status changes and reversals, with actor and reason) · `payments` (cash or QRIS) · `payment_proofs` (customer screenshots, review result, reviewer, rejection reason) · `cash_drawers` · `cashier_shifts` (drawer, starting cash, counted cash, difference) · `ledger_entries` · `tables` · `reservations` · `reservation_events` · `whatsapp_contacts` · `customer_consents` · `conversations` · `messages` · `processed_messages` (duplicate check) · `scheduled_jobs` (timers for unpaid-order cancellation, reminders, no-show release, anonymization) · `attendance_records` and `attendance_events` (MVP: clock in, clock out, flag, correction, with the selfie for clock in and clock out) · `attendance_devices` (paired outlet tablets, revocation) · `staff_shifts` (Phase 3)
+`tenants` · `outlets` (WhatsApp number, catalog, payment mode, delivery fee) · `users` · `staff_outlets` · `products` (menu items) · `addon_groups` · `addon_options` · `outlet_prices` (menu items and add-on options) · `product_tags` · `stock_items` (ingredients) · `recipe_items` · `stock_movements` · `bills` (open bills) · `orders` (channel, outlet, optional table or bill, order status, payment status) · `order_items` · `order_item_addons` · `order_events` (status changes and reversals, with actor and reason) · `payments` (cash or QRIS) · `payment_proofs` (customer screenshots, review result, reviewer, rejection reason) · `cash_drawers` · `cashier_shifts` (drawer, starting cash, counted cash, difference) · `ledger_entries` · `suppliers` · `purchase_orders` (outlet, supplier, payment term, due or expected delivery date, total, status) · `purchase_order_lines` (ingredient or free-text item, quantity, unit price) · `purchase_order_receipts` (goods received per delivery, linked to restock movements) · `purchase_order_payments` (date, amount, method, linked expense ledger entry and optional cashier shift) · `tables` · `reservations` · `reservation_events` · `whatsapp_contacts` · `customer_consents` · `conversations` · `messages` · `processed_messages` (duplicate check) · `scheduled_jobs` (timers for unpaid-order cancellation, reminders, no-show release, anonymization) · `attendance_records` and `attendance_events` (MVP: clock in, clock out, flag, correction, with the selfie for clock in and clock out) · `attendance_devices` (paired outlet tablets, revocation) · `staff_shifts` (Phase 3)
 
-Every operational record (stock movements, bills, orders, payments, ledger entries, tables, reservations) carries both `tenant_id` and `outlet_id`.
+Every operational record (stock movements, bills, orders, payments, ledger entries, purchase orders, tables, reservations) carries both `tenant_id` and `outlet_id`.
 
 ---
 
@@ -508,6 +526,9 @@ The MVP (Phases 0–1) alone is a shippable, revenue-generating product. Its onl
 - Hosting region — as of November 18, 2026, neither Supabase nor Railway lists an Indonesia region (the nearest is Singapore for both). Auth and the database stay on Supabase, so the pilot with real data needs a legally reviewed cross-border transfer basis under the PDP Law (NFR1). Who obtains it, and what must the privacy notice and consent text say about storage in Singapore? — **TBD**, blocks any real merchant data
 - Attendance — decided in v0.11 and v0.13: clock in and out only on the outlet's paired tablet with a selfie and no PIN; selfies kept for 30 days; a missing clock-out flagged 1 hour after closing time by default. — **Decided**
 - Busy and crowded thresholds — 130% and 60% of the hourly average for busy and quiet hours, and 75% and 25% of tables for Ramai and Sepi, are placeholders; the final values and how an outlet with no tables (takeaway only) shows its current crowd will be set during development (T-123). — **TBD in development**
+- Purchase orders, short deliveries, and returns — when a supplier delivers less than ordered or goods are returned, can the owner close the remaining quantity and lower the amount owed (with a reason), or is a supplier credit note needed? Proposed for the MVP: the owner can close the rest of a line with a reason, which lowers the amount owed on a pay-later PO; refunds from suppliers for pay-in-advance POs are recorded later as a separate entry. — **TBD**
+- Purchase orders, payment methods and taxes — is bank transfer plus cash enough for supplier payments, and must PPN on purchases be tracked separately? Proposed for the MVP: cash or bank transfer, prices include tax, no separate PPN. — **TBD**
+- Purchase orders, approvals and reminders — do POs need an approval step, and should due-date reminders go to the owner on WhatsApp? Proposed for the MVP: no approval (only the owner creates POs), and due dates are shown in the app only. — **TBD**
 - Delivery — who delivers (outlet staff or a courier the customer books)? The fee is a flat amount per outlet (FR2.6). — **TBD**
 
 ---
@@ -517,6 +538,8 @@ The MVP (Phases 0–1) alone is a shippable, revenue-generating product. Its onl
 - **SME / UMKM** — Usaha Mikro, Kecil, dan Menengah; Indonesia's micro/small/medium enterprise designation.
 - **Outlet** — a single physical location (branch) of a tenant business.
 - **Open bill** — a running bill for a dine-in table (or guest name) that orders are added to, paid when the guests finish.
+- **Purchase order (PO)** — an order to a supplier for one outlet. **Pay later** (bayar mundur/tempo): goods arrive first and the outlet owes the supplier until a due date. **Pay in advance** (bayar di muka): paid when ordered, goods delivered later.
+- **Supplier debt (hutang supplier)** — the amount still owed on pay-later POs; shown in reports but not posted to the cash ledger until it is paid.
 - **Cashier shift** — the period a cash drawer is in use, from the starting cash count to the end-of-shift count. Separate from staff scheduling (Phase 3).
 - **Acceptance criteria** — testable Given/When/Then conditions that must all pass before a requirement counts as done.
 - **WhatsApp catalog** — a product list linked to a WhatsApp Business account, where customers browse items with photos and prices and send a cart to the business.
