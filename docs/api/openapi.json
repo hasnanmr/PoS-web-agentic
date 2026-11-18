@@ -228,6 +228,456 @@
         "title": "Availability",
         "type": "object"
       },
+      "BillCard": {
+        "properties": {
+          "guest_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "order_count": {
+            "title": "Order Count",
+            "type": "integer"
+          },
+          "running_total": {
+            "title": "Running Total",
+            "type": "integer"
+          },
+          "table_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Area"
+          },
+          "table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Id"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          }
+        },
+        "required": [
+          "id",
+          "table_id",
+          "table_name",
+          "table_area",
+          "guest_name",
+          "running_total",
+          "order_count",
+          "opened_at"
+        ],
+        "title": "BillCard",
+        "type": "object"
+      },
+      "BillClose": {
+        "properties": {
+          "cash_received": {
+            "anyOf": [
+              {
+                "maximum": 1000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Received"
+          },
+          "drawer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawer Id"
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "qris"
+            ],
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method"
+        ],
+        "title": "BillClose",
+        "type": "object"
+      },
+      "BillClosed": {
+        "properties": {
+          "bill_id": {
+            "format": "uuid",
+            "title": "Bill Id",
+            "type": "string"
+          },
+          "change_due": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Due"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "orders_completed": {
+            "title": "Orders Completed",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bill_id",
+          "total",
+          "method",
+          "change_due",
+          "orders_completed"
+        ],
+        "title": "BillClosed",
+        "type": "object"
+      },
+      "BillDetail": {
+        "properties": {
+          "guest_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/BillOrder"
+            },
+            "title": "Orders",
+            "type": "array"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "pb1_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Rate Bps"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "table_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Area"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "table_name",
+          "table_area",
+          "guest_name",
+          "status",
+          "opened_at",
+          "orders",
+          "subtotal",
+          "pb1_rate_bps",
+          "pb1_amount",
+          "total"
+        ],
+        "title": "BillDetail",
+        "type": "object"
+      },
+      "BillItem": {
+        "properties": {
+          "addons": {
+            "title": "Addons",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "quantity",
+          "addons"
+        ],
+        "title": "BillItem",
+        "type": "object"
+      },
+      "BillList": {
+        "properties": {
+          "bills": {
+            "items": {
+              "$ref": "#/components/schemas/BillCard"
+            },
+            "title": "Bills",
+            "type": "array"
+          },
+          "payment_mode": {
+            "enum": [
+              "pay_first",
+              "open_bill"
+            ],
+            "title": "Payment Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_mode",
+          "bills"
+        ],
+        "title": "BillList",
+        "type": "object"
+      },
+      "BillOpen": {
+        "properties": {
+          "guest_name": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Name"
+          },
+          "table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Id"
+          }
+        },
+        "title": "BillOpen",
+        "type": "object"
+      },
+      "BillOrder": {
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BillItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "line_total": {
+            "title": "Line Total",
+            "type": "integer"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_no",
+          "channel",
+          "created_at",
+          "status",
+          "line_total",
+          "items"
+        ],
+        "title": "BillOrder",
+        "type": "object"
+      },
+      "Board": {
+        "properties": {
+          "awaiting_payment": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Awaiting Payment",
+            "type": "array"
+          },
+          "confirmed": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Confirmed",
+            "type": "array"
+          },
+          "done_today": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Done Today",
+            "type": "array"
+          },
+          "preparing": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Preparing",
+            "type": "array"
+          },
+          "ready": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Ready",
+            "type": "array"
+          }
+        },
+        "required": [
+          "awaiting_payment",
+          "confirmed",
+          "preparing",
+          "ready",
+          "done_today"
+        ],
+        "title": "Board",
+        "type": "object"
+      },
+      "CancelIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "CancelIn",
+        "type": "object"
+      },
       "Drawer": {
         "properties": {
           "has_open_shift": {
@@ -252,6 +702,31 @@
         "title": "Drawer",
         "type": "object"
       },
+      "DrawerCard": {
+        "properties": {
+          "drawer": {
+            "additionalProperties": true,
+            "title": "Drawer",
+            "type": "object"
+          },
+          "shift": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DrawerShift"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "drawer",
+          "shift"
+        ],
+        "title": "DrawerCard",
+        "type": "object"
+      },
       "DrawerName": {
         "properties": {
           "name": {
@@ -265,6 +740,58 @@
           "name"
         ],
         "title": "DrawerName",
+        "type": "object"
+      },
+      "DrawerShift": {
+        "properties": {
+          "cash_in": {
+            "title": "Cash In",
+            "type": "integer"
+          },
+          "cash_in_count": {
+            "title": "Cash In Count",
+            "type": "integer"
+          },
+          "cash_refunds": {
+            "title": "Cash Refunds",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "opened_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened By"
+          },
+          "starting_cash": {
+            "title": "Starting Cash",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "opened_at",
+          "starting_cash",
+          "opened_by",
+          "cash_in",
+          "cash_in_count",
+          "cash_refunds"
+        ],
+        "title": "DrawerShift",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -310,6 +837,48 @@
           "outlet_ids"
         ],
         "title": "InviteRequest",
+        "type": "object"
+      },
+      "LineIn": {
+        "properties": {
+          "addon_option_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Addon Option Ids",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "maximum": 999.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id",
+          "quantity"
+        ],
+        "title": "LineIn",
         "type": "object"
       },
       "MeOutlet": {
@@ -460,6 +1029,154 @@
           "display_name"
         ],
         "title": "MeUser",
+        "type": "object"
+      },
+      "MenuGroup": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_required": {
+            "title": "Is Required",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/MenuOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "selection": {
+            "enum": [
+              "single",
+              "multiple"
+            ],
+            "title": "Selection",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "selection",
+          "is_required",
+          "options"
+        ],
+        "title": "MenuGroup",
+        "type": "object"
+      },
+      "MenuItem": {
+        "properties": {
+          "addon_groups": {
+            "items": {
+              "$ref": "#/components/schemas/MenuGroup"
+            },
+            "title": "Addon Groups",
+            "type": "array"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "is_owner_pick": {
+            "title": "Is Owner Pick",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "price": {
+            "title": "Price",
+            "type": "integer"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "sold_out": {
+            "title": "Sold Out",
+            "type": "boolean"
+          },
+          "sold_out_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Out Reason"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "category",
+          "is_owner_pick",
+          "price",
+          "photo_url",
+          "sold_out",
+          "sold_out_reason",
+          "addon_groups"
+        ],
+        "title": "MenuItem",
+        "type": "object"
+      },
+      "MenuOption": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "title": "Price",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price",
+          "available"
+        ],
+        "title": "MenuOption",
         "type": "object"
       },
       "MovementCreate": {
@@ -745,6 +1462,25 @@
         "title": "OnboardingResponse",
         "type": "object"
       },
+      "OpenBillRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "total"
+        ],
+        "title": "OpenBillRef",
+        "type": "object"
+      },
       "OpeningHoursItem": {
         "properties": {
           "closes_at": {
@@ -791,6 +1527,590 @@
           "price"
         ],
         "title": "OptionPrice",
+        "type": "object"
+      },
+      "OrderCard": {
+        "properties": {
+          "allowed_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "auto_cancel_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Cancel At"
+          },
+          "bill_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill Id"
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_summary": {
+            "title": "Item Summary",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "payment_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method"
+          },
+          "payment_mode": {
+            "title": "Payment Mode",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_no",
+          "channel",
+          "type",
+          "payment_mode",
+          "status",
+          "payment_status",
+          "payment_method",
+          "table",
+          "customer_name",
+          "item_summary",
+          "total",
+          "bill_id",
+          "created_at",
+          "auto_cancel_at",
+          "allowed_actions"
+        ],
+        "title": "OrderCard",
+        "type": "object"
+      },
+      "OrderCreate": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentIn"
+          },
+          "table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Id"
+          },
+          "type": {
+            "enum": [
+              "dine_in",
+              "takeaway"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "items",
+          "payment"
+        ],
+        "title": "OrderCreate",
+        "type": "object"
+      },
+      "OrderCreated": {
+        "properties": {
+          "bill_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill Id"
+          },
+          "change_due": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Due"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "order_no",
+          "status",
+          "payment_status",
+          "subtotal",
+          "pb1_amount",
+          "total",
+          "change_due",
+          "bill_id"
+        ],
+        "title": "OrderCreated",
+        "type": "object"
+      },
+      "OrderDetail": {
+        "properties": {
+          "allowed_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "auto_cancel_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Cancel At"
+          },
+          "bill_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill Id"
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/OrderEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_summary": {
+            "title": "Item Summary",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "payment_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method"
+          },
+          "payment_mode": {
+            "title": "Payment Mode",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "pb1_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Rate Bps"
+          },
+          "refund": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_no",
+          "channel",
+          "type",
+          "payment_mode",
+          "status",
+          "payment_status",
+          "payment_method",
+          "table",
+          "customer_name",
+          "item_summary",
+          "total",
+          "bill_id",
+          "created_at",
+          "auto_cancel_at",
+          "allowed_actions",
+          "items",
+          "subtotal",
+          "pb1_rate_bps",
+          "pb1_amount",
+          "delivery_fee",
+          "timezone",
+          "events"
+        ],
+        "title": "OrderDetail",
+        "type": "object"
+      },
+      "OrderEventOut": {
+        "properties": {
+          "actor": {
+            "additionalProperties": true,
+            "title": "Actor",
+            "type": "object"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "from_payment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Payment"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "to_payment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Payment"
+          }
+        },
+        "required": [
+          "at",
+          "kind",
+          "from",
+          "to",
+          "from_payment",
+          "to_payment",
+          "reason",
+          "data",
+          "actor"
+        ],
+        "title": "OrderEventOut",
+        "type": "object"
+      },
+      "OrderItemOut": {
+        "properties": {
+          "addons": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Addons",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "line_total": {
+            "title": "Line Total",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "name",
+          "unit_price",
+          "quantity",
+          "line_total",
+          "note",
+          "addons"
+        ],
+        "title": "OrderItemOut",
         "type": "object"
       },
       "OutletCreate": {
@@ -1221,6 +2541,57 @@
         "title": "OutletSummary",
         "type": "object"
       },
+      "PaymentIn": {
+        "properties": {
+          "cash_received": {
+            "anyOf": [
+              {
+                "maximum": 1000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Received"
+          },
+          "drawer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawer Id"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "cash",
+                  "qris"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "to_open_bill": {
+            "default": false,
+            "title": "To Open Bill",
+            "type": "boolean"
+          }
+        },
+        "title": "PaymentIn",
+        "type": "object"
+      },
       "ProductCreate": {
         "properties": {
           "category": {
@@ -1528,6 +2899,119 @@
         "title": "ProductRow",
         "type": "object"
       },
+      "QuoteLine": {
+        "properties": {
+          "addons": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Addons",
+            "type": "array"
+          },
+          "line_total": {
+            "title": "Line Total",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "unit_price",
+          "quantity",
+          "addons",
+          "line_total"
+        ],
+        "title": "QuoteLine",
+        "type": "object"
+      },
+      "QuoteRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "type": {
+            "default": "takeaway",
+            "enum": [
+              "dine_in",
+              "takeaway"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "QuoteRequest",
+        "type": "object"
+      },
+      "QuoteResponse": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/QuoteLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "pb1_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Rate Bps"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lines",
+          "subtotal",
+          "pb1_rate_bps",
+          "pb1_amount",
+          "total"
+        ],
+        "title": "QuoteResponse",
+        "type": "object"
+      },
       "RecipeLine": {
         "properties": {
           "quantity": {
@@ -1586,6 +3070,103 @@
           "unit"
         ],
         "title": "RecipeLineRow",
+        "type": "object"
+      },
+      "ReversalIn": {
+        "properties": {
+          "ingredients": {
+            "anyOf": [
+              {
+                "enum": [
+                  "waste",
+                  "return"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients"
+          },
+          "reason": {
+            "maxLength": 300,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReversalIn",
+        "type": "object"
+      },
+      "ShiftOpen": {
+        "properties": {
+          "starting_cash": {
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Starting Cash",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "starting_cash"
+        ],
+        "title": "ShiftOpen",
+        "type": "object"
+      },
+      "ShiftRow": {
+        "properties": {
+          "drawer_id": {
+            "format": "uuid",
+            "title": "Drawer Id",
+            "type": "string"
+          },
+          "drawer_name": {
+            "title": "Drawer Name",
+            "type": "string"
+          },
+          "drawer_number": {
+            "title": "Drawer Number",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "opened_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened By Name"
+          },
+          "starting_cash": {
+            "title": "Starting Cash",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "drawer_id",
+          "drawer_name",
+          "drawer_number",
+          "opened_at",
+          "starting_cash",
+          "opened_by_name"
+        ],
+        "title": "ShiftRow",
         "type": "object"
       },
       "StaffMember": {
@@ -1903,6 +3484,48 @@
         "title": "StockRow",
         "type": "object"
       },
+      "TableRow": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open_bill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpenBillRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "area",
+          "open_bill"
+        ],
+        "title": "TableRow",
+        "type": "object"
+      },
       "ThresholdItem": {
         "properties": {
           "low_threshold": {
@@ -1928,6 +3551,27 @@
           "low_threshold"
         ],
         "title": "ThresholdItem",
+        "type": "object"
+      },
+      "TransitionIn": {
+        "properties": {
+          "to_status": {
+            "enum": [
+              "confirmed",
+              "preparing",
+              "ready",
+              "out_for_delivery",
+              "served",
+              "completed"
+            ],
+            "title": "To Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to_status"
+        ],
+        "title": "TransitionIn",
         "type": "object"
       },
       "ValidationError": {
@@ -2029,6 +3673,881 @@
         "summary": "Me",
         "tags": [
           "session"
+        ]
+      }
+    },
+    "/api/v1/ops/bills/{bill_id}": {
+      "get": {
+        "operationId": "bill_detail_api_v1_ops_bills__bill_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Bill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bill Detail",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      }
+    },
+    "/api/v1/ops/bills/{bill_id}/close": {
+      "post": {
+        "operationId": "close_bill_api_v1_ops_bills__bill_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Bill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillClose"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillClosed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Bill",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      }
+    },
+    "/api/v1/ops/drawers/{drawer_id}/shifts": {
+      "post": {
+        "operationId": "open_shift_api_v1_ops_drawers__drawer_id__shifts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "drawer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Drawer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftOpen"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "title": "Response Open Shift Api V1 Ops Drawers  Drawer Id  Shifts Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Shift",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      }
+    },
+    "/api/v1/ops/orders/{order_id}": {
+      "get": {
+        "operationId": "order_detail_api_v1_ops_orders__order_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Detail",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/orders/{order_id}/cancel": {
+      "post": {
+        "operationId": "order_cancel_api_v1_ops_orders__order_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Cancel",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/orders/{order_id}/reversal": {
+      "post": {
+        "operationId": "order_reversal_api_v1_ops_orders__order_id__reversal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReversalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Reversal",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/orders/{order_id}/transitions": {
+      "post": {
+        "operationId": "order_transition_api_v1_ops_orders__order_id__transitions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Transition",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/bills": {
+      "get": {
+        "operationId": "list_bills_api_v1_ops_outlets__outlet_id__bills_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Bills",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      },
+      "post": {
+        "operationId": "open_bill_api_v1_ops_outlets__outlet_id__bills_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillOpen"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Bill",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/drawers": {
+      "get": {
+        "operationId": "drawers_api_v1_ops_outlets__outlet_id__drawers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DrawerCard"
+                  },
+                  "title": "Response Drawers Api V1 Ops Outlets  Outlet Id  Drawers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Drawers",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/menu": {
+      "get": {
+        "operationId": "counter_menu_api_v1_ops_outlets__outlet_id__menu_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 60,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner_picks",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Owner Picks",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MenuItem"
+                  },
+                  "title": "Response Counter Menu Api V1 Ops Outlets  Outlet Id  Menu Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Counter Menu",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/orders": {
+      "post": {
+        "operationId": "create_order_api_v1_ops_outlets__outlet_id__orders_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Order",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/orders/board": {
+      "get": {
+        "operationId": "order_board_api_v1_ops_outlets__outlet_id__orders_board_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "counter",
+                    "whatsapp_online",
+                    "whatsapp_table"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "dine_in",
+                    "takeaway",
+                    "delivery",
+                    "pickup"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 60,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Board"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Board",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/quotes": {
+      "post": {
+        "operationId": "create_quote_api_v1_ops_outlets__outlet_id__quotes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Quote",
+        "tags": [
+          "ops: orders"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/shifts/current": {
+      "get": {
+        "operationId": "current_shifts_api_v1_ops_outlets__outlet_id__shifts_current_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShiftRow"
+                  },
+                  "title": "Response Current Shifts Api V1 Ops Outlets  Outlet Id  Shifts Current Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Current Shifts",
+        "tags": [
+          "ops: bills & shifts"
         ]
       }
     },
@@ -2243,6 +4762,53 @@
         "summary": "Create Movement",
         "tags": [
           "ops: stock"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/tables": {
+      "get": {
+        "operationId": "tables_api_v1_ops_outlets__outlet_id__tables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TableRow"
+                  },
+                  "title": "Response Tables Api V1 Ops Outlets  Outlet Id  Tables Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tables",
+        "tags": [
+          "ops: orders"
         ]
       }
     },

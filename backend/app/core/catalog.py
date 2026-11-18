@@ -633,3 +633,106 @@ async def product_availability(conn: AsyncConnection, product_id: UUID) -> list[
             }
         )
     return out
+
+
+# Counter menu (S1) -----------------------------------------------------------------------------
+
+
+async def counter_menu(
+    conn: AsyncConnection,
+    outlet_id: UUID,
+    *,
+    q: str | None = None,
+    category: str | None = None,
+    owner_picks: bool = False,
+) -> list[dict[str, Any]]:
+    """Active products priced at the outlet, with sold-out state and add-on availability."""
+    cur = conn.cursor(row_factory=dict_row)
+    await cur.execute(
+        """
+        select p.id as product_id, p.name, p.category, p.is_owner_pick, op.price
+        from app.products p
+        join app.outlet_prices op on op.product_id = p.id and op.outlet_id = %s and op.is_available
+        where p.is_active
+        order by p.is_owner_pick desc, coalesce(p.owner_pick_rank, 999), p.category nulls last,
+                 p.name
+        """,
+        (outlet_id,),
+    )
+    products = await cur.fetchall()
+    recipes = await stock_core.load_recipes(conn)
+    stock = await stock_core.on_hand(conn, outlet_id)
+    await cur.execute(
+        """
+        select g.id, g.product_id, g.name, g.selection::text as selection, g.is_required,
+               o.id as option_id, o.name as option_name, op.price
+        from app.addon_groups g
+        join app.addon_options o on o.group_id = g.id and o.is_active
+        join app.outlet_prices op on op.addon_option_id = o.id and op.outlet_id = %s
+        order by g.sort_order, g.created_at, o.sort_order, o.created_at
+        """,
+        (outlet_id,),
+    )
+    groups: dict[UUID, dict[UUID, dict[str, Any]]] = defaultdict(dict)
+    for r in await cur.fetchall():
+        product_groups = groups[r["product_id"]]
+        group = product_groups.setdefault(
+            r["id"],
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "selection": r["selection"],
+                "is_required": r["is_required"],
+                "options": [],
+            },
+        )
+        base = recipes.products.get(r["product_id"], {})
+        group["options"].append(
+            {
+                "id": r["option_id"],
+                "name": r["option_name"],
+                "price": r["price"],
+                "available": stock_core.option_available(
+                    base, recipes.options.get(r["option_id"], {}), stock
+                ),
+            }
+        )
+    needle = (q or "").strip().lower()
+    out = []
+    for p in products:
+        if needle and needle not in p["name"].lower():
+            continue
+        if category and p["category"] != category:
+            continue
+        if owner_picks and not p["is_owner_pick"]:
+            continue
+        sold_out = stock_core.product_availability(
+            recipes.products.get(p["product_id"], {}), stock
+        ).sold_out
+        out.append(
+            {
+                **p,
+                "photo_url": None,
+                "sold_out": sold_out,
+                "sold_out_reason": "Bahan tidak cukup" if sold_out else None,
+                "addon_groups": list(groups.get(p["product_id"], {}).values()),
+            }
+        )
+    return out
+
+
+async def tables_with_bills(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str, Any]]:
+    """S1 table dropdown: "Meja 05 · Indoor — open bill aktif (Rp 64.000)"."""
+    cur = conn.cursor(row_factory=dict_row)
+    await cur.execute(
+        """
+        select t.id, t.name, t.area, b.id as bill_id,
+               (select coalesce(sum(o.subtotal), 0) from app.orders o
+                where o.bill_id = b.id and o.status <> 'cancelled') as bill_subtotal
+        from app.tables t
+        left join app.bills b on b.table_id = t.id and b.status = 'open'
+        where t.outlet_id = %s and t.is_active order by t.name
+        """,
+        (outlet_id,),
+    )
+    return await cur.fetchall()

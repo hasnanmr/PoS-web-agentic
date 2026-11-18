@@ -20,7 +20,7 @@ export type TokenSource = () => Promise<string | null>
 
 export interface Api {
   get<T>(path: string): Promise<T>
-  post<T>(path: string, body?: unknown): Promise<T>
+  post<T>(path: string, body?: unknown, headers?: Record<string, string>): Promise<T>
   put<T>(path: string, body: unknown): Promise<T>
   patch<T>(path: string, body: unknown): Promise<T>
   del<T = void>(path: string): Promise<T>
@@ -29,8 +29,8 @@ export interface Api {
 export function createApi(baseUrl: string, token: TokenSource): Api {
   const root = baseUrl.replace(/\/+$/, '') + '/api/v1'
 
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { Accept: 'application/json' }
+  async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+    const headers: Record<string, string> = { Accept: 'application/json', ...extra }
     const access = await token()
     if (access) headers.Authorization = `Bearer ${access}`
     if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -56,7 +56,7 @@ export function createApi(baseUrl: string, token: TokenSource): Api {
 
   return {
     get: (path) => request('GET', path),
-    post: (path, body) => request('POST', path, body ?? {}),
+    post: (path, body, headers) => request('POST', path, body ?? {}, headers),
     put: (path, body) => request('PUT', path, body),
     patch: (path, body) => request('PATCH', path, body),
     del: (path) => request('DELETE', path),
@@ -86,6 +86,18 @@ const ERROR_COPY: Record<string, string> = {
   already_onboarded: 'Akun ini sudah punya bisnis.',
   insufficient_stock: 'Stok tidak cukup; stok tidak boleh minus.',
   stock_item_name_taken: 'Nama bahan sudah dipakai.',
+  item_sold_out: 'Item habis.',
+  item_unavailable: 'Item tidak tersedia di outlet ini.',
+  addon_required: 'Pilih add-on yang wajib.',
+  addon_invalid: 'Pilihan add-on tidak valid.',
+  shift_not_open: 'Buka shift kasir dulu untuk menerima cash.',
+  shift_already_open: 'Drawer ini sudah punya shift aktif.',
+  cash_insufficient: 'Uang diterima kurang dari total.',
+  invalid_transition: 'Status order sudah berubah. Muat ulang.',
+  reason_required: 'Alasan wajib diisi — reversal tanpa alasan ditolak.',
+  bill_not_open: 'Bill sudah ditutup.',
+  bill_empty: 'Bill belum punya order.',
+  payment_mode_pay_first: 'Outlet ini memakai mode pay first.',
   addon_group_in_use: 'Opsi grup ini sudah dipakai di order; ubah opsinya saja.',
 }
 
@@ -93,6 +105,9 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'validation_failed' && error.details.field === 'pb1_rate_bps') {
       return 'Isi tarif PB1 saat PB1 aktif.'
+    }
+    if (error.code === 'item_sold_out' && typeof error.details.name === 'string') {
+      return `${error.details.name} habis. Hapus atau ganti item ini.`
     }
     return ERROR_COPY[error.code] ?? error.message
   }

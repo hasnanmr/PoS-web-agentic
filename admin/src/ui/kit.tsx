@@ -1,6 +1,6 @@
 // Small building blocks matching the wireframe look (cards, labelled fields, buttons).
 // Tokens come from index.css; sizes follow CLAUDE.md (13px labels/body, 16–20px headings).
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode, SelectHTMLAttributes } from 'react'
 
 export function Card({ title, actions, children, className = '' }: {
   title?: ReactNode
@@ -63,7 +63,7 @@ const control =
   'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-[13px] text-text ' +
   'placeholder:text-text-muted focus:border-primary focus:outline-none disabled:bg-page'
 
-export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput(props: ComponentProps<'input'>) {
   return <input {...props} className={`${control} ${props.className ?? ''}`} />
 }
 

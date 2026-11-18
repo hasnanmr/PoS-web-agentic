@@ -20,8 +20,9 @@ _INSERT = """
 insert into app.audit_events
   (tenant_id, outlet_id, actor_type, actor_id, action, entity_type, entity_id, reason, data)
 values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-returning id
 """
+# No RETURNING: staff may append audit events but only the owner may read them (RLS),
+# and RETURNING needs read access to the new row.
 
 
 async def record_audit(
@@ -33,10 +34,10 @@ async def record_audit(
     entity_id: str | UUID | None = None,
     outlet_id: UUID | None = None,
     data: dict[str, Any] | None = None,
-) -> int:
-    """Insert one audit event and return its id. `ctx.reason` is stored when present."""
+) -> None:
+    """Insert one audit event. `ctx.reason` is stored when present."""
     payload = {"correlation_id": ctx.correlation_id, **(data or {})}
-    cur = await conn.execute(
+    await conn.execute(
         _INSERT,
         (
             ctx.tenant_id,
@@ -50,6 +51,3 @@ async def record_audit(
             Jsonb(payload),
         ),
     )
-    row = await cur.fetchone()
-    assert row is not None  # noqa: S101 - insert ... returning always yields a row
-    return int(row[0])

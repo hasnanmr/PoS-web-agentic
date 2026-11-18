@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.core.actor import ReasonRequiredError
 from app.core.errors import DomainError
 
 
@@ -51,6 +52,10 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code, content=_body(exc.code, exc.message, exc.details)
         )
+
+    @app.exception_handler(ReasonRequiredError)
+    async def _reason_required(_: Request, exc: ReasonRequiredError) -> JSONResponse:
+        return JSONResponse(status_code=422, content=_body("reason_required", str(exc)))
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:

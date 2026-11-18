@@ -175,3 +175,150 @@ export interface Movement {
   actor_type: string
   actor: string
 }
+
+// Orders, bills, shifts (S1, S2, S3, S5, S8) ------------------------------------------
+
+export interface MenuOption { id: string; name: string; price: number; available: boolean }
+export interface MenuGroup {
+  id: string
+  name: string
+  selection: 'single' | 'multiple'
+  is_required: boolean
+  options: MenuOption[]
+}
+export interface MenuItem {
+  product_id: string
+  name: string
+  category: string | null
+  is_owner_pick: boolean
+  price: number
+  photo_url: string | null
+  sold_out: boolean
+  sold_out_reason: string | null
+  addon_groups: MenuGroup[]
+}
+
+export interface TableRow {
+  id: string
+  name: string
+  area: string | null
+  open_bill: { id: string; total: number } | null
+}
+
+export interface Quote {
+  lines: { product_id: string; name: string; unit_price: number; quantity: number; line_total: number;
+    addons: { id: string; name: string; price: number }[] }[]
+  subtotal: number
+  pb1_rate_bps: number | null
+  pb1_amount: number
+  total: number
+}
+
+export interface OrderCreated {
+  id: string
+  order_no: string
+  status: string
+  payment_status: string
+  subtotal: number
+  pb1_amount: number
+  total: number
+  change_due: number | null
+  bill_id: string | null
+}
+
+export type OrderStatus =
+  | 'pending_payment' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'served' | 'completed' | 'cancelled'
+export type PaymentStatus = 'unpaid' | 'proof_submitted' | 'paid' | 'refunded'
+
+export interface OrderCard {
+  id: string
+  order_no: string
+  channel: 'counter' | 'whatsapp_online' | 'whatsapp_table'
+  type: 'dine_in' | 'takeaway' | 'delivery' | 'pickup'
+  payment_mode: 'pay_first' | 'open_bill'
+  status: OrderStatus
+  payment_status: PaymentStatus
+  payment_method: 'cash' | 'qris' | null
+  table: string | null
+  customer_name: string | null
+  item_summary: string
+  total: number
+  bill_id: string | null
+  created_at: string
+  auto_cancel_at: string | null
+  allowed_actions: string[]
+}
+
+export interface Board {
+  awaiting_payment: OrderCard[]
+  confirmed: OrderCard[]
+  preparing: OrderCard[]
+  ready: OrderCard[]
+  done_today: OrderCard[]
+}
+
+export interface OrderEvent {
+  at: string
+  kind: string
+  from: string | null
+  to: string | null
+  from_payment: string | null
+  to_payment: string | null
+  reason: string | null
+  data: Record<string, unknown>
+  actor: { type: string; name: string | null; role: string | null }
+}
+
+export interface OrderDetail extends OrderCard {
+  items: { id: string; name: string; unit_price: number; quantity: number; line_total: number; note: string | null;
+    addons: { name: string; price: number }[] }[]
+  subtotal: number
+  pb1_rate_bps: number | null
+  pb1_amount: number
+  delivery_fee: number
+  timezone: string
+  events: OrderEvent[]
+  refund?: { amount: number; method: string } | null
+}
+
+export interface BillCard {
+  id: string
+  table_id: string | null
+  table_name: string | null
+  table_area: string | null
+  guest_name: string | null
+  running_total: number
+  order_count: number
+  opened_at: string
+}
+
+export interface BillDetail {
+  id: string
+  table_name: string | null
+  table_area: string | null
+  guest_name: string | null
+  status: string
+  opened_at: string
+  orders: { id: string; order_no: string; channel: string; created_at: string; status: string; line_total: number;
+    items: { name: string; quantity: number; addons: string }[] }[]
+  subtotal: number
+  pb1_rate_bps: number | null
+  pb1_amount: number
+  total: number
+}
+
+export interface ShiftRow {
+  id: string
+  drawer_id: string
+  drawer_name: string
+  drawer_number: number
+  opened_at: string
+  starting_cash: number
+  opened_by_name: string | null
+}
+
+export interface DrawerCard {
+  drawer: { id: string; name: string }
+  shift: { id: string; opened_at: string; starting_cash: number; opened_by: string | null; cash_in: number;
+    cash_in_count: number; cash_refunds: number } | null
+}
