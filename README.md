@@ -130,7 +130,7 @@ Two Railway services in one project, both deployed by GitHub Actions (`.github/w
 | `admin` | `admin/` | `admin/Dockerfile`, `admin/railway.toml` |
 
 On every push to `main`, CI runs first; if it is green, only the service whose files changed
-is redeployed (`backend/**` or `supabase/**` -> backend, `admin/**` -> admin). When the
+is redeployed (`backend/**`, `supabase/**` or the workflow file -> backend, `admin/**` -> admin). When the
 backend changes, pending `supabase/migrations/` are applied to the hosted Supabase project
 first (job "Apply Supabase migrations"); the backend is deployed only if that succeeds.
 Pull requests and other branches run CI only.

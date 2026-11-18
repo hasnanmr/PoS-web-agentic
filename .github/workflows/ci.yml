@@ -124,6 +124,7 @@ jobs:
             backend:
               - 'backend/**'
               - 'supabase/**'
+              - '.github/workflows/ci.yml'
             admin:
               - 'admin/**'
 
