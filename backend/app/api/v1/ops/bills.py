@@ -109,8 +109,13 @@ class DrawerShift(BaseModel):
     cash_refunds: int
 
 
+class DrawerOut(BaseModel):
+    id: UUID
+    name: str | None
+
+
 class DrawerCard(BaseModel):
-    drawer: dict[str, Any]
+    drawer: DrawerOut
     shift: DrawerShift | None
 
 
@@ -129,7 +134,7 @@ class ShiftCloseIn(BaseModel):
 
 class ShiftClosed(BaseModel):
     id: UUID
-    drawer: dict[str, Any]
+    drawer: DrawerOut
     opened_at: datetime
     closed_at: datetime
     timezone: str

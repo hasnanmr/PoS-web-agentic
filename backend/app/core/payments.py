@@ -133,7 +133,9 @@ async def post_refund(
         # that already closed, and the description says why for the owner's review.
         shift_id = await shifts.shift_for_refund(conn, ctx, outlet_id)
         if shift_id is None:
-            description = f"[tunai tanpa shift terbuka] {ctx.reason or ''}".strip()
+            several = len(await shifts.open_shifts(conn, outlet_id)) > 1
+            note = "[tunai, drawer tidak dipilih]" if several else "[tunai tanpa shift terbuka]"
+            description = f"{note} {ctx.reason or ''}".strip()
     await ledger.post(
         conn,
         ctx,

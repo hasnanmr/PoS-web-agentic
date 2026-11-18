@@ -298,6 +298,8 @@ def test_blind_count_close_posts_surplus_and_is_idempotent(client, ctx) -> None:
 
 
 def test_blind_count_with_refund_posts_shortage_and_cash_count_report(client, ctx) -> None:
+    url = f"/api/v1/owner/reports/cash-count?outlet_id={ctx['outlet']}&drawer_id={ctx['drawer']}"
+    before = client.get(url, headers=ctx["owner"]).json()["summary"]
     shift = _open_shift(client, ctx, 300000)
     order = _cash_order(client, ctx)
     res = client.post(
@@ -317,13 +319,14 @@ def test_blind_count_with_refund_posts_shortage_and_cash_count_report(client, ct
     assert closed["cash_refunds"] == order["total"] and closed["expected_cash"] == 300000
     assert closed["difference"] == -1000 and closed["kind"] == "shortage"
 
-    url = f"/api/v1/owner/reports/cash-count?outlet_id={ctx['outlet']}&drawer_id={ctx['drawer']}"
     assert client.get(url, headers=ctx["staff"]).status_code == 403
     report = client.get(url, headers=ctx["owner"]).json()
-    assert report["summary"]["shifts"] == 2
-    assert report["summary"]["shifts_with_difference"] == 2
-    assert report["summary"]["total_shortage"] == -1000
-    assert report["summary"]["total_surplus"] == 2000
+    # Deltas against the report before this test, so it does not depend on test order.
+    summary = report["summary"]
+    assert summary["shifts"] == before["shifts"] + 1
+    assert summary["shifts_with_difference"] == before["shifts_with_difference"] + 1
+    assert summary["total_shortage"] == before["total_shortage"] - 1000
+    assert summary["total_surplus"] == before["total_surplus"]
     row = report["rows"][0]
     assert row["shift_id"] == shift and row["drawer"]["number"] == 1
     assert row["outlet"]["name"] == "Dago" and row["counted_by"] == "Rina"
@@ -331,7 +334,10 @@ def test_blind_count_with_refund_posts_shortage_and_cash_count_report(client, ct
     csv = client.get(url + "&format=csv", headers=ctx["owner"])
     assert csv.status_code == 200 and csv.headers["content-type"].startswith("text/csv")
     lines = csv.text.strip().splitlines()
-    assert lines[0].startswith("tanggal,buka,tutup,zona,outlet,drawer") and len(lines) == 3
+    assert (
+        lines[0].startswith("tanggal,buka,tutup,zona,outlet,drawer")
+        and len(lines) == 1 + summary["shifts"]
+    )
     assert ",-1000,shortage,Rina" in lines[1]
 
 
@@ -377,11 +383,19 @@ def test_expenses_are_owner_only_append_only_and_reversible(client, ctx) -> None
         "Kemasan takeaway",
         "Servis mesin espresso",
     ]
-    rest = client.get(
-        f"/api/v1/owner/expenses?limit=2&cursor={page['next_cursor']}", headers=ctx["owner"]
-    ).json()
-    assert [e["description"] for e in rest["items"]] == ["Beli es batu & gas"]
-    assert rest["next_cursor"] is None
+    seen = [e["id"] for e in page["items"]]
+    cursor = page["next_cursor"]
+    rest = client.get(f"/api/v1/owner/expenses?limit=2&cursor={cursor}", headers=ctx["owner"])
+    assert rest.json()["items"][0]["description"] == "Beli es batu & gas"
+    while cursor:  # walk to the end: every expense once, then no cursor
+        nxt = client.get(f"/api/v1/owner/expenses?limit=2&cursor={cursor}", headers=ctx["owner"])
+        seen += [e["id"] for e in nxt.json()["items"]]
+        cursor = nxt.json()["next_cursor"]
+    total = admin_sql(
+        "select count(*) from app.ledger_entries where tenant_id = %s and type = 'expense'",
+        (ctx["tenant"],),
+    )[0][0]
+    assert len(seen) == len(set(seen)) == total
 
     url = f"/api/v1/owner/ledger-entries/{first['id']}/reversal"
     assert client.post(url, headers=ctx["owner"], json={"reason": ""}).status_code == 422
@@ -391,9 +405,19 @@ def test_expenses_are_owner_only_append_only_and_reversible(client, ctx) -> None
     assert res.json()["expense"]["reversed"] is True
     again = client.post(url, headers=ctx["owner"], json={"reason": "lagi"})
     assert again.status_code == 409 and again.json()["error"]["code"] == "already_reversed"
+    paid = client.post(  # a QRIS sale of its own, so a revenue row exists in any test order
+        f"/api/v1/ops/outlets/{ctx['outlet']}/orders",
+        headers=ctx["staff"],
+        json={
+            "type": "takeaway",
+            "items": [{"product_id": ctx["americano"]["product_id"], "quantity": 1}],
+            "payment": {"method": "qris"},
+        },
+    )
+    assert paid.status_code == 201, paid.text
     revenue = admin_sql(
-        "select id from app.ledger_entries where outlet_id = %s and type = 'revenue' limit 1",
-        (ctx["outlet"],),
+        "select id from app.ledger_entries where order_id = %s and type = 'revenue' limit 1",
+        (paid.json()["id"],),
     )[0][0]
     res = client.post(
         f"/api/v1/owner/ledger-entries/{revenue}/reversal",
@@ -405,6 +429,19 @@ def test_expenses_are_owner_only_append_only_and_reversible(client, ctx) -> None
 
 def test_cashflow_report_adds_up_from_the_ledger(client, ctx) -> None:
     today = _today()
+    # Seed this test's own expense; every other figure is checked against the ledger itself,
+    # so the test holds whichever other tests ran before it.
+    res = client.post(
+        "/api/v1/owner/expenses",
+        headers=ctx["owner"],
+        json={
+            "outlet_id": ctx["outlet"],
+            "amount": 450000,
+            "business_date": today.isoformat(),
+            "description": "Listrik & air",
+        },
+    )
+    assert res.status_code == 201, res.text
     url = f"/api/v1/owner/reports/cashflow?from={today.replace(day=1)}&to={today}"
     assert client.get(url, headers=ctx["staff"]).status_code == 403
     report = client.get(url, headers=ctx["owner"]).json()
@@ -428,17 +465,22 @@ def test_cashflow_report_adds_up_from_the_ledger(client, ctx) -> None:
     b = report["breakdown"]
     assert b["revenue_excl_pb1"] == by.get("revenue", 0)
     assert b["cash"] == by.get("cash", 0) and b["qris"] == by.get("qris", 0)
-    assert b["refunds"] == refunds and b["expenses"] == expenses == 1200000 + 880000
-    assert b["cash_difference"] == difference == 1000
+    assert b["refunds"] == refunds and b["expenses"] == expenses >= 450000
+    assert b["cash_difference"] == difference
     t = report["totals"]
     assert t["cash_in"]["amount"] == cash_in
     assert t["cash_out"]["amount"] == refunds + expenses
     assert t["net"]["amount"] == cash_in - refunds - expenses + difference
     assert t["cash_in"]["change_pct"] is None  # nothing in the previous period
+    open_expenses = admin_sql(
+        "select count(*) from app.ledger_entries e where e.tenant_id = %s and e.type = 'expense'"
+        " and not exists (select 1 from app.ledger_entries r where r.reverses_entry_id = e.id)",
+        (ctx["tenant"],),
+    )[0][0]
     assert report["expenses_by_outlet"] == [
-        {"outlet_id": ctx["outlet"], "outlet": "Dago", "amount": expenses, "count": 2}
+        {"outlet_id": ctx["outlet"], "outlet": "Dago", "amount": expenses, "count": open_expenses}
     ]
-    assert report["expenses_count"] == 2
+    assert report["expenses_count"] == open_expenses
     days = [p["date"] for p in report["series"]]
     assert days[0] == today.replace(day=1).isoformat() and days[-1] == today.isoformat()
     assert sum(p["cash_in"] for p in report["series"]) == cash_in

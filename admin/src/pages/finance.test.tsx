@@ -138,6 +138,8 @@ describe('O9 Laporan Cashflow & Pengeluaran', () => {
     expect(screen.getByText('+ Rp 82.000')).toBeInTheDocument()
     expect(screen.getByText('− Rp 1.230.000')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '1–17 Nov 2026 ▾' })).toBeInTheDocument()
+    expect(screen.getByText(/^Nov 2026 · dari ledger/)).toBeInTheDocument()
+    expect(screen.getAllByTestId('series-bar')).toHaveLength(CASHFLOW.series.length)
     expect(await screen.findByText('17 Nov · Dago · oleh Olga')).toBeInTheDocument()
     expect(screen.getByText('Tidak bisa diedit/dihapus. Koreksi lewat reversal.')).toBeInTheDocument()
 
@@ -152,6 +154,18 @@ describe('O9 Laporan Cashflow & Pengeluaran', () => {
       expect(call?.[2]).toMatchObject({ outlet_id: 'o-dago', amount: 350000, description: 'Beli es batu & gas' })
     })
     expect(await screen.findByText('Pengeluaran tersimpan di ledger.')).toBeInTheDocument()
+  })
+
+  it('opens the full expense list from "Lihat semua pengeluaran →"', async () => {
+    const api = fakeApi({
+      'GET /owner/reports/cashflow?granularity=daily': CASHFLOW,
+      'GET /owner/expenses?limit=5': EXPENSES,
+      'GET /owner/expenses?limit=20': EXPENSES,
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><CashflowPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Lihat semua pengeluaran →' }))
+    await waitFor(() => expect(api.calls.map((c) => c[1])).toContain('/owner/expenses?limit=20'))
+    expect(await screen.findByRole('button', { name: 'Buat entry reversal' })).toBeInTheDocument()
   })
 
   it('reverses an expense from the full list with a reason', async () => {

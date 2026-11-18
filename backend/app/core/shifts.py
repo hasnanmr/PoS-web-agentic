@@ -33,7 +33,7 @@ _OPEN_SHIFTS = """
 select s.id, s.drawer_id, d.name as drawer_name, s.opened_at, s.starting_cash,
        s.opened_by, u.display_name as opened_by_name,
        (select count(*) from app.cash_drawers d2
-        where d2.outlet_id = d.outlet_id and d2.is_active and d2.created_at <= d.created_at)
+        where d2.outlet_id = d.outlet_id and d2.created_at <= d.created_at)
          as drawer_number
 from app.cashier_shifts s
 join app.cash_drawers d on d.id = s.drawer_id

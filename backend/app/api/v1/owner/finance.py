@@ -57,7 +57,7 @@ class ExpenseIn(BaseModel):
     description: str = Field(min_length=1, max_length=ledger.DESCRIPTION_MAX)
 
 
-class ReversalIn(BaseModel):
+class ExpenseReversalIn(BaseModel):
     reason: str = Field(max_length=300)
 
 
@@ -247,7 +247,7 @@ async def create_expense(
 
 @router.post("/ledger-entries/{entry_id}/reversal", status_code=status.HTTP_201_CREATED)
 async def reverse_entry(
-    entry_id: int, body: ReversalIn, request: Request, user: OwnerOnly
+    entry_id: int, body: ExpenseReversalIn, request: Request, user: OwnerOnly
 ) -> ReversalOut:
     """O9 "Salah input? Buat entry reversal, bukan edit." (expenses only)."""
     if not body.reason.strip():

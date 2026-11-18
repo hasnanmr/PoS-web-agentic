@@ -182,7 +182,8 @@ async def cashflow(
     by_outlet = [
         {"outlet_id": o["id"], "outlet": o["name"], **expenses[o["id"]]}
         for o in outlets
-        if o["id"] in expenses
+        # An outlet whose expenses were all reversed is left out, not shown as "Rp 0 · 0 entri".
+        if expenses[o["id"]]["count"] or expenses[o["id"]]["amount"]
     ]
     by_outlet.sort(key=lambda e: -e["amount"])
     return {
@@ -220,7 +221,7 @@ _CASH_COUNT = """
 select s.id as shift_id, s.opened_at, s.closed_at, s.outlet_id, o.name as outlet_name,
        o.timezone, s.drawer_id, d.name as drawer_name,
        (select count(*) from app.cash_drawers d2
-        where d2.outlet_id = d.outlet_id and d2.is_active and d2.created_at <= d.created_at)
+        where d2.outlet_id = d.outlet_id and d2.created_at <= d.created_at)
          as drawer_number,
        s.starting_cash, s.expected_cash, s.counted_cash, s.difference,
        u.display_name as counted_by

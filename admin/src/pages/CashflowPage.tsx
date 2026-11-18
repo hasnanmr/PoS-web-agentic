@@ -7,12 +7,15 @@
 import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
-import { formatDay, formatRange, formatRupiah, formatSignedRupiah, shortOutlet, todayIn } from '../lib/format'
+import { MONTHS, formatDay, formatRange, formatRupiah, formatSignedRupiah, shortOutlet, todayIn } from '../lib/format'
 import type { Cashflow, Expense, ExpensePage, Granularity, Tile } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, Field, LinkButton, Loading, Select, TextInput } from '../ui/kit'
 import { RangePicker } from '../ui/RangePicker'
+
+/** Server cap per expense entry (ledger.EXPENSE_MAX). */
+const EXPENSE_MAX = 1_000_000_000
 
 const GRANULARITY: { key: Granularity; label: string }[] = [
   { key: 'daily', label: 'Harian' },
@@ -40,6 +43,9 @@ export default function CashflowPage({ expandExpenses = false }: { expandExpense
   const query = params.toString()
   const report = useLoad(() => api.get<Cashflow>(`/owner/reports/cashflow?${query}`), query)
   const [expensesVersion, setExpensesVersion] = useState(0)
+  // "Lihat semua →" (Pengeluaran terbaru) and "Lihat semua pengeluaran →" (per outlet) open the
+  // same full list the sidebar item Pengeluaran opens.
+  const [allExpenses, setAllExpenses] = useState(expandExpenses)
   const r = report.data
 
   return (
@@ -77,7 +83,7 @@ export default function CashflowPage({ expandExpenses = false }: { expandExpense
             <div className="grid gap-4 lg:grid-cols-3">
               <Card className="lg:col-span-2" title={SERIES_TITLE[r.granularity]}>
                 <p className="-mt-2 mb-2 text-[11px] text-text-muted">
-                  {formatRange(r.from, r.to)} · dari ledger · batas hari mengikuti zona waktu tiap outlet
+                  {periodCaption(r.from, r.to)} · dari ledger · batas hari mengikuti zona waktu tiap outlet
                 </p>
                 <SeriesChart series={r.series} granularity={r.granularity} />
               </Card>
@@ -97,13 +103,17 @@ export default function CashflowPage({ expandExpenses = false }: { expandExpense
                   ))}
                   {r.expenses_by_outlet.length === 0 && <li className="text-text-muted">Belum ada pengeluaran di periode ini.</li>}
                 </ul>
+                <LinkButton className="mt-3 text-[12px]" onClick={() => {
+                  setAllExpenses(true)
+                  document.getElementById('recent-expenses')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+                }}>Lihat semua pengeluaran →</LinkButton>
               </Card>
             </div>
           </>
         )}
         <div className="grid gap-4 lg:grid-cols-3">
           {r && <BreakdownCard r={r} />}
-          <RecentExpenses outletId={outletId} version={expensesVersion} expanded={expandExpenses}
+          <RecentExpenses outletId={outletId} version={expensesVersion} all={allExpenses} onShowAll={() => setAllExpenses(true)}
             onChanged={() => { setExpensesVersion((v) => v + 1); void report.reload() }} />
           <ExpenseForm defaultOutletId={outletId || me.outlets[0]?.id || ''} onSaved={() => {
             setExpensesVersion((v) => v + 1)
@@ -140,24 +150,34 @@ function niceStep(max: number): number {
   return [1, 2, 2.5, 5, 10].map((m) => m * power).find((s) => s >= raw) ?? power * 10
 }
 
+/** "Nov 2026" when the range sits in one month (as drawn), else the range itself. */
+function periodCaption(from: string, to: string): string {
+  if (from.slice(0, 7) !== to.slice(0, 7)) return formatRange(from, to)
+  return `${MONTHS[Number(to.slice(5, 7)) - 1]} ${to.slice(0, 4)}`
+}
+
+// Grouped bars per period, as drawn on O9: kas masuk (primary) next to kas keluar (orange),
+// with the value written above the highest kas masuk bar.
 function SeriesChart({ series, granularity }: { series: Cashflow['series']; granularity: Granularity }) {
   const W = 600
   const H = 200
-  const pad = { l: 44, r: 8, t: 8, b: 22 }
+  const pad = { l: 44, r: 8, t: 16, b: 22 }
   const peak = Math.max(0, ...series.flatMap((p) => [p.cash_in, p.cash_out]))
   const step = niceStep(peak)
   const top = peak === 0 ? step * 4 : Math.ceil(peak / step) * step
-  const x = (i: number) => pad.l + (series.length <= 1 ? 0 : (i / (series.length - 1)) * (W - pad.l - pad.r))
+  const slot = (W - pad.l - pad.r) / Math.max(1, series.length)
+  const bar = Math.max(2, Math.min(14, (slot - 4) / 2))
+  const center = (i: number) => pad.l + slot * (i + 0.5)
   const y = (v: number) => pad.t + (1 - v / top) * (H - pad.t - pad.b)
-  const line = (key: 'cash_in' | 'cash_out') => series.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p[key])}`).join(' ')
   const ticks = Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step)
   const every = Math.max(1, Math.ceil(series.length / 9))
   const label = (d: string) => granularity === 'daily' ? String(Number(d.slice(8))) : formatDay(d)
+  const peakIn = series.reduce((best, p, i) => (p.cash_in > (series[best]?.cash_in ?? 0) ? i : best), 0)
   return (
     <div>
       <div className="mb-1 flex gap-4 text-[11px]">
-        <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4 bg-primary" />Kas masuk</span>
-        <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4 bg-accent-orange" />Kas keluar</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary" />Kas masuk</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent-orange" />Kas keluar</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Grafik kas masuk dan kas keluar">
         {ticks.map((t) => (
@@ -166,11 +186,23 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
             <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" fontSize="10" fill="var(--pos-text-muted)">{juta(t)}</text>
           </g>
         ))}
-        {series.map((p, i) => i % every === 0 && (
-          <text key={p.date} x={x(i)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--pos-text-muted)">{label(p.date)}</text>
+        {series.map((p, i) => (
+          <g key={p.date} data-testid="series-bar">
+            <rect x={center(i) - bar} y={y(p.cash_in)} width={bar} height={y(0) - y(p.cash_in)} rx="2" fill="var(--pos-primary)">
+              <title>{`${label(p.date)} · Kas masuk ${formatRupiah(p.cash_in)}`}</title>
+            </rect>
+            <rect x={center(i)} y={y(p.cash_out)} width={bar} height={y(0) - y(p.cash_out)} rx="2" fill="var(--pos-accent-orange)">
+              <title>{`${label(p.date)} · Kas keluar ${formatRupiah(p.cash_out)}`}</title>
+            </rect>
+            {i % every === 0 && (
+              <text x={center(i)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--pos-text-muted)">{label(p.date)}</text>
+            )}
+          </g>
         ))}
-        <path d={line('cash_in')} fill="none" stroke="var(--pos-primary)" strokeWidth="2" />
-        <path d={line('cash_out')} fill="none" stroke="var(--pos-accent-orange)" strokeWidth="2" />
+        {series[peakIn]?.cash_in > 0 && (
+          <text x={center(peakIn) - bar / 2} y={y(series[peakIn].cash_in) - 4} textAnchor="middle" fontSize="10"
+            fontWeight="600" fill="var(--pos-text)">{juta(series[peakIn].cash_in)}</text>
+        )}
       </svg>
     </div>
   )
@@ -191,7 +223,7 @@ function BreakdownCard({ r }: { r: Cashflow }) {
         {row('PB1 (titipan pajak)', formatRupiah(b.pb1))}
         {row('Delivery fee', formatRupiah(b.delivery_fee))}
         <p className="text-[11px] text-text-muted">
-          Cash {formatRupiah(b.cash)} ({share(b.cash)}%) · QRIS {formatRupiah(b.qris)} ({share(b.qris)}%)
+          Cash {juta(b.cash)} ({share(b.cash)}%) · QRIS {juta(b.qris)} ({share(b.qris)}%)
         </p>
         <p className="pt-1 text-[11px] font-semibold tracking-wide text-text-muted">KAS KELUAR</p>
         {row('Refund / reversal', formatRupiah(-b.refunds))}
@@ -203,14 +235,14 @@ function BreakdownCard({ r }: { r: Cashflow }) {
   )
 }
 
-function RecentExpenses({ outletId, version, expanded, onChanged }: {
+function RecentExpenses({ outletId, version, all, onShowAll, onChanged }: {
   outletId: string
   version: number
-  expanded: boolean
+  all: boolean
+  onShowAll: () => void
   onChanged: () => void
 }) {
   const { api } = useSession()
-  const [all, setAll] = useState(expanded)
   const [more, setMore] = useState<Expense[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [reversing, setReversing] = useState<number>()
@@ -234,7 +266,7 @@ function RecentExpenses({ outletId, version, expanded, onChanged }: {
   }
 
   return (
-    <Card title="Pengeluaran terbaru" actions={!all ? <LinkButton onClick={() => setAll(true)}>Lihat semua →</LinkButton> : null}>
+    <Card id="recent-expenses" title="Pengeluaran terbaru" actions={!all ? <LinkButton onClick={onShowAll}>Lihat semua →</LinkButton> : null}>
       {first.loading && !first.data ? <Loading /> : (
         <ul className="divide-y divide-border text-[12px]">
           {items.map((e) => (
@@ -308,6 +340,7 @@ function ExpenseForm({ defaultOutletId, onSaved }: { defaultOutletId: string; on
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
   const [key, setKey] = useState(() => crypto.randomUUID())
+  const tooLarge = Number(amount) > EXPENSE_MAX
 
   async function save() {
     setBusy(true)
@@ -341,7 +374,8 @@ function ExpenseForm({ defaultOutletId, onSaved }: { defaultOutletId: string; on
       <Field label="Nominal" htmlFor="expense-amount">
         <TextInput id="expense-amount" inputMode="numeric" placeholder="Rp 0"
           value={amount ? `Rp ${Number(amount).toLocaleString('id-ID')}` : ''}
-          onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').slice(0, 10))} />
+          onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 10))} />
+        {tooLarge && <p className="mt-1 text-[11px] text-danger">Maksimal {formatRupiah(EXPENSE_MAX)} per entri.</p>}
       </Field>
       <Field label="Tanggal" htmlFor="expense-date">
         <TextInput id="expense-date" type="date" max={today} value={day || today} onChange={(e) => setDay(e.target.value)} />
@@ -351,7 +385,7 @@ function ExpenseForm({ defaultOutletId, onSaved }: { defaultOutletId: string; on
           onChange={(e) => setDescription(e.target.value)} />
       </Field>
       {notice && <div className="mb-2"><Alert tone={notice.tone}>{notice.text}</Alert></div>}
-      <Button variant="action" className="w-full" disabled={busy || !chosen || !Number(amount) || !description.trim()}
+      <Button variant="action" className="w-full" disabled={busy || !chosen || !Number(amount) || tooLarge || !description.trim()}
         onClick={() => void save()}>
         Simpan pengeluaran
       </Button>

@@ -1000,9 +1000,7 @@
       "DrawerCard": {
         "properties": {
           "drawer": {
-            "additionalProperties": true,
-            "title": "Drawer",
-            "type": "object"
+            "$ref": "#/components/schemas/DrawerOut"
           },
           "shift": {
             "anyOf": [
@@ -1035,6 +1033,32 @@
           "name"
         ],
         "title": "DrawerName",
+        "type": "object"
+      },
+      "DrawerOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DrawerOut",
         "type": "object"
       },
       "DrawerRef": {
@@ -1242,6 +1266,20 @@
           "next_cursor"
         ],
         "title": "ExpensePage",
+        "type": "object"
+      },
+      "ExpenseReversalIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ExpenseReversalIn",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -3816,6 +3854,35 @@
         "title": "RejectIn",
         "type": "object"
       },
+      "ReversalIn": {
+        "properties": {
+          "ingredients": {
+            "anyOf": [
+              {
+                "enum": [
+                  "waste",
+                  "return"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients"
+          },
+          "reason": {
+            "maxLength": 300,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReversalIn",
+        "type": "object"
+      },
       "ReversalOut": {
         "properties": {
           "expense": {
@@ -3920,9 +3987,7 @@
             "type": "integer"
           },
           "drawer": {
-            "additionalProperties": true,
-            "title": "Drawer",
-            "type": "object"
+            "$ref": "#/components/schemas/DrawerOut"
           },
           "expected_cash": {
             "title": "Expected Cash",
@@ -4525,35 +4590,6 @@
         "title": "ValidationError",
         "type": "object"
       },
-      "app__api__v1__ops__orders__ReversalIn": {
-        "properties": {
-          "ingredients": {
-            "anyOf": [
-              {
-                "enum": [
-                  "waste",
-                  "return"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ingredients"
-          },
-          "reason": {
-            "maxLength": 300,
-            "title": "Reason",
-            "type": "string"
-          }
-        },
-        "required": [
-          "reason"
-        ],
-        "title": "ReversalIn",
-        "type": "object"
-      },
       "app__api__v1__owner__catalog__Created": {
         "properties": {
           "catalog_sync": {
@@ -4571,20 +4607,6 @@
           "id"
         ],
         "title": "Created",
-        "type": "object"
-      },
-      "app__api__v1__owner__finance__ReversalIn": {
-        "properties": {
-          "reason": {
-            "maxLength": 300,
-            "title": "Reason",
-            "type": "string"
-          }
-        },
-        "required": [
-          "reason"
-        ],
-        "title": "ReversalIn",
         "type": "object"
       },
       "app__api__v1__owner__outlets__Created": {
@@ -4952,7 +4974,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__ops__orders__ReversalIn"
+                "$ref": "#/components/schemas/ReversalIn"
               }
             }
           },
@@ -6543,7 +6565,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__owner__finance__ReversalIn"
+                "$ref": "#/components/schemas/ExpenseReversalIn"
               }
             }
           },
