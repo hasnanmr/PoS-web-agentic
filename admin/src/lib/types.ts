@@ -324,3 +324,124 @@ export interface DrawerCard {
   shift: { id: string; opened_at: string; starting_cash: number; opened_by: string | null; cash_in: number;
     cash_in_count: number; cash_refunds: number } | null
 }
+
+// S8 close (blind count) ---------------------------------------------------------------
+export interface ShiftClosed {
+  id: string
+  drawer: { id: string; name: string | null }
+  opened_at: string
+  closed_at: string
+  timezone: string
+  starting_cash: number
+  cash_in: number
+  cash_refunds: number
+  expected_cash: number
+  counted_cash: number
+  difference: number
+  kind: 'shortage' | 'surplus' | 'none'
+  counted_by: string | null
+}
+
+// S4 Review Pembayaran QRIS -------------------------------------------------------------
+export interface ProofQueueItem {
+  proof_id: string
+  order_id: string
+  order_no: string
+  channel: OrderCard['channel']
+  order_type: OrderCard['type']
+  table: string | null
+  total: number
+  received_at: string
+  timezone: string
+}
+
+export interface ProofDetail {
+  proof_id: string
+  status: 'pending' | 'accepted' | 'rejected'
+  image_url: string | null
+  order_id: string
+  order_no: string
+  channel: OrderCard['channel']
+  order_type: OrderCard['type']
+  table: string | null
+  total: number
+  order_status: string
+  payment_status: string
+  customer_phone_masked: string | null
+  received_at: string
+  timezone: string
+  timer_stopped: boolean
+  reviewed_by: string | null
+  reviewed_at: string | null
+  rejection_reason: string | null
+}
+
+// O9 Laporan Cashflow & Pengeluaran ------------------------------------------------------
+export interface Expense {
+  id: number
+  business_date: string
+  outlet: { id: string; name: string }
+  description: string
+  amount: number
+  recorded_by: string | null
+  created_at: string
+  reversed: boolean
+  reversal_reason: string | null
+}
+
+export interface ExpensePage {
+  items: Expense[]
+  next_cursor: string | null
+}
+
+export interface Tile {
+  amount: number
+  change_pct: number | null
+}
+
+export type Granularity = 'daily' | 'weekly' | 'monthly'
+
+export interface Cashflow {
+  from: string
+  to: string
+  granularity: Granularity
+  previous: { from: string; to: string }
+  totals: { cash_in: Tile; cash_out: Tile; net: Tile; pb1_collected: Tile }
+  series: { date: string; cash_in: number; cash_out: number }[]
+  breakdown: {
+    revenue_excl_pb1: number
+    pb1: number
+    delivery_fee: number
+    cash: number
+    qris: number
+    refunds: number
+    expenses: number
+    cash_difference: number
+  }
+  expenses_by_outlet: { outlet_id: string; outlet: string; amount: number; count: number }[]
+  expenses_total: number
+  expenses_count: number
+}
+
+// O10 Laporan Cash Count ------------------------------------------------------------------
+export interface CashCountRow {
+  shift_id: string
+  opened_at: string
+  closed_at: string
+  timezone: Timezone
+  outlet: { id: string; name: string }
+  drawer: { id: string; name: string; number: number }
+  starting_cash: number
+  expected_cash: number
+  counted_cash: number
+  difference: number
+  kind: 'shortage' | 'surplus' | 'none'
+  counted_by: string | null
+}
+
+export interface CashCount {
+  from: string
+  to: string
+  summary: { shifts: number; shifts_with_difference: number; total_shortage: number; total_surplus: number }
+  rows: CashCountRow[]
+}

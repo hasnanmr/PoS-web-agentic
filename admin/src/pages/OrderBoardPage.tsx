@@ -1,9 +1,11 @@
 // Wireframe S2 / M1 — Order Board (T-030, T-031, T-068) with the S3 detail drawer
 // (Detail Order & Reversal, T-032). Endpoints: GET /ops/outlets/{id}/orders/board (polled
 // for "↻ live"), GET /ops/orders/{id}, POST /ops/orders/{id}/transitions | cancel | reversal.
+// "Cek →" on a proof_submitted card opens S4 Review Pembayaran for that order.
 // Behavior notes: order status and payment status are separate badges; buttons come only
 // from the server's allowed_actions; unpaid pay-first orders have no "Mulai siapkan".
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
@@ -141,6 +143,12 @@ export default function OrderBoardPage() {
                           </button>
                           {o.payment_status !== 'paid' && !o.bill_id && (
                             <span className="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">{o.payment_status}</span>
+                          )}
+                          {o.payment_status === 'proof_submitted' && (
+                            <Link to={`/payment-review?order=${o.id}`}
+                              className="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-white hover:opacity-90">
+                              Cek →
+                            </Link>
                           )}
                           {forward && (
                             <Button className={`mt-2 h-8 w-full ${forward === 'completed' ? 'bg-success' : ''}`} onClick={() => void act(o, forward)}>

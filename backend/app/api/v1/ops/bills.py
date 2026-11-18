@@ -1,6 +1,6 @@
 """Open bills (S5 / M3) and cashier shifts (S8 open, S1 header) for owner and staff.
 
-T-033, T-039. Closing a shift with the blind count (T-040) is added in Wave 4.
+T-033, T-039, T-040 (close with blind count).
 """
 
 from __future__ import annotations
@@ -109,13 +109,43 @@ class DrawerShift(BaseModel):
     cash_refunds: int
 
 
+class DrawerOut(BaseModel):
+    id: UUID
+    name: str | None
+
+
 class DrawerCard(BaseModel):
-    drawer: dict[str, Any]
+    drawer: DrawerOut
     shift: DrawerShift | None
 
 
 class ShiftOpen(BaseModel):
     starting_cash: int = Field(ge=0, le=1_000_000_000)
+
+
+class ShiftCloseIn(BaseModel):
+    count_breakdown: dict[str, int] = Field(
+        description='Note counts per denomination ("100000" … "2000") plus "coins" as an amount',
+        examples=[
+            {"100000": 12, "50000": 6, "20000": 9, "10000": 5, "5000": 4, "2000": 3, "coins": 4400}
+        ],
+    )
+
+
+class ShiftClosed(BaseModel):
+    id: UUID
+    drawer: DrawerOut
+    opened_at: datetime
+    closed_at: datetime
+    timezone: str
+    starting_cash: int
+    cash_in: int
+    cash_refunds: int
+    expected_cash: int
+    counted_cash: int
+    difference: int
+    kind: Literal["shortage", "surplus", "none"]
+    counted_by: str | None
 
 
 def _pool(request: Request) -> Any:
@@ -218,3 +248,32 @@ async def open_shift(
     async with db.transaction(_pool(request), ctx) as conn:
         shift_id = await shifts.open_shift(conn, ctx, drawer_id, body.starting_cash)
     return {"id": shift_id}
+
+
+@router.post("/shifts/{shift_id}/close")
+async def close_shift(
+    shift_id: UUID,
+    body: ShiftCloseIn,
+    request: Request,
+    user: TenantUser,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> ShiftClosed:
+    """S8 "Submit hitungan & tutup shift". Expected cash is revealed only in this response."""
+    key = idempotency.check_key(idempotency_key)
+    fp = idempotency.fingerprint(str(shift_id), body.model_dump(mode="json"))
+    scope = f"shift.close:{shift_id}"
+    ctx = user.actor()
+    try:
+        async with db.transaction(_pool(request), ctx) as conn:
+            cached = await idempotency.lookup(conn, ctx, scope, key, fp)
+            if cached is not None:
+                return ShiftClosed(**cached)
+            result = ShiftClosed(
+                **await shifts.close_shift(conn, ctx, shift_id, body.count_breakdown)
+            )
+            await idempotency.store(conn, ctx, scope, key, fp, result.model_dump(mode="json"))
+    except psycopg.errors.UniqueViolation as exc:
+        if "idempotency_keys" in str(exc):
+            raise ApiError(409, "conflict", "the same request is already being processed") from None
+        raise
+    return result

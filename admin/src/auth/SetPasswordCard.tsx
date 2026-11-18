@@ -2,7 +2,7 @@
 // link signs the user in; they choose a password here before continuing.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useState, type FormEvent } from 'react'
-import { Alert, Button, Card, Field, TextInput } from '../ui/kit'
+import { Alert, Button, Card, Field, PasswordInput } from '../ui/kit'
 
 export function SetPasswordCard({ supabase, onDone }: { supabase: SupabaseClient; onDone: () => void }) {
   const [password, setPassword] = useState('')
@@ -29,11 +29,11 @@ export function SetPasswordCard({ supabase, onDone }: { supabase: SupabaseClient
       <p className="mb-4 text-[12px] text-text-muted">Pakai password ini untuk masuk berikutnya.</p>
       <form onSubmit={submit} noValidate>
         <Field label="Password" htmlFor="new-password">
-          <TextInput id="new-password" type="password" autoComplete="new-password"
+          <PasswordInput id="new-password" autoComplete="new-password"
             value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <Field label="Ulangi password" htmlFor="confirm-password">
-          <TextInput id="confirm-password" type="password" autoComplete="new-password"
+          <PasswordInput id="confirm-password" autoComplete="new-password"
             value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </Field>
         {error && <div className="mb-3"><Alert>{error}</Alert></div>}

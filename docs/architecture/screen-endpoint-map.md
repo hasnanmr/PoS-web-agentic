@@ -99,20 +99,21 @@ Staff calling it → `403` (AC7.7).
 
 ### O9 · Laporan Cashflow & Pengeluaran (T-041, T-042, T-043)
 
-The sidebar item **Pengeluaran** opens this screen until its own detailed wireframe exists (product owner, 2026-11-17); it uses the same endpoints below. Add a new section here when that wireframe arrives.
+The sidebar item **Pengeluaran** opens this screen with the full expense list until its own detailed wireframe exists (product owner, 2026-11-17); it uses the same endpoints below. O15 is now drawn with a **Pengeluaran | Purchase Order** tab strip, but only the PO tab is drawn, so the Pengeluaran tab stays on O9 until it is drawn. "Lihat semua →" (Pengeluaran terbaru) and "Lihat semua pengeluaran →" (Pengeluaran per outlet) open the same full list.
 
 | Card / action | Endpoint | Fields |
 |---|---|---|
-| All cards | `GET /owner/reports/cashflow?outlet_id=&granularity=daily\|weekly\|monthly&from=&to=` | `totals:{cash_in, cash_out, net, pb1_collected}` each with `change_pct` vs the previous period of the same length; `series:[{date, cash_in, cash_out}]` (outlet-local days); `breakdown:{revenue_excl_pb1, pb1, delivery_fee, cash, qris, refunds, expenses, cash_difference}`; `expenses_by_outlet:[{outlet, amount}]` + total and count. |
-| Pengeluaran terbaru / Lihat semua | `GET /owner/expenses?outlet_id=&from=&to=&cursor=` | `[{business_date, outlet, description, amount, recorded_by}]`. |
-| Catat pengeluaran | `POST /owner/expenses` | `outlet_id, amount, business_date, description`. Append-only; corrections via `POST /owner/ledger-entries/{id}/reversal` with `reason`. |
+| All cards | `GET /owner/reports/cashflow?outlet_id=&granularity=daily\|weekly\|monthly&from=&to=` ✅ | Default range month to date (outlet zone, WIB for all outlets). `totals:{cash_in, cash_out, net, pb1_collected}` each `{amount, change_pct}` vs `previous:{from, to}` — a range starting on the 1st compares with the same days of the previous month ("vs 1–17 Okt"), any other range with the same number of days just before; `change_pct` null when the previous period is 0. `series:[{date, cash_in, cash_out}]` (bucket start: day, Monday, or 1st; outlet-local business dates); `breakdown:{revenue_excl_pb1, pb1, delivery_fee, cash, qris, refunds, expenses, cash_difference}`; `expenses_by_outlet:[{outlet_id, outlet, amount, count}]` (an outlet whose expenses were all reversed is left out) + `expenses_total`, `expenses_count`. A blind-count difference counts on the shift's outlet-local **closing** date (when the count is made), while O10 lists the shift under its **opening** date, so a 21:00→01:00 shift shows in O10 on day 1 and its difference in O9 on day 2. cash_in = revenue + PB1 + delivery fee; cash_out = refunds + expenses; net = cash_in − cash_out + cash_difference; pb1_collected = PB1 − refunded PB1. Max range 1 year. The cross-outlet default range ("Semua outlet") uses WIB, so a WITA/WIT outlet can be a day off near midnight; a tenant-level default zone is a follow-up. |
+| Pengeluaran terbaru / Lihat semua | `GET /owner/expenses?outlet_id=&from=&to=&cursor=&limit=` ✅ | `items:[{id, business_date, outlet:{id, name}, description, amount (positive), recorded_by, created_at, reversed, reversal_reason}]`, `next_cursor`. Newest business date first. |
+| Catat pengeluaran | `POST /owner/expenses` ✅ (`Idempotency-Key`) | `outlet_id, amount (> 0), business_date (not in the future), description (max 120)`. Append-only. |
+| Koreksi ("Buat entry reversal, bukan edit") | `POST /owner/ledger-entries/{id}/reversal` ✅ | `reason*`. Expenses only (`not_reversible` otherwise; sales are reversed from the order, S3); once per entry (`already_reversed`). The reversal row has the opposite amount and the expense's business date, so the corrected period adds up; the expense is then shown as reversed and no longer counted. A blind-count difference (`cash_shortage`/`cash_surplus`) cannot be reversed yet: the count is the physical record, and no screen draws a correction for it (follow-up if needed). |
 
 ### O10 · Laporan Cash Count (T-040, T-102)
 
 | Action | Endpoint | Fields |
 |---|---|---|
-| Table + summary | `GET /owner/reports/cash-count?outlet_id=&drawer_id=&from=&to=` | `summary:{shifts, shifts_with_difference, total_shortage, total_surplus}`, `rows:[{opened_at, closed_at, outlet, drawer, timezone, starting_cash, expected_cash, counted_cash, difference, counted_by}]`. |
-| ⭳ Ekspor CSV | same path with `Accept: text/csv` (or `?format=csv`) | Same columns. |
+| Table + summary | `GET /owner/reports/cash-count?outlet_id=&drawer_id=&from=&to=` ✅ | Closed shifts by outlet-local opening date (default month to date). `summary:{shifts, shifts_with_difference, total_shortage (≤ 0), total_surplus}`, `rows:[{shift_id, opened_at, closed_at, outlet:{id, name}, drawer:{id, name, number (1-based by creation order among all of the outlet's drawers, inactive ones included, so deactivating a drawer never renumbers past shifts)}, timezone, starting_cash, expected_cash, counted_cash, difference, kind: shortage\|surplus\|none, counted_by}]`. Drawer filter options: `GET /owner/outlets/{id}/drawers` (O3). |
+| ⭳ Ekspor CSV | same path with `Accept: text/csv` (or `?format=csv`) ✅ | Same columns, local date/time and zone label. |
 
 ### O11 · Audit Log (T-031, T-101)
 
@@ -206,16 +207,16 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | Drawer | `GET /ops/orders/{id}` ✅ | Items with add-ons, `subtotal, pb1_amount, total, channel, status, payment_status, payment_method`, `events:[{at, from, to, kind, actor:{name, role}, data}]`, `allowed_actions`. |
 | Tandai selesai | `POST /ops/orders/{id}/transitions` ✅ | `to_status: completed`. |
 | Batalkan (unpaid) | `POST /ops/orders/{id}/cancel` ✅ | `reason?`; stock returned. |
-| Reversal order… | `POST /ops/orders/{id}/reversal` ✅ | `reason*`, `ingredients: waste\|return` (default from status: prepared → waste). Response: refund amount + method. |
+| Reversal order… | `POST /ops/orders/{id}/reversal` ✅ | `reason*`, `ingredients: waste\|return` (default from status: prepared → waste). Response: refund amount + method. A cash refund leaves the refunder's own open shift, or the only open one. With several open shifts and none theirs, it is recorded without a shift and described "[tunai, drawer tidak dipilih]" (no open shift: "[tunai tanpa shift terbuka]"). That drawer's count then shows the refund as a shortage. **Known gap:** a `drawer_id` on this request (a drawer picker in S3) would close it; S3 does not draw one yet. |
 
 ### S4 · Review Pembayaran QRIS (T-036, T-037)
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Antrian proof_submitted | `GET /ops/outlets/{id}/payment-proofs?status=pending` | `[{proof_id, order_no, order_type, table?, total, received_at}]`. |
-| Detail + screenshot | `GET /ops/payment-proofs/{id}` | `image_url` (signed), `order_no, channel, total, customer_phone_masked, received_at, timer_stopped: true`. |
-| ✓ Tandai paid | `POST /ops/payment-proofs/{id}/accept` | `merchant_account_checked: true` (required; mirrors the checkbox). Posts ledger. |
-| ✕ Tolak bukti bayar | `POST /ops/payment-proofs/{id}/reject` | `reason*`. Cancels order, returns stock, no ledger, notifies customer. |
+| Antrian proof_submitted | `GET /ops/outlets/{id}/payment-proofs?status=pending` ✅ | `[{proof_id, order_id, order_no, channel, order_type, table?, total, received_at, timezone}]`, oldest first; the latest pending screenshot per order still in `proof_submitted` (older pending screenshots of the same order stay `pending` but hidden; marking them superseded is a follow-up). Only `status=pending` is accepted (422 otherwise). |
+| Detail + screenshot | `GET /ops/payment-proofs/{id}` ✅ | `image_url` (signed; **null until proof storage arrives with T-036**), `status, order_id, order_no, channel, order_type, table, total, order_status, payment_status, customer_phone_masked ("+62 812-xxxx-221"), received_at, timezone, timer_stopped, reviewed_by, reviewed_at, rejection_reason`. |
+| ✓ Tandai paid | `POST /ops/payment-proofs/{id}/accept` ✅ | `merchant_account_checked: true` (required, 422 otherwise; stored as `payment_proofs.merchant_checked_at`). QRIS payment + ledger (revenue, PB1, delivery fee), order `pending_payment → confirmed`, events with actor and time. `proof_not_pending` (409) once reviewed. |
+| ✕ Tolak bukti bayar | `POST /ops/payment-proofs/{id}/reject` ✅ | `reason*` (`reason_required`). Order cancelled, payment back to `unpaid`, stock returned (`sale_reversal`), no ledger, `proof_rejected` event; customer notification hook (sent once the WhatsApp worker exists). |
 
 ### S5 / M3 · Open Bills (T-033)
 
@@ -249,9 +250,9 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Drawer cards | `GET /ops/outlets/{id}/drawers` ✅ (always includes the current shift; no query parameters) | `[{drawer, shift?:{id, opened_by, opened_at, starting_cash, cash_in, cash_in_count, cash_refunds}}]` — **no expected cash** before the count. |
+| Drawer cards | `GET /ops/outlets/{id}/drawers` ✅ (always includes the current shift; no query parameters) | `[{drawer:{id, name}, shift?:{id, opened_by, opened_at, starting_cash, cash_in, cash_in_count, cash_refunds}}]` — **no expected cash** before the count. |
 | Buka shift | `POST /ops/drawers/{id}/shifts` ✅ | `starting_cash`. `conflict` if one is open. |
-| Submit hitungan & tutup shift | `POST /ops/shifts/{id}/close` | `count_breakdown:{"100000":12, …, "coins":4400}` → server sums `counted_cash`; response then reveals `expected_cash, difference, kind: shortage\|surplus\|none`. |
+| Submit hitungan & tutup shift | `POST /ops/shifts/{id}/close` ✅ (`Idempotency-Key`) | `count_breakdown:{"100000":12, "50000":6, "20000":9, "10000":5, "5000":4, "2000":3, "coins":4400}` (note counts; `coins` = "Rp 1.000 & koin" as an amount) → server sums `counted_cash`; the response then reveals `drawer:{id, name}, starting_cash, cash_in, cash_refunds, expected_cash (= starting + cash in − cash refunds), counted_cash, difference, kind: shortage\|surplus\|none, counted_by, closed_at, timezone`. A non-zero difference posts `cash_shortage`/`cash_surplus` to the ledger. `shift_closed` (409) when already closed; cash payments wait for or refuse a shift being closed. |
 
 ### S9 / M6 · Absensi Saya (T-116, T-117, T-122)
 
@@ -293,5 +294,7 @@ WhatsApp flows, not REST endpoints. They use the same core functions (quote, cre
 ## Schema fields added for the wireframes
 
 Added to T-004 when this map was written: `outlets.order_prefix` (#A-1036), `outlets.whatsapp_status`, `outlets.catalog_synced_at` (O3/O12), `users.invited_at`, `users.invitation_accepted_at` ("Diundang", O4), `cashier_shifts.count_breakdown` (S8), `order_events.data` (S3 timeline), default drawer name "Kasir depan" (O3/S8); removed configurable hold minutes (O8 shows 15 minutes fixed).
+
+Wave 4 (migration `20261118000400`): `payment_proofs.merchant_checked_at` (S4 merchant-account step, required on accepted proofs), one reversal per ledger entry (unique `reverses_entry_id`), and a restrictive policy so only an owner (or the system) can insert `expense`/`reversal` ledger rows (O9).
 
 Still needed later: a WhatsApp template registry table (O12, T-084).

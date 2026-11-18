@@ -78,3 +78,61 @@ export function plainQuantity(value: string | number): string {
   if (!text.includes('.')) return text
   return text.replace(/\.?0+$/, '').replace('.', ',')
 }
+
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'] as const
+
+/** Plain thousands, as in the O10 table: "1.678.400". */
+export function formatNumber(amount: number): string {
+  return rupiah.format(amount)
+}
+
+/** Signed amount with a space, as in O9/O10: "+ Rp 82.000", "− Rp 50.000", "Rp 0". */
+export function formatSignedRupiah(amount: number): string {
+  if (amount === 0) return 'Rp 0'
+  return `${amount < 0 ? '−' : '+'} Rp ${rupiah.format(Math.abs(amount))}`
+}
+
+function parts(day: string): [number, number, number] {
+  const [y, m, d] = day.split('-').map(Number)
+  return [y, m, d]
+}
+
+/** "2026-11-17" → "17 Nov". */
+export function formatDay(day: string): string {
+  const [, m, d] = parts(day)
+  return `${d} ${MONTHS[m - 1]}`
+}
+
+/** "1–17 Nov 2026", "28 Okt – 3 Nov 2026", "17 Nov 2026" (O9/O10 date pickers). */
+export function formatRange(from: string, to: string, withYear = true): string {
+  const [fy, fm, fd] = parts(from)
+  const [ty, tm, td] = parts(to)
+  const year = withYear ? ` ${ty}` : ''
+  if (from === to) return `${td} ${MONTHS[tm - 1]}${year}`
+  if (fy === ty && fm === tm) return `${fd}–${td} ${MONTHS[tm - 1]}${year}`
+  if (fy === ty) return `${fd} ${MONTHS[fm - 1]} – ${td} ${MONTHS[tm - 1]}${year}`
+  return `${fd} ${MONTHS[fm - 1]} ${fy} – ${td} ${MONTHS[tm - 1]}${year}`
+}
+
+/** The outlet-local calendar date of an instant, as "YYYY-MM-DD". */
+export function localDay(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date(iso))
+}
+
+/** Today in a zone, as "YYYY-MM-DD". */
+export function todayIn(timeZone: string, now: Date = new Date()): string {
+  return localDay(now.toISOString(), timeZone)
+}
+
+/** "Bandung – Dago" → "Dago" (short outlet labels in O9/O10 rows). */
+export function shortOutlet(name: string): string {
+  const cut = name.lastIndexOf('– ')
+  return cut >= 0 ? name.slice(cut + 2) : name
+}
+
+export const ZONE_LABEL: Record<string, string> = {
+  'Asia/Jakarta': 'WIB',
+  'Asia/Makassar': 'WITA',
+  'Asia/Jayapura': 'WIT',
+}

@@ -1,15 +1,16 @@
 // Small building blocks matching the wireframe look (cards, labelled fields, buttons).
 // Tokens come from index.css; sizes follow CLAUDE.md (13px labels/body, 16–20px headings).
-import type { ButtonHTMLAttributes, ComponentProps, ReactNode, SelectHTMLAttributes } from 'react'
+import { useState, type ButtonHTMLAttributes, type ComponentProps, type ReactNode, type SelectHTMLAttributes } from 'react'
 
-export function Card({ title, actions, children, className = '' }: {
+export function Card({ id, title, actions, children, className = '' }: {
+  id?: string
   title?: ReactNode
   actions?: ReactNode
   children: ReactNode
   className?: string
 }) {
   return (
-    <section className={`rounded-lg border border-border bg-surface p-4 ${className}`}>
+    <section id={id} className={`rounded-lg border border-border bg-surface p-4 ${className}`}>
       {(title || actions) && (
         <div className="mb-3 flex items-center justify-between gap-2">
           {title && <h2 className="text-[13px] font-semibold text-text">{title}</h2>}
@@ -65,6 +66,20 @@ const control =
 
 export function TextInput(props: ComponentProps<'input'>) {
   return <input {...props} className={`${control} ${props.className ?? ''}`} />
+}
+
+/** Password field with a "Lihat" / "Sembunyikan" toggle so the user can check what they typed. */
+export function PasswordInput(props: Omit<ComponentProps<'input'>, 'type'>) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="relative">
+      <input {...props} type={visible ? 'text' : 'password'} className={`${control} pr-24 ${props.className ?? ''}`} />
+      <button type="button" aria-pressed={visible} aria-controls={props.id} onClick={() => setVisible((v) => !v)}
+        className="absolute inset-y-0 right-0 px-3 text-[12px] font-medium text-primary hover:underline">
+        {visible ? 'Sembunyikan' : 'Lihat'}
+      </button>
+    </div>
+  )
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {

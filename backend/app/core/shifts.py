@@ -1,25 +1,39 @@
-"""Cashier shifts per drawer (T-039) — S8 open, S1 header. Closing with the blind count
-(T-040) comes in Wave 4. One open shift per drawer (unique index); cash payments need
-an open shift and are linked to it.
+"""Cashier shifts per drawer (T-039, T-040) — S8, S1 header, O10.
+
+One open shift per drawer (unique index); cash payments need an open shift and are linked
+to it. Closing is a blind count: the cashier submits the counted notes and coins first,
+and only the response reveals the expected cash and the difference, which is posted to
+the ledger as `cash_shortage` or `cash_surplus` (glossary §7).
 """
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
+from app.core import ledger
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
+from app.core.localtime import local_date
+
+# S8 blind count: note counts per denomination, plus "Rp 1.000 & koin" entered as an amount.
+NOTES = (100_000, 50_000, 20_000, 10_000, 5_000, 2_000)
+COINS_KEY = "coins"
+MAX_NOTES = 100_000
+MAX_COINS = 100_000_000
 
 _OPEN_SHIFTS = """
 select s.id, s.drawer_id, d.name as drawer_name, s.opened_at, s.starting_cash,
        s.opened_by, u.display_name as opened_by_name,
        (select count(*) from app.cash_drawers d2
-        where d2.outlet_id = d.outlet_id and d2.is_active and d2.created_at <= d.created_at)
+        where d2.outlet_id = d.outlet_id and d2.created_at <= d.created_at)
          as drawer_number
 from app.cashier_shifts s
 join app.cash_drawers d on d.id = s.drawer_id
@@ -113,7 +127,20 @@ async def shift_for_cash(
         raise ValidationFailedError(
             "several cashier shifts are open; choose the drawer", {"field": "drawer_id"}
         )
+    if not await _still_open(conn, chosen):
+        raise ConflictError("shift_not_open", "open a cashier shift before taking cash")
     return chosen
+
+
+async def _still_open(conn: AsyncConnection, shift_id: UUID) -> bool:
+    """Share-lock the shift until the payment commits. A blind count closing it at the same
+    time (FOR UPDATE) waits for this payment and counts it, or closes first and the payment
+    sees `closed` here, so cash never lands on a shift after its count."""
+    cur = await conn.execute(
+        "select status::text from app.cashier_shifts where id = %s for share", (shift_id,)
+    )
+    row = await cur.fetchone()
+    return row is not None and row[0] == "open"
 
 
 def _unambiguous(shifts: list[dict[str, Any]], ctx: ActorContext) -> UUID | None:
@@ -128,4 +155,124 @@ async def shift_for_refund(
 ) -> UUID | None:
     """The shift a cash refund leaves from: the cashier's own or the only open one, else
     None (no shift is touched; a closed shift's final count is never changed)."""
-    return _unambiguous(await open_shifts(conn, outlet_id), ctx)
+    chosen = _unambiguous(await open_shifts(conn, outlet_id), ctx)
+    return chosen if chosen is not None and await _still_open(conn, chosen) else None
+
+
+# Close with blind count (T-040) -------------------------------------------------------------
+
+
+def counted_total(breakdown: Mapping[str, int]) -> int:
+    """Sum the S8 count: notes x denomination + the coins amount. Unknown keys are refused."""
+    allowed = {str(n) for n in NOTES} | {COINS_KEY}
+    unknown = sorted(set(breakdown) - allowed)
+    if unknown:
+        raise ValidationFailedError(
+            "unknown denomination", {"field": "count_breakdown", "keys": unknown}
+        )
+    total = 0
+    for key, value in breakdown.items():
+        limit = MAX_COINS if key == COINS_KEY else MAX_NOTES
+        if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= limit:
+            raise ValidationFailedError("enter a whole number", {"field": f"count_breakdown.{key}"})
+        total += value if key == COINS_KEY else value * int(key)
+    return total
+
+
+def difference_kind(difference: int) -> Literal["shortage", "surplus", "none"]:
+    if difference < 0:
+        return "shortage"
+    if difference > 0:
+        return "surplus"
+    return "none"
+
+
+async def _cash_movements(conn: AsyncConnection, shift_id: UUID) -> tuple[int, int, int]:
+    """Cash received (payments), how many, and cash refunded (positive) for one shift."""
+    cur = await conn.execute(
+        """
+        select coalesce((select sum(amount) from app.payments
+                         where shift_id = %(s)s and method = 'cash'), 0),
+               (select count(*) from app.payments where shift_id = %(s)s and method = 'cash'),
+               coalesce((select -sum(amount) from app.ledger_entries
+                         where shift_id = %(s)s and type = 'refund'), 0)
+        """,
+        {"s": shift_id},
+    )
+    cash_in, count, refunds = await cur.fetchone()  # type: ignore[misc]
+    return int(cash_in), int(count), int(refunds)
+
+
+async def close_shift(
+    conn: AsyncConnection, ctx: ActorContext, shift_id: UUID, breakdown: Mapping[str, int]
+) -> dict[str, Any]:
+    """S8 "Submit hitungan & tutup shift". Expected = starting cash + cash received - cash
+    refunded; difference = counted - expected; non-zero difference posts to the ledger."""
+    counted = counted_total(breakdown)
+    cur = conn.cursor(row_factory=dict_row)
+    await cur.execute(
+        "select s.id, s.outlet_id, s.drawer_id, s.status::text as status, s.starting_cash,"
+        " s.opened_at, o.timezone from app.cashier_shifts s"
+        " join app.outlets o on o.id = s.outlet_id where s.id = %s for update of s",
+        (shift_id,),
+    )
+    shift = await cur.fetchone()
+    if shift is None:
+        raise NotFoundError("shift")
+    if shift["status"] != "open":
+        raise ConflictError("shift_closed", "this shift is already closed")
+    cash_in, _, refunds = await _cash_movements(conn, shift_id)
+    expected = shift["starting_cash"] + cash_in - refunds
+    difference = counted - expected
+    kind = difference_kind(difference)
+    closed_at = datetime.now(UTC)
+    await conn.execute(
+        """
+        update app.cashier_shifts
+        set status = 'closed', closed_by = %s, closed_at = %s, counted_cash = %s,
+            count_breakdown = %s, expected_cash = %s, difference = %s
+        where id = %s
+        """,
+        (ctx.user_id, closed_at, counted, Jsonb(dict(breakdown)), expected, difference, shift_id),
+    )
+    if difference:
+        await ledger.post(
+            conn,
+            ctx,
+            shift["outlet_id"],
+            "cash_shortage" if difference < 0 else "cash_surplus",
+            difference,
+            "cash",
+            local_date(closed_at, shift["timezone"]),
+            shift_id=shift_id,
+        )
+    await record_audit(
+        conn,
+        ctx,
+        action="shift.closed",
+        entity_type="cashier_shift",
+        entity_id=shift_id,
+        outlet_id=shift["outlet_id"],
+        data={"counted_cash": counted, "expected_cash": expected, "difference": difference},
+    )
+    await cur.execute(
+        "select d.id, d.name, u.display_name from app.cash_drawers d, app.users u"
+        " where d.id = %s and u.id = %s",
+        (shift["drawer_id"], ctx.user_id),
+    )
+    names = await cur.fetchone()
+    return {
+        "id": shift_id,
+        "drawer": {"id": shift["drawer_id"], "name": names["name"] if names else None},
+        "opened_at": shift["opened_at"],
+        "closed_at": closed_at,
+        "timezone": shift["timezone"],
+        "starting_cash": shift["starting_cash"],
+        "cash_in": cash_in,
+        "cash_refunds": refunds,
+        "expected_cash": expected,
+        "counted_cash": counted,
+        "difference": difference,
+        "kind": kind,
+        "counted_by": names["display_name"] if names else None,
+    }

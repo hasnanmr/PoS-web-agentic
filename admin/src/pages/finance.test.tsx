@@ -1,0 +1,215 @@
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
+import { describe, expect, it } from 'vitest'
+import type { CashCount, Cashflow, DrawerCard, ExpensePage, ProofDetail, ProofQueueItem, ShiftClosed } from '../lib/types'
+import { fakeApi, fakeSession } from '../test/fakes'
+import { WithSession } from '../test/session'
+import CashCountPage from './CashCountPage'
+import CashflowPage from './CashflowPage'
+import PaymentReviewPage from './PaymentReviewPage'
+import ShiftsPage from './ShiftsPage'
+
+const QUEUE: ProofQueueItem[] = [
+  { proof_id: 'pr1', order_id: 'o1', order_no: '#A-1043', channel: 'whatsapp_table', order_type: 'dine_in', table: 'Meja 07',
+    total: 30800, received_at: '2026-11-18T03:21:00Z', timezone: 'Asia/Jakarta' },
+  { proof_id: 'pr2', order_id: 'o2', order_no: '#A-1044', channel: 'whatsapp_online', order_type: 'delivery', table: null,
+    total: 87500, received_at: '2026-11-18T03:23:00Z', timezone: 'Asia/Jakarta' },
+]
+
+const DETAIL: ProofDetail = {
+  proof_id: 'pr1', status: 'pending', image_url: null, order_id: 'o1', order_no: '#A-1043', channel: 'whatsapp_table',
+  order_type: 'dine_in', table: 'Meja 07', total: 30800, order_status: 'pending_payment', payment_status: 'proof_submitted',
+  customer_phone_masked: '+62 812-xxxx-221', received_at: '2026-11-18T03:21:00Z', timezone: 'Asia/Jakarta',
+  timer_stopped: true, reviewed_by: null, reviewed_at: null, rejection_reason: null,
+}
+
+function renderS4(api: ReturnType<typeof fakeApi>, path = '/payment-review') {
+  render(<MemoryRouter initialEntries={[path]}><WithSession session={fakeSession('staff', { api })}><PaymentReviewPage /></WithSession></MemoryRouter>)
+}
+
+describe('S4 Review Pembayaran QRIS', () => {
+  it('lists the queue and enables "Tandai paid" only after the merchant check', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/payment-proofs?status=pending': QUEUE,
+      'GET /ops/payment-proofs/pr1': DETAIL,
+      'POST /ops/payment-proofs/pr1/accept': { ...DETAIL, status: 'accepted' },
+    })
+    renderS4(api)
+    expect(await screen.findByText('Antrian · proof_submitted (2)')).toBeInTheDocument()
+    expect(screen.getByText('#A-1043 · Meja 07 · Rp 30.800')).toBeInTheDocument()
+    expect(screen.getByText('#A-1044 · Delivery · Rp 87.500')).toBeInTheDocument()
+    expect(await screen.findByText('Pelanggan: +62 812-xxxx-221')).toBeInTheDocument()
+    expect(screen.getByText(/10:21 WIB \(timer auto-cancel berhenti\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Cek mutasi di akun merchant QRIS untuk nominal Rp 30\.800/)).toBeInTheDocument()
+
+    const paid = screen.getByRole('button', { name: '✓ Tandai paid' })
+    expect(paid).toBeDisabled()
+    await userEvent.click(screen.getByLabelText('Saya sudah menemukan transaksi ini di akun merchant QRIS'))
+    await userEvent.click(paid)
+    await waitFor(() => expect(api.calls).toContainEqual(
+      ['POST', '/ops/payment-proofs/pr1/accept', { merchant_account_checked: true }]))
+    expect(await screen.findByText('#A-1043 ditandai paid (QRIS).')).toBeInTheDocument()
+  })
+
+  it('requires a reason to reject, and opens the order chosen on the board', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/payment-proofs?status=pending': QUEUE,
+      'GET /ops/payment-proofs/pr2': { ...DETAIL, proof_id: 'pr2', order_id: 'o2', order_no: '#A-1044', table: null },
+      'POST /ops/payment-proofs/pr2/reject': { ...DETAIL, status: 'rejected' },
+    })
+    renderS4(api, '/payment-review?order=o2')
+    expect(await screen.findByText('#A-1044 · whatsapp_table')).toBeInTheDocument()
+    const reject = screen.getByRole('button', { name: '✕ Tolak bukti bayar & batalkan order' })
+    expect(reject).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('Alasan penolakan'), 'Dana tidak masuk')
+    await userEvent.click(reject)
+    await waitFor(() => expect(api.calls).toContainEqual(
+      ['POST', '/ops/payment-proofs/pr2/reject', { reason: 'Dana tidak masuk' }]))
+  })
+})
+
+describe('S8 blind count', () => {
+  it('hides the expected cash until the count is submitted', async () => {
+    const drawers: DrawerCard[] = [{
+      drawer: { id: 'd1', name: 'Kasir depan' },
+      shift: { id: 's1', opened_at: '2026-11-18T01:00:00Z', starting_cash: 500000, opened_by: 'Rina', cash_in: 1240000,
+        cash_in_count: 26, cash_refunds: 61600 },
+    }]
+    const closed: ShiftClosed = {
+      id: 's1', drawer: { id: 'd1', name: 'Kasir depan' }, opened_at: '2026-11-18T01:00:00Z', closed_at: '2026-11-18T15:04:00Z',
+      timezone: 'Asia/Jakarta', starting_cash: 500000, cash_in: 1240000, cash_refunds: 61600, expected_cash: 1678400,
+      counted_cash: 1760400, difference: 82000, kind: 'surplus', counted_by: 'Rina',
+    }
+    const api = fakeApi({ 'GET /ops/outlets/o-dago/drawers': drawers, 'POST /ops/shifts/s1/close': closed })
+    render(<WithSession session={fakeSession('staff', { api })}><ShiftsPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Tutup shift & hitung kas' }))
+    const panel = screen.getByText('Tutup shift · Drawer 1').closest('section') as HTMLElement
+    for (const [note, count] of [['100.000', '12'], ['50.000', '6'], ['20.000', '9'], ['10.000', '5'], ['5.000', '4'], ['2.000', '3']]) {
+      await userEvent.type(within(panel).getByLabelText(`Jumlah lembar Rp ${note}`), count)
+    }
+    await userEvent.type(within(panel).getByLabelText('Nominal Rp 1.000 & koin'), '4400')
+    expect(within(panel).getByText('Rp 1.760.400')).toBeInTheDocument()
+    expect(within(panel).queryByText(/1\.678\.400/)).not.toBeInTheDocument()
+
+    await userEvent.click(within(panel).getByRole('button', { name: 'Submit hitungan & tutup shift' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/shifts/s1/close', { count_breakdown: {
+      coins: 4400, '100000': 12, '50000': 6, '20000': 9, '10000': 5, '5000': 4, '2000': 3 } }]))
+    expect(await within(panel).findByText(/= Rp 1\.678\.400/)).toBeInTheDocument()
+    expect(within(panel).getByText(/Selisih: \+ Rp 82\.000 \(SURPLUS\) → diposting ke ledger · dihitung oleh Rina 22:04 WIB/))
+      .toBeInTheDocument()
+  })
+})
+
+const CASHFLOW: Cashflow = {
+  from: '2026-11-01', to: '2026-11-17', granularity: 'daily', previous: { from: '2026-10-01', to: '2026-10-17' },
+  totals: {
+    cash_in: { amount: 206760000, change_pct: 12 },
+    cash_out: { amount: 26030000, change_pct: 8 },
+    net: { amount: 180812000, change_pct: 13 },
+    pb1_collected: { amount: 18240000, change_pct: null },
+  },
+  series: [{ date: '2026-11-01', cash_in: 12000000, cash_out: 900000 }, { date: '2026-11-02', cash_in: 16800000, cash_out: 400000 }],
+  breakdown: { revenue_excl_pb1: 182400000, pb1: 18240000, delivery_fee: 6120000, cash: 61300000, qris: 145460000,
+    refunds: 1230000, expenses: 24800000, cash_difference: 82000 },
+  expenses_by_outlet: [{ outlet_id: 'o-dago', outlet: 'Bandung – Dago', amount: 9200000, count: 9 }],
+  expenses_total: 24800000,
+  expenses_count: 23,
+}
+
+const EXPENSES: ExpensePage = {
+  items: [{ id: 7, business_date: '2026-11-17', outlet: { id: 'o-dago', name: 'Bandung – Dago' }, description: 'Beli es batu & gas',
+    amount: 350000, recorded_by: 'Olga', created_at: '2026-11-17T04:00:00Z', reversed: false, reversal_reason: null }],
+  next_cursor: null,
+}
+
+describe('O9 Laporan Cashflow & Pengeluaran', () => {
+  it('shows the tiles, breakdown, and records an expense', async () => {
+    const api = fakeApi({
+      'GET /owner/reports/cashflow?granularity=daily': CASHFLOW,
+      'GET /owner/expenses?limit=5': EXPENSES,
+      'POST /owner/expenses': EXPENSES.items[0],
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><CashflowPage /></WithSession>)
+    expect(await screen.findByText('Rp 206.760.000')).toBeInTheDocument()
+    expect(screen.getByText('▲ 12% vs 1–17 Okt')).toBeInTheDocument()
+    expect(screen.getByText('Titipan pajak, bukan pendapatan')).toBeInTheDocument()
+    expect(screen.getByText('Total Rp 24.800.000 · 23 entri')).toBeInTheDocument()
+    expect(screen.getByText('+ Rp 82.000')).toBeInTheDocument()
+    expect(screen.getByText('− Rp 1.230.000')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '1–17 Nov 2026 ▾' })).toBeInTheDocument()
+    expect(screen.getByText(/^Nov 2026 · dari ledger/)).toBeInTheDocument()
+    expect(screen.getAllByTestId('series-bar')).toHaveLength(CASHFLOW.series.length)
+    expect(await screen.findByText('17 Nov · Dago · oleh Olga')).toBeInTheDocument()
+    expect(screen.getByText('Tidak bisa diedit/dihapus. Koreksi lewat reversal.')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mingguan' }))
+    await waitFor(() => expect(api.calls.map((c) => c[1])).toContain('/owner/reports/cashflow?granularity=weekly'))
+
+    await userEvent.type(screen.getByLabelText('Nominal'), '350000')
+    await userEvent.type(screen.getByLabelText('Deskripsi'), 'Beli es batu & gas')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan pengeluaran' }))
+    await waitFor(() => {
+      const call = api.calls.find((c) => c[0] === 'POST' && c[1] === '/owner/expenses')
+      expect(call?.[2]).toMatchObject({ outlet_id: 'o-dago', amount: 350000, description: 'Beli es batu & gas' })
+    })
+    expect(await screen.findByText('Pengeluaran tersimpan di ledger.')).toBeInTheDocument()
+  })
+
+  it('opens the full expense list from "Lihat semua pengeluaran →"', async () => {
+    const api = fakeApi({
+      'GET /owner/reports/cashflow?granularity=daily': CASHFLOW,
+      'GET /owner/expenses?limit=5': EXPENSES,
+      'GET /owner/expenses?limit=20': EXPENSES,
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><CashflowPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Lihat semua pengeluaran →' }))
+    await waitFor(() => expect(api.calls.map((c) => c[1])).toContain('/owner/expenses?limit=20'))
+    expect(await screen.findByRole('button', { name: 'Buat entry reversal' })).toBeInTheDocument()
+  })
+
+  it('reverses an expense from the full list with a reason', async () => {
+    const api = fakeApi({
+      'GET /owner/reports/cashflow?granularity=daily': CASHFLOW,
+      'GET /owner/expenses?limit=5': EXPENSES,
+      'GET /owner/expenses?limit=20': EXPENSES,
+      'POST /owner/ledger-entries/7/reversal': { reversal_id: 8, expense: { ...EXPENSES.items[0], reversed: true } },
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><CashflowPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Lihat semua →' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Buat entry reversal' }))
+    const reverse = screen.getByRole('button', { name: 'Buat reversal Rp 350.000' })
+    expect(reverse).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('Alasan reversal Beli es batu & gas'), 'Salah nominal')
+    await userEvent.click(reverse)
+    await waitFor(() => expect(api.calls).toContainEqual(
+      ['POST', '/owner/ledger-entries/7/reversal', { reason: 'Salah nominal' }]))
+  })
+})
+
+describe('O10 Laporan Cash Count', () => {
+  it('shows the summary and rows with the difference kind', async () => {
+    const report: CashCount = {
+      from: '2026-11-01', to: '2026-11-17',
+      summary: { shifts: 2, shifts_with_difference: 1, total_shortage: -50000, total_surplus: 0 },
+      rows: [
+        { shift_id: 's1', opened_at: '2026-11-17T01:00:00Z', closed_at: '2026-11-17T15:04:00Z', timezone: 'Asia/Jakarta',
+          outlet: { id: 'o-dago', name: 'Bandung – Dago' }, drawer: { id: 'd1', name: 'Kasir depan', number: 1 },
+          starting_cash: 500000, expected_cash: 1902500, counted_cash: 1852500, difference: -50000, kind: 'shortage', counted_by: 'Rina' },
+        { shift_id: 's2', opened_at: '2026-11-16T09:00:00Z', closed_at: '2026-11-16T15:00:00Z', timezone: 'Asia/Makassar',
+          outlet: { id: 'o-riau', name: 'Bali – Canggu' }, drawer: { id: 'd2', name: 'Kasir', number: 1 },
+          starting_cash: 400000, expected_cash: 966000, counted_cash: 966000, difference: 0, kind: 'none', counted_by: 'Maya' },
+      ],
+    }
+    const api = fakeApi({ 'GET /owner/reports/cash-count': report })
+    render(<WithSession session={fakeSession('owner', { api })}><CashCountPage /></WithSession>)
+    expect(await screen.findByText('− Rp 50.000')).toBeInTheDocument()
+    expect(screen.getByText('Selisih otomatis diposting ke ledger sebagai shortage / surplus.')).toBeInTheDocument()
+    expect(screen.getByText('17 Nov · 08:00–22:04')).toBeInTheDocument()
+    expect(screen.getByText('− 50.000 shortage')).toBeInTheDocument()
+    expect(screen.getByText('Canggu · Drawer 1 (WITA)')).toBeInTheDocument()
+    expect(screen.getByText('16 Nov · 17:00–23:00')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Drawer' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '⭳ Ekspor CSV' })).toBeInTheDocument()
+  })
+})
