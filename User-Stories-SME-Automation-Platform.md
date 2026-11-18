@@ -432,55 +432,62 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - PO tanpa pembayaran dan tanpa penerimaan barang dapat dibatalkan dengan alasan wajib; PO yang sudah dibayar atau sudah menerima barang tidak dapat dibatalkan.
   - Staf tidak dapat membuat, membatalkan, atau melihat harga PO, termasuk lewat API langsung.
 - **Traceability:** FR1.5, FR3.5, FR3.6, FR3.9, AC3.6, AC3.11, AC3.13
+- **Catatan alur:** Skema 1 (bayar mundur): PO dibuka → barang datang dan dicek → PO ditutup → pengingat bayar di dashboard owner. Skema 2 (bayar di muka): PO dibuka → notifikasi bayar di dashboard owner → barang tiba dan dicek → PO ditutup.
 
-### US-058 — Membayar PO tempo secara bertahap dan memantau jatuh tempo
+### US-058 — PO bayar mundur: cek barang, tutup PO, lalu bayar
 
-**Sebagai** owner, **saya ingin** mencatat pembayaran PO tempo sekaligus atau dicicil dan melihat PO yang jatuh tempo, **sehingga** hutang ke supplier tidak terlewat dan cashflow mencerminkan uang yang benar-benar keluar.
+**Sebagai** owner, **saya ingin** PO tempo baru muncul sebagai pengingat bayar setelah barangnya dicek dan PO ditutup, **sehingga** saya hanya membayar barang yang benar-benar diterima dan tidak melewatkan jatuh tempo.
 
 - **Fase/Prioritas:** MVP / P0
+- **Alur:** PO dibuka → barang datang → admin cek qty sesuai PO → PO ditutup → pengingat pembayaran muncul di dashboard owner → owner mencatat pembayaran.
 - **Acceptance criteria:**
-  - Owner mencatat satu atau beberapa pembayaran (tanggal, nominal, metode cash atau transfer bank) sampai total PO lunas; pembayaran yang melebihi sisa hutang ditolak.
+  - Setelah PO tempo ditutup, kartu **Pembayaran supplier** di dashboard owner menampilkan PO tersebut dengan supplier, outlet, sisa hutang, dan tanggal jatuh tempo.
+  - Owner mencatat satu atau beberapa pembayaran (tanggal, nominal, metode cash atau transfer bank) sampai lunas; pembayaran yang melebihi sisa hutang ditolak.
   - Setiap pembayaran membuat satu ledger entry `expense` pada tanggal bayar dengan metode, nomor PO, dan supplier.
   - Pembayaran cash dapat diambil dari laci shift kasir yang sedang terbuka sehingga ekspektasi kas shift itu berkurang; jika tidak, dianggap dibayar di luar laci.
-  - PO tempo yang masih ada sisa hutang setelah tanggal jatuh tempo (zona waktu outlet) ditandai **jatuh tempo/overdue**.
+  - Lewat tanggal jatuh tempo (zona waktu outlet) dengan sisa hutang, pengingat ditandai **overdue** dan tampil paling atas; pengingat hilang setelah lunas.
   - Pembayaran tidak dapat diedit atau dihapus.
-- **Traceability:** FR3.7, FR3.9, FR11.8, AC3.7, AC3.8, AC3.10
+- **Traceability:** FR3.7, FR3.9, FR3.11, FR11.8, AC3.7, AC3.8, AC3.10
 
-### US-059 — PO bayar di muka dengan barang datang belakangan
+### US-059 — PO bayar di muka: notifikasi bayar, barang tiba, cek, tutup PO
 
-**Sebagai** owner, **saya ingin** mencatat PO yang langsung dibayar walaupun barang baru diantar beberapa hari kemudian, **sehingga** uang yang sudah keluar dan barang yang masih ditunggu sama-sama terlihat.
+**Sebagai** owner, **saya ingin** diingatkan membayar PO bayar di muka begitu PO dibuka, lalu PO ditutup setelah barang tiba dan dicek, **sehingga** pembayaran di muka tidak terlupa dan barang yang ditunggu tetap terpantau.
+
+- **Fase/Prioritas:** MVP / P0
+- **Alur:** PO dibuka → notifikasi pembayaran muncul di dashboard owner → owner membayar → barang tiba → admin cek qty sesuai PO → PO ditutup.
+- **Acceptance criteria:**
+  - Begitu PO bayar di muka dibuka, kartu **Pembayaran supplier** di dashboard owner menampilkan permintaan bayar untuk PO itu.
+  - Owner mencatat pembayaran penuh; ledger `expense` diposting pada tanggal bayar dan permintaan bayar hilang dari dashboard.
+  - Setelah dibayar, PO berstatus **menunggu barang**; PO bayar di muka yang belum dibayar tidak dapat ditutup.
+  - Laporan menampilkan nilai barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar, sampai PO ditutup.
+- **Traceability:** FR3.8, FR3.9, FR3.11, AC3.9
+
+### US-060 — Mengecek barang datang terhadap PO dan menutup PO
+
+**Sebagai** owner atau staf outlet, **saya ingin** mengecek apakah qty barang yang datang sesuai PO lalu menutup PO jika sesuai, **sehingga** stok bertambah sesuai barang yang benar-benar diterima dan selisih tidak terlewat.
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Owner mencatat pembayaran penuh saat membuat PO bayar di muka (atau sebelum barang datang); ledger `expense` diposting pada tanggal bayar.
-  - Setelah dibayar, PO berstatus **menunggu barang** sampai seluruh barang diterima.
-  - Laporan menampilkan nilai barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
-- **Traceability:** FR3.8, FR3.9, FR3.10, AC3.9
-
-### US-060 — Mencatat penerimaan barang dari PO
-
-**Sebagai** owner atau staf outlet, **saya ingin** mencatat barang yang datang dari supplier berdasarkan PO, **sehingga** stok bertambah sesuai barang yang benar-benar diterima.
-
-- **Fase/Prioritas:** MVP / P0
-- **Acceptance criteria:**
-  - Owner atau staf yang ditugaskan di outlet PO mencatat jumlah yang datang per baris, tanggal terima, dan catatan opsional.
+  - Owner atau staf yang ditugaskan di outlet PO mengisi qty yang datang di samping qty PO untuk setiap baris, beserta tanggal terima dan catatan opsional; aplikasi menandai baris yang sesuai dan yang kurang.
   - Baris yang terhubung ke bahan menambah stok lewat movement restock yang merujuk PO, dikonversi ke satuan dasar bahan; baris teks bebas tidak mengubah stok.
-  - Barang boleh diterima dalam beberapa kali pengiriman; jumlah yang diterima tidak boleh melebihi jumlah yang dipesan.
-  - Staf hanya melihat item dan jumlah, tanpa harga atau nominal.
-  - Setiap penerimaan mencatat siapa dan kapan, dan tidak dapat diubah atau dihapus.
-- **Traceability:** FR1.5, FR4.2, FR4.10, AC4.9
+  - Barang boleh datang dalam beberapa kali pengiriman; qty yang diterima tidak boleh melebihi qty PO.
+  - Jika semua baris sesuai, owner atau staf dapat **menutup PO**.
+  - Jika ada selisih, PO tetap terbuka dengan status **ada selisih** dan kekurangan per baris, sampai sisanya datang atau owner menutupnya dengan alasan wajib; untuk PO tempo, hutang menjadi qty diterima × harga satuan (default usulan).
+  - Staf hanya melihat item dan qty, tanpa harga atau nominal; setiap pengecekan dan penutupan mencatat siapa dan kapan, dan PO yang ditutup tidak dapat dibuka lagi.
+- **Traceability:** FR1.5, FR4.2, FR4.10, FR4.11, AC4.9, AC4.10
 
-### US-061 — Melihat tab Purchase Order dan hutang supplier
+### US-061 — Tab Purchase Order dan pengingat pembayaran di dashboard
 
-**Sebagai** owner, **saya ingin** melihat seluruh PO di tab tersendiri pada layar Pengeluaran beserta ringkasan hutang supplier, **sehingga** saya tahu apa yang harus dibayar dan barang apa yang masih ditunggu.
+**Sebagai** owner, **saya ingin** melihat seluruh PO di tab tersendiri dan semua pembayaran supplier yang perlu dilakukan di dashboard, **sehingga** saya tahu apa yang harus dibayar dan barang apa yang masih ditunggu.
 
-- **Fase/Prioritas:** MVP / P1
+- **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
   - Layar Pengeluaran memiliki tab **Pengeluaran** (pengeluaran langsung) dan **Purchase Order**.
-  - Tab Purchase Order memiliki filter belum lunas, jatuh tempo, menunggu barang, dan selesai, serta detail PO berisi baris item, riwayat penerimaan, dan riwayat pembayaran beserta pencatatnya.
-  - Laporan cashflow dan dashboard owner menampilkan total hutang supplier (dengan jumlah PO overdue dan yang jatuh tempo dalam 7 hari) serta barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
-  - Hutang yang belum dibayar tidak mengubah angka kas keluar.
-- **Traceability:** FR3.10, FR7.2, AC3.12, AC3.13
+  - Tab Purchase Order memiliki filter terbuka (menunggu barang), ada selisih, menunggu pembayaran, overdue, dan ditutup, serta detail PO berisi baris item, riwayat pengecekan barang, dan riwayat pembayaran beserta pencatatnya.
+  - Dashboard owner memiliki kartu **Pembayaran supplier**: PO tempo yang sudah ditutup dan belum lunas (overdue dulu, lalu jatuh tempo terdekat) dan PO bayar di muka yang terbuka dan belum dibayar, masing-masing dengan tombol catat pembayaran.
+  - Kartu itu dan laporan cashflow menampilkan total hutang supplier (jumlah overdue dan jatuh tempo 7 hari) serta barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
+  - Staf tidak melihat kartu ini, termasuk lewat API langsung.
+- **Traceability:** FR3.10, FR3.11, FR7.2, AC3.12, AC3.13
 
 ### US-033 — Menggunakan dashboard admin sesuai peran
 
