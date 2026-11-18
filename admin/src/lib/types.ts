@@ -453,3 +453,17 @@ export interface CashCount {
 export interface QrisStatus {
   image: { filename: string; content_type: string; size: number; uploaded_at: string } | null
 }
+
+// O2 Dashboard · Item terlaris (GET /owner/dashboard/top-items)
+export type TopItemsPeriod = 'day' | 'month' | 'year'
+
+export interface TopItem {
+  name: string
+  quantity_sold: number
+  revenue: number
+}
+
+export interface TopItems {
+  period: TopItemsPeriod
+  top_items: TopItem[]
+}

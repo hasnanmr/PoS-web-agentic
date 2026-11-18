@@ -34,6 +34,7 @@ Every list/action response for an order includes **`allowed_actions`**, computed
 | Order per jam | ↳ `orders_per_hour` | `[{hour, orders, mark: busy\|quiet\|null}]` + `busy_summary`, `quiet_summary` (hours, orders, share). |
 | Stok rendah & sold out | ↳ `low_stock` | `[{stock_item, outlet, on_hand, low_threshold, unit, status: low\|out}]`. Not affected by `hours`. |
 | Komposisi per kanal / Metode bayar | ↳ `channel_mix`, `payment_methods` | `[{channel, orders, share}]`, `[{method, amount, transactions}]`. |
+| Item terlaris (own toggle Hari ini / Bulan ini / Tahun ini) | `GET /owner/dashboard/top-items` ✅ implemented | Query: `outlet_id` (or all, from the header), `period=day\|month\|year` (default `day`). Own endpoint because the card has its own period toggle and ignores the header's `period` and `hours`. → `{period, top_items: [{name, quantity_sold, revenue}]}`, at most 5, sorted by `quantity_sold` desc, then `revenue` desc. Today / this month / this year in each outlet's time zone, by order `created_at`. Paid orders only (`payment_status = paid`, not cancelled; reversed orders are `refunded` and drop out); add-on variants are grouped under their menu item; `revenue` = sum of `order_items.line_total` (incl. add-ons, excl. PB1 and delivery fee, integer rupiah); `name` = current product name. Empty list → "Belum ada item terjual di periode ini." No migration needed (`order_items` already stores quantity and line_total). |
 
 Staff calling it → `403` (AC7.7).
 
