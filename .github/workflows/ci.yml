@@ -1,9 +1,11 @@
 # CI (T-009): migrations, SQL tests (schema, RLS, token hook), backend tests and lint,
 # API contract check, and the admin app build. Runs on every push and pull request.
 #
-# CD: on a push to main, once CI is green, the changed service is deployed to Railway
-# (backend/ -> "backend" service, admin/ -> "admin" service). Needs the repository secret
-# RAILWAY_TOKEN (project token of the Railway environment); see README "Deployment".
+# CD: on a push to main, once CI is green, pending Supabase migrations are applied to the
+# hosted database first, then the changed service is deployed to Railway (backend/ ->
+# "backend" service, admin/ -> "admin" service). Needs the repository secrets RAILWAY_TOKEN
+# (project token of the Railway environment) and SUPABASE_DB_URL (session pooler connection
+# string of the hosted project, with the database password); see README "Deployment".
 name: CI
 
 on:
@@ -125,9 +127,37 @@ jobs:
             admin:
               - 'admin/**'
 
+  migrate:
+    name: Apply Supabase migrations
+    needs: [backend, admin, changes]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: migrate-supabase
+      cancel-in-progress: false
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.2.0
+      - name: Check the secret
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Repository secret SUPABASE_DB_URL is not set (see README 'Deployment')"; exit 1
+          fi
+      # Migrations are additive and run before the new backend is deployed, so the running
+      # code never reads a table or column that does not exist yet. Already-applied
+      # migrations are skipped (supabase_migrations.schema_migrations).
+      - name: Pending migrations
+        run: supabase db push --remote="$SUPABASE_DB_URL" --skip-vault --dry-run
+      - name: Apply
+        run: supabase db push --remote="$SUPABASE_DB_URL" --skip-vault
+
   deploy-backend:
     name: Deploy backend to Railway
-    needs: [backend, admin, changes]
+    needs: [backend, admin, changes, migrate]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     concurrency:

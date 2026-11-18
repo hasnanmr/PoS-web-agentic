@@ -130,8 +130,10 @@ Two Railway services in one project, both deployed by GitHub Actions (`.github/w
 | `admin` | `admin/` | `admin/Dockerfile`, `admin/railway.toml` |
 
 On every push to `main`, CI runs first; if it is green, only the service whose files changed
-is redeployed (`backend/**` or `supabase/**` -> backend, `admin/**` -> admin). Pull requests
-and other branches run CI only.
+is redeployed (`backend/**` or `supabase/**` -> backend, `admin/**` -> admin). When the
+backend changes, pending `supabase/migrations/` are applied to the hosted Supabase project
+first (job "Apply Supabase migrations"); the backend is deployed only if that succeeds.
+Pull requests and other branches run CI only.
 
 One-time setup:
 
@@ -142,8 +144,11 @@ One-time setup:
    environment.
 3. GitHub: Settings -> Secrets and variables -> Actions -> new secret `RAILWAY_TOKEN`.
 4. Do **not** also connect the services to the GitHub repo in Railway, or each push deploys twice.
+5. GitHub: new secret `SUPABASE_DB_URL`, the **session pooler** connection string of the hosted
+   project (Supabase dashboard -> Connect -> Session pooler, port 5432, IPv4), with the database
+   password filled in: `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
 
-Database migrations (`supabase/migrations/`) are not applied by this pipeline; apply them to
-the hosted Supabase project before merging a backend change that depends on them.
+Migrations must stay additive (new tables/columns, no drops or renames in the same release),
+because they are applied before the new backend replaces the old one.
 The WhatsApp worker will be a separate Railway service using the backend image with start
 command `python -m app.worker.main`.
