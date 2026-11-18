@@ -10,7 +10,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 import psycopg
-from fastapi import APIRouter, Header, Request, status
+from fastapi import APIRouter, Header, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app import db
@@ -158,10 +158,11 @@ async def close_bill(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> BillClosed:
     key = idempotency.check_key(idempotency_key)
+    fp = idempotency.fingerprint(str(bill_id), body.model_dump(mode="json"))
     ctx = user.actor()
     try:
         async with db.transaction(_pool(request), ctx) as conn:
-            cached = await idempotency.lookup(conn, ctx, f"bill.close:{bill_id}", key)
+            cached = await idempotency.lookup(conn, ctx, f"bill.close:{bill_id}", key, fp)
             if cached is not None:
                 return BillClosed(**cached)
             result = BillClosed(
@@ -173,13 +174,22 @@ async def close_bill(
                 )
             )
             await idempotency.store(
-                conn, ctx, f"bill.close:{bill_id}", key, result.model_dump(mode="json")
+                conn, ctx, f"bill.close:{bill_id}", key, fp, result.model_dump(mode="json")
             )
     except psycopg.errors.UniqueViolation as exc:
         if "idempotency_keys" in str(exc):
             raise ApiError(409, "conflict", "the same request is already being processed") from None
         raise
     return result
+
+
+@router.post("/bills/{bill_id}/void", status_code=status.HTTP_204_NO_CONTENT)
+async def void_bill(bill_id: UUID, request: Request, user: TenantUser) -> Response:
+    """S5: cancel an open bill that has no orders (e.g. the wrong table was picked)."""
+    ctx = user.actor()
+    async with db.transaction(_pool(request), ctx) as conn:
+        await bills.void_empty(conn, ctx, bill_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/outlets/{outlet_id}/shifts/current")

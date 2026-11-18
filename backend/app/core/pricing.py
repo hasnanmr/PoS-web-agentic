@@ -129,7 +129,11 @@ async def price_lines(
         product_groups = {g["id"]: g for g in groups_by_product.get(line.product_id, [])}
         chosen_by_group: dict[UUID, list[UUID]] = defaultdict(list)
         addons: list[PricedAddon] = []
-        for option_id in dict.fromkeys(line.addon_option_ids):
+        if len(set(line.addon_option_ids)) != len(line.addon_option_ids):
+            raise InvalidLineError(
+                "addon_invalid", "the same add-on was chosen twice", line.product_id
+            )
+        for option_id in line.addon_option_ids:
             option = options.get(option_id)
             if (
                 option is None

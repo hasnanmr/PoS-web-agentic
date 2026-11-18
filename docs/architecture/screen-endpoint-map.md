@@ -157,7 +157,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 |---|---|---|
 | Header "Shift aktif · Drawer 1 · 08:00" | `GET /ops/outlets/{id}/shifts/current` ✅ | Open shifts per drawer (also used to enable/disable Cash). |
 | Product grid, search, category tabs, Owner's picks | `GET /ops/outlets/{id}/menu?q=&category=&owner_picks=` ✅ | `[{product_id, name, price, photo_url, sold_out, sold_out_reason ("Bahan tidak cukup"), addon_groups:[{…, options:[{id, name, price, available}]}]}]`. |
-| Table dropdown (Dine-in) | `GET /ops/outlets/{id}/tables?include=open_bill` ✅ | `[{id, name, area, open_bill:{id, total}?}]`. |
+| Table dropdown (Dine-in) | `GET /ops/outlets/{id}/tables` ✅ (always includes `open_bill`; no query parameters) | `[{id, name, area, open_bill:{id, total}?}]`. |
 | Live totals | `POST /ops/outlets/{id}/quotes` ✅ | Items + add-ons + order type → `subtotal, pb1_rate_bps, pb1_amount, total` (server is the only source of PB1). |
 | Buat order & terima bayar (F9) | `POST /ops/outlets/{id}/orders` (`Idempotency-Key`) ✅ | `type: dine_in\|takeaway, table_id?, items[{product_id, quantity, addon_option_ids[]}], payment: {method: cash, cash_received} \| {method: qris} \| {to_open_bill: true}`. Errors: `item_sold_out` (names the item), `shift_not_open`, `cash_insufficient`, `addon_required`, `addon_invalid`. Response includes `change_due`. Dine-in at an open-bill outlet must use `{to_open_bill: true}` with a `table_id`; the order joins the table's open bill (opened if needed). |
 
@@ -192,10 +192,11 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Bill cards + mode badge | `GET /ops/outlets/{id}/bills?status=open` ✅ | `payment_mode`, `[{id, table?, guest_name?, running_total, order_count, opened_at}]`. |
+| Bill cards + mode badge | `GET /ops/outlets/{id}/bills` ✅ (open bills only; no query parameters) | `payment_mode`, `[{id, table?, guest_name?, running_total, order_count, opened_at}]`. |
 | + Buka bill | `POST /ops/outlets/{id}/bills` ✅ | `table_id` or `guest_name`. `conflict` if the table already has an open bill. |
 | Bill detail | `GET /ops/bills/{id}` ✅ | `orders:[{order_no, channel, created_at, items, line_total}]`, `subtotal, pb1_amount, total`. |
-| Tutup bill & bayar | `POST /ops/bills/{id}/close` (`Idempotency-Key`) ✅ | `method: cash\|qris, cash_received?` → `change_due`. Full payment only. |
+| Tutup bill & bayar | `POST /ops/bills/{id}/close` (`Idempotency-Key`) ✅ | `method: cash\|qris, cash_received?, drawer_id?` → `change_due`. Full payment only. `drawer_id` is required (422) when several shifts are open and none is the cashier's own. A closed bill returns its snapshot (subtotal, PB1, total). |
+| Batalkan bill kosong | `POST /ops/bills/{id}/void` ✅ | No body, 204. `bill_not_empty` (409) when orders are on it; `bill_not_open` when already closed. For a wrong table or a guest who left. |
 
 ### S6 / M4 · Reservasi & Meja (T-062, T-063, T-064)
 
@@ -219,7 +220,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Drawer cards | `GET /ops/outlets/{id}/drawers?include=current_shift` ✅ | `[{drawer, shift?:{id, opened_by, opened_at, starting_cash, cash_in, cash_in_count, cash_refunds}}]` — **no expected cash** before the count. |
+| Drawer cards | `GET /ops/outlets/{id}/drawers` ✅ (always includes the current shift; no query parameters) | `[{drawer, shift?:{id, opened_by, opened_at, starting_cash, cash_in, cash_in_count, cash_refunds}}]` — **no expected cash** before the count. |
 | Buka shift | `POST /ops/drawers/{id}/shifts` ✅ | `starting_cash`. `conflict` if one is open. |
 | Submit hitungan & tutup shift | `POST /ops/shifts/{id}/close` | `count_breakdown:{"100000":12, …, "coins":4400}` → server sums `counted_cash`; response then reveals `expected_cash, difference, kind: shortage\|surplus\|none`. |
 

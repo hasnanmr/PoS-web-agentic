@@ -52,8 +52,10 @@ export default function CounterPage() {
   const [picking, setPicking] = useState<MenuItem>()
   const [method, setMethod] = useState<Method>()
   const [received, setReceived] = useState('')
-  const [quote, setQuote] = useState<Quote>()
-  const [quoteError, setQuoteError] = useState<string>()
+  // A quote counts only for the exact cart it was asked for; while the next one is on its
+  // way the total, "Uang pas", "Kembalian" and submit never use the previous cart's numbers.
+  const [quoted, setQuoted] = useState<{ key: string; quote: Quote }>()
+  const [quoteFailed, setQuoteFailed] = useState<{ key: string; text: string }>()
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
   const [idemKey, setIdemKey] = useState(newKey)
@@ -68,15 +70,19 @@ export default function CounterPage() {
     product_id: l.item.product_id, quantity: l.quantity, addon_option_ids: l.optionIds,
   })), [cart])
 
+  const quoteKey = useMemo(() => JSON.stringify({ type, items }), [type, items])
+  const quote = quoted?.key === quoteKey ? quoted.quote : undefined
+  const quoteError = quoteFailed?.key === quoteKey ? quoteFailed.text : undefined
+
   useEffect(() => {
     if (!outletId || items.length === 0) return
     let active = true
     api.post<Quote>(`/ops/outlets/${outletId}/quotes`, { type, items }).then(
-      (result) => { if (active) { setQuote(result); setQuoteError(undefined) } },
-      (e: unknown) => { if (active) { setQuote(undefined); setQuoteError(errorMessage(e)) } },
+      (result) => { if (active) setQuoted({ key: quoteKey, quote: result }) },
+      (e: unknown) => { if (active) setQuoteFailed({ key: quoteKey, text: errorMessage(e) }) },
     )
     return () => { active = false }
-  }, [api, outletId, type, items])
+  }, [api, outletId, type, items, quoteKey])
 
   const total = items.length ? quote?.total ?? 0 : 0
   const cashReceived = Number(received.replace(/\D/g, '') || 0)
@@ -99,7 +105,7 @@ export default function CounterPage() {
       setNotice({ tone: 'success', text: `Order ${created.order_no} dibuat · ${formatRupiah(created.total)}${extra}` })
       setCart([])
       setReceived('')
-      setQuote(undefined)
+      setQuoted(undefined)
       setIdemKey(newKey())
       await Promise.all([menu.reload(), tables.reload()])
     } catch (e) {
@@ -231,7 +237,7 @@ export default function CounterPage() {
             {(quote?.pb1_rate_bps ?? null) !== null && (
               <div className="flex justify-between"><dt>PB1 {(quote!.pb1_rate_bps! / 100).toLocaleString('id-ID')}%</dt><dd>{formatRupiah(items.length ? quote!.pb1_amount : 0)}</dd></div>
             )}
-            <div className="flex justify-between text-[15px] font-bold"><dt>Total</dt><dd>{formatRupiah(total)}</dd></div>
+            <div className="flex justify-between text-[15px] font-bold"><dt>Total</dt><dd>{cart.length > 0 && !quote && !quoteError ? '…' : formatRupiah(total)}</dd></div>
           </dl>
 
           <div className="mt-3">

@@ -13,7 +13,7 @@ from psycopg.rows import dict_row
 
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 
 _OPEN_SHIFTS = """
 select s.id, s.drawer_id, d.name as drawer_name, s.opened_at, s.starting_cash,
@@ -98,12 +98,34 @@ async def open_shift(
 async def shift_for_cash(
     conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID, drawer_id: UUID | None
 ) -> UUID:
-    """The open shift that receives a cash payment: the requested drawer's, else the one the
-    cashier opened, else the outlet's first open shift. `shift_not_open` when none."""
+    """The open shift that receives a cash payment. With a drawer_id, that drawer's shift.
+    Without one, the cashier's own shift, or the only open shift; when it is ambiguous
+    (several open shifts and none, or more than one, is the cashier's) the client must send
+    `drawer_id`, so money never lands in someone else's drawer by accident.
+    `shift_not_open` when there is none."""
     shifts = await open_shifts(conn, outlet_id)
     if drawer_id is not None:
         shifts = [s for s in shifts if s["drawer_id"] == drawer_id]
     if not shifts:
         raise ConflictError("shift_not_open", "open a cashier shift before taking cash")
+    chosen = _unambiguous(shifts, ctx)
+    if chosen is None:
+        raise ValidationFailedError(
+            "several cashier shifts are open; choose the drawer", {"field": "drawer_id"}
+        )
+    return chosen
+
+
+def _unambiguous(shifts: list[dict[str, Any]], ctx: ActorContext) -> UUID | None:
+    if len(shifts) == 1:
+        return shifts[0]["id"]
     mine = [s for s in shifts if s["opened_by"] == ctx.user_id]
-    return (mine or shifts)[0]["id"]
+    return mine[0]["id"] if len(mine) == 1 else None
+
+
+async def shift_for_refund(
+    conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID
+) -> UUID | None:
+    """The shift a cash refund leaves from: the cashier's own or the only open one, else
+    None (no shift is touched; a closed shift's final count is never changed)."""
+    return _unambiguous(await open_shifts(conn, outlet_id), ctx)

@@ -1,7 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { act, renderHook } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { usePolling } from '../lib/usePolling'
+import type { Quote } from '../lib/types'
 import { fakeApi, fakeSession, OUTLETS } from '../test/fakes'
 import { WithSession } from '../test/session'
 import type { Board, MenuItem, OrderCard, OrderDetail } from '../lib/types'
@@ -75,6 +78,72 @@ describe('S1 Counter', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Buat order ke open bill (F9)' }))
     await waitFor(() => expect(api.calls.find(([m, p]) => m === 'POST' && p.endsWith('/orders'))?.[2])
       .toMatchObject({ table_id: 't5', payment: { to_open_bill: true } }))
+  })
+})
+
+describe('S1 Counter: stale quote', () => {
+  it('does not show or submit the previous cart total while the new quote is loading', async () => {
+    const quote = (total: number): Quote => ({ lines: [], subtotal: total, pb1_rate_bps: null, pb1_amount: 0, total })
+    const pending: ((q: Quote) => void)[] = []
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/menu': [{ ...KOPI, addon_groups: [] }],
+      'GET /ops/outlets/o-dago/tables': [],
+      'GET /ops/outlets/o-dago/shifts/current': [],
+    })
+    const base = api.post
+    api.post = vi.fn(async (path: string, body?: unknown) => {
+      if (path.endsWith('/quotes')) return new Promise<Quote>((resolve) => { pending.push(resolve) })
+      return base(path, body)
+    }) as typeof api.post
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api, outlet: PAY_FIRST })}><CounterPage /></WithSession></MemoryRouter>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    await userEvent.click(screen.getByRole('button', { name: '▦ QRIS' }))
+    await act(async () => { pending[0](quote(25000)) })
+    const submit = () => screen.getByRole('button', { name: /Buat order/ })
+    await waitFor(() => expect(screen.getAllByText('Rp 25.000', { selector: 'dd' }).length).toBeGreaterThan(0))
+    expect(submit()).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah jumlah Es Kopi Susu Senja' }))
+    expect(screen.getByText('Total').nextSibling).toHaveTextContent('…')
+    expect(submit()).toBeDisabled()
+    await act(async () => { pending[1](quote(50000)) })
+    await waitFor(() => expect(screen.getByText('Total').nextSibling).toHaveTextContent('Rp 50.000'))
+    expect(submit()).toBeEnabled()
+  })
+})
+
+describe('S5 empty bill', () => {
+  it('lets the cashier void a bill that has no orders', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/bills': { payment_mode: 'open_bill', bills: [{ id: 'b2', table_id: 't2', table_name: 'Meja 02',
+        table_area: null, guest_name: null, running_total: 0, order_count: 0, opened_at: new Date().toISOString() }] },
+      'GET /ops/bills/b2': { id: 'b2', table_name: 'Meja 02', table_area: null, guest_name: null, status: 'open',
+        opened_at: new Date().toISOString(), orders: [], subtotal: 0, pb1_rate_bps: null, pb1_amount: 0, total: 0 },
+      'GET /ops/outlets/o-dago/shifts/current': [],
+    })
+    render(<WithSession session={fakeSession('staff', { api })}><OpenBillsPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Batalkan bill' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/bills/b2/void', undefined]))
+  })
+})
+
+describe('usePolling', () => {
+  it('reloads on a timer and skips a tick while a request is still running', () => {
+    vi.useFakeTimers()
+    try {
+      const reload = vi.fn(() => Promise.resolve())
+      const { rerender } = renderHook(({ loading }) => usePolling({ loading, reload }, 1000), { initialProps: { loading: false } })
+      act(() => { vi.advanceTimersByTime(1000) })
+      expect(reload).toHaveBeenCalledTimes(1)
+      rerender({ loading: true })
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(reload).toHaveBeenCalledTimes(1)
+      rerender({ loading: false })
+      act(() => { vi.advanceTimersByTime(1000) })
+      expect(reload).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

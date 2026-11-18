@@ -10,7 +10,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 import psycopg
-from fastapi import APIRouter, Header, Query, Request, status
+from fastapi import APIRouter, Header, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app import db
@@ -280,11 +280,13 @@ async def create_order(
     outlet_id: UUID,
     body: OrderCreate,
     request: Request,
+    response: Response,
     user: TenantUser,
     idempotency_key: str | None = IdempotencyKey,
 ) -> OrderCreated:
     key = idempotency.check_key(idempotency_key)
     scope = f"order.create:{outlet_id}"
+    fp = idempotency.fingerprint(str(outlet_id), body.model_dump(mode="json"))
     ctx = user.actor()
     pay = body.payment
     draft = CounterOrder(
@@ -296,12 +298,14 @@ async def create_order(
     )
     try:
         async with db.transaction(_pool(request), ctx) as conn:
-            cached = await idempotency.lookup(conn, ctx, scope, key)
+            cached = await idempotency.lookup(conn, ctx, scope, key, fp)
             if cached is not None:
+                response.status_code = status.HTTP_200_OK  # a replay, not a new order
+                response.headers["Idempotent-Replay"] = "true"
                 return OrderCreated(**cached)
             await outlets.require_outlet(conn, outlet_id)
             created = OrderCreated(**await orders.create_counter_order(conn, ctx, outlet_id, draft))
-            await idempotency.store(conn, ctx, scope, key, created.model_dump(mode="json"))
+            await idempotency.store(conn, ctx, scope, key, fp, created.model_dump(mode="json"))
     except psycopg.errors.UniqueViolation as exc:
         if "idempotency_keys" in str(exc):
             raise ApiError(409, "conflict", "the same request is already being processed") from None

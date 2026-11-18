@@ -19,6 +19,7 @@ from psycopg.types.json import Jsonb
 
 from app.core import payments
 from app.core.actor import ActorContext
+from app.core.audit import record_audit
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.pricing import outlet_pb1
 from app.core.tax import Quote, quote_totals
@@ -93,13 +94,20 @@ async def _require_open_bill_outlet(conn: AsyncConnection, outlet_id: UUID) -> N
 async def open_bill_for_table(
     conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID, table_id: UUID
 ) -> UUID:
-    cur = await conn.execute(
-        "select id from app.bills where table_id = %s and status = 'open'", (table_id,)
-    )
+    existing = "select id from app.bills where table_id = %s and status = 'open'"
+    cur = await conn.execute(existing, (table_id,))
     row = await cur.fetchone()
     if row:
         return row[0]
-    return await _insert(conn, ctx, outlet_id, table_id=table_id, guest_name=None)
+    try:
+        return await _insert(conn, ctx, outlet_id, table_id=table_id, guest_name=None)
+    except ConflictError:
+        # Another order opened this table's bill between the select and the insert: join it.
+        cur = await conn.execute(existing, (table_id,))
+        row = await cur.fetchone()
+        if row is None:
+            raise
+        return row[0]
 
 
 async def void_if_empty(conn: AsyncConnection, bill_id: UUID) -> None:
@@ -108,6 +116,38 @@ async def void_if_empty(conn: AsyncConnection, bill_id: UUID) -> None:
         " where id = %s and status = 'open'"
         " and not exists (select 1 from app.orders where bill_id = %s and status <> 'cancelled')",
         (bill_id, bill_id),
+    )
+
+
+async def void_empty(conn: AsyncConnection, ctx: ActorContext, bill_id: UUID) -> None:
+    """S5: void an open bill that has no live orders (a wrong table, a guest who left).
+    `bill_not_empty` when orders are on it: cancel or reverse those first."""
+    cur = await conn.execute(
+        "select outlet_id, status::text from app.bills where id = %s for update", (bill_id,)
+    )
+    row = await cur.fetchone()
+    if row is None:
+        raise NotFoundError("bill")
+    outlet_id, status = row
+    if status != "open":
+        raise ConflictError("bill_not_open", "this bill is already closed")
+    cur = await conn.execute(
+        "select exists (select 1 from app.orders where bill_id = %s and status <> 'cancelled')",
+        (bill_id,),
+    )
+    if (await cur.fetchone())[0]:  # type: ignore[index]
+        raise ConflictError("bill_not_empty", "this bill has orders; cancel them first")
+    await conn.execute(
+        "update app.bills set status = 'voided', closed_at = now(), closed_by = %s where id = %s",
+        (ctx.user_id, bill_id),
+    )
+    await record_audit(
+        conn,
+        ctx,
+        action="bill.voided",
+        entity_type="bill",
+        entity_id=bill_id,
+        outlet_id=outlet_id,
     )
 
 
@@ -134,11 +174,8 @@ async def list_open(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str, An
         (outlet_id,),
     )
     rows = await cur.fetchall()
-    out = []
-    for r in rows:
-        totals = await _totals(conn, outlet_id, int(r["subtotal"]))
-        out.append({**r, "running_total": totals.total})
-    return out
+    pb1 = await outlet_pb1(conn, outlet_id)  # one lookup for the whole list
+    return [{**r, "running_total": quote_totals(int(r["subtotal"]), pb1).total} for r in rows]
 
 
 async def detail(conn: AsyncConnection, bill_id: UUID) -> dict[str, Any]:
@@ -176,11 +213,17 @@ async def detail(conn: AsyncConnection, bill_id: UUID) -> dict[str, Any]:
         totals = await _totals(conn, bill["outlet_id"], int(bill["subtotal"]))
         pb1_rate, pb1, total = totals.pb1_rate_bps, totals.pb1_amount, totals.total
     else:
+        # A closed or voided bill reads every money figure from its snapshot, so a reversal
+        # after close does not make the subtotal disagree with the total that was paid.
         await cur.execute(
-            "select pb1_rate_bps, pb1_amount, total from app.bills where id = %s", (bill_id,)
+            "select subtotal, pb1_rate_bps, pb1_amount, total from app.bills where id = %s",
+            (bill_id,),
         )
         snap = await cur.fetchone()
-        pb1_rate, pb1, total = snap["pb1_rate_bps"], snap["pb1_amount"], snap["total"]  # type: ignore[index]
+        assert snap is not None  # noqa: S101
+        if snap["subtotal"] is not None:
+            bill["subtotal"] = snap["subtotal"]
+        pb1_rate, pb1, total = snap["pb1_rate_bps"], snap["pb1_amount"] or 0, snap["total"] or 0
     return {**bill, "orders": orders, "pb1_rate_bps": pb1_rate, "pb1_amount": pb1, "total": total}
 
 
@@ -222,6 +265,10 @@ async def close(
         pb1_amount=totals.pb1_amount,
         bill_id=bill_id,
     )
+    # Closing a bill completes every live order on it, whatever its kitchen status
+    # (confirmed, preparing, ready): the table has been served and paid (glossary §5). This
+    # deliberately bypasses the per-order state machine; do not route it through it. The
+    # order_events rows are written here (not via orders._event) to avoid an import cycle.
     for order_id, order_status in orders:
         await conn.execute(
             "update app.orders set payment_status = 'paid', status = 'completed' where id = %s",

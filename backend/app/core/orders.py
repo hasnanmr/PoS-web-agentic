@@ -65,6 +65,21 @@ async def _line_requirements(
     return out
 
 
+def _first_short(
+    lines: tuple[PricedLine, ...],
+    per_line: list[dict[UUID, Decimal]],
+    on_hand: dict[UUID, Decimal],
+) -> PricedLine | None:
+    """The first line whose ingredients (cumulative over the order) exceed what is on hand."""
+    total: dict[UUID, Decimal] = defaultdict(Decimal)
+    for line, need in zip(lines, per_line, strict=True):
+        for sid, qty in need.items():
+            total[sid] += qty
+            if total[sid] > on_hand.get(sid, Decimal(0)):
+                return line
+    return None
+
+
 async def _deduct_stock(
     conn: AsyncConnection,
     ctx: ActorContext,
@@ -73,15 +88,15 @@ async def _deduct_stock(
     lines: tuple[PricedLine, ...],
 ) -> None:
     per_line = await _line_requirements(conn, lines)
-    on_hand = await stock.on_hand(conn, outlet_id)
+    short = _first_short(lines, per_line, await stock.on_hand(conn, outlet_id))
+    if short is not None:
+        raise SoldOutError(short.product_id, short.name)
     total: dict[UUID, Decimal] = defaultdict(Decimal)
-    for line, need in zip(lines, per_line, strict=True):
+    for need in per_line:
         for sid, qty in need.items():
             total[sid] += qty
-            if total[sid] > on_hand.get(sid, Decimal(0)):
-                raise SoldOutError(line.product_id, line.name)
     try:
-        async with conn.transaction():
+        async with conn.transaction():  # all-or-nothing: a failure undoes the earlier rows
             for sid, qty in sorted(total.items(), key=lambda kv: str(kv[0])):  # stable lock order
                 await conn.execute(
                     "insert into app.stock_movements (tenant_id, outlet_id, stock_item_id, type,"
@@ -97,9 +112,14 @@ async def _deduct_stock(
                         ctx.actor_id,
                     ),
                 )
-    except errors.CheckViolation:
-        # Another order took the last stock between the check and the insert.
-        raise SoldOutError(lines[0].product_id, lines[0].name) from None
+    except errors.CheckViolation as exc:
+        if getattr(exc.diag, "constraint_name", None) != "outlet_stock_on_hand_check":
+            raise
+        # Another order took stock between the check and the insert. Look at the stock as it
+        # is now and name the line that no longer fits (not just the first line).
+        short = _first_short(lines, per_line, await stock.on_hand(conn, outlet_id))
+        culprit = short or lines[0]
+        raise SoldOutError(culprit.product_id, culprit.name) from None
 
 
 async def _return_stock(
@@ -110,7 +130,7 @@ async def _return_stock(
     cur = await conn.execute(
         "select stock_item_id, -sum(quantity) from app.stock_movements"
         " where order_id = %s and type in ('sale', 'sale_reversal') group by stock_item_id"
-        " having sum(quantity) < 0",
+        " having sum(quantity) < 0 order by stock_item_id",  # same lock order as _deduct_stock
         (order["id"],),
     )
     for sid, qty in await cur.fetchall():
@@ -227,6 +247,8 @@ async def create_counter_order(
     """S1 "Buat order & terima bayar": dine-in at an open-bill outlet goes onto the table's
     bill (opened if needed); everything else is paid now (cash or QRIS)."""
     outlet = await _outlet(conn, outlet_id)
+    if draft.type == "takeaway" and draft.table_id is not None:
+        raise ValidationFailedError("a takeaway order has no table", {"field": "table_id"})
     await _check_table(conn, outlet_id, draft.table_id)
     open_bill_flow = draft.type == "dine_in" and outlet["payment_mode"] == "open_bill"
     if open_bill_flow:
@@ -395,7 +417,7 @@ async def _insert_order(
 # Status changes ------------------------------------------------------------------------
 
 
-_ORDER_SQL = """
+_ORDER_SELECT = """
 select o.id, o.outlet_id, o.order_no, o.channel::text as channel, o.type::text as type,
        o.payment_mode::text as payment_mode, o.status::text as status,
        o.payment_status::text as payment_status, o.table_id, o.bill_id, o.subtotal,
@@ -405,8 +427,8 @@ from app.orders o
 join app.outlets ou on ou.id = o.outlet_id
 left join app.tables t on t.id = o.table_id
 left join app.bills b on b.id = o.bill_id
-where o.id = %s
 """
+_ORDER_SQL = _ORDER_SELECT + "where o.id = %s"
 
 
 async def _load(conn: AsyncConnection, order_id: UUID, *, lock: bool = False) -> dict[str, Any]:
@@ -484,12 +506,11 @@ async def reverse(
         raise ConflictError("invalid_transition", "only paid orders can be reversed")
     ingredients = ingredients or order_flow.default_ingredients(order["status"])
     cur = await conn.execute(
-        "select method::text, shift_id from app.payments where order_id = %s"
-        " or bill_id = %s limit 1",
+        "select method::text from app.payments where order_id = %s or bill_id = %s limit 1",
         (order_id, order["bill_id"]),
     )
     pay = await cur.fetchone()
-    method, shift_id = (pay[0], pay[1]) if pay else ("cash", None)
+    method = pay[0] if pay else "cash"
     await _return_stock(conn, ctx, order, as_waste=ingredients == "waste")
     await payments.post_refund(
         conn,
@@ -497,8 +518,8 @@ async def reverse(
         order["outlet_id"],
         order_id=order_id,
         amount=order["total"],
+        pb1_portion=order["pb1_amount"],
         method=method,
-        shift_id=shift_id,
     )
     await conn.execute(
         "update app.orders set status = 'cancelled', payment_status = 'refunded' where id = %s",
@@ -653,7 +674,7 @@ async def board(
     start, _ = local_day_bounds(local_date(datetime.now(UTC), tz), tz)
     dcur = conn.cursor(row_factory=dict_row)
     await dcur.execute(
-        _ORDER_SQL.replace("where o.id = %s", "")
+        _ORDER_SELECT
         + """
         where o.outlet_id = %s
           and (o.status not in ('completed', 'cancelled') or o.updated_at >= %s)

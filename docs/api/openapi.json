@@ -3788,6 +3788,43 @@
         ]
       }
     },
+    "/api/v1/ops/bills/{bill_id}/void": {
+      "post": {
+        "description": "S5: cancel an open bill that has no orders (e.g. the wrong table was picked).",
+        "operationId": "void_bill_api_v1_ops_bills__bill_id__void_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Bill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Void Bill",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      }
+    },
     "/api/v1/ops/drawers/{drawer_id}/shifts": {
       "post": {
         "operationId": "open_shift_api_v1_ops_drawers__drawer_id__shifts_post",

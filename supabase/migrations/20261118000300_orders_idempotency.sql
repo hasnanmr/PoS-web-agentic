@@ -27,6 +27,9 @@ begin
   if not app.can_access_outlet(p_outlet_id) then
     raise exception 'no access to outlet' using errcode = '42501';
   end if;
+  -- Held until the order transaction ends, so order creation is serialized per outlet. That is
+  -- fine for one outlet's counter traffic; revisit (a per-outlet sequence table) if one outlet
+  -- ever takes many orders per second.
   perform pg_advisory_xact_lock(hashtextextended('order_no:' || p_outlet_id::text, 0));
   select coalesce(max(order_no), 1000) + 1 into v_next from app.orders where outlet_id = p_outlet_id;
   return v_next;

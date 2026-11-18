@@ -3,12 +3,13 @@
 // for "↻ live"), GET /ops/orders/{id}, POST /ops/orders/{id}/transitions | cancel | reversal.
 // Behavior notes: order status and payment status are separate badges; buttons come only
 // from the server's allowed_actions; unpaid pay-first orders have no "Mulai siapkan".
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
 import type { Board, OrderCard, OrderDetail } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
+import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, LinkButton, Loading, Select, TextInput } from '../ui/kit'
 
@@ -65,11 +66,7 @@ export default function OrderBoardPage() {
     `${outletId}?${query}`,
   )
   const { reload } = board
-
-  useEffect(() => {
-    const timer = window.setInterval(() => { void reload() }, POLL_MS)
-    return () => window.clearInterval(timer)
-  }, [reload])
+  usePolling(board, POLL_MS)
 
   async function act(order: OrderCard, to: string) {
     setError(undefined)
@@ -101,9 +98,16 @@ export default function OrderBoardPage() {
           <option value="pickup">Pickup</option>
         </Select>
         <TextInput aria-label="Cari order" placeholder="⌕ Cari #order / nama" className="h-8 w-full sm:w-48" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button type="button" className="ml-auto text-text-muted hover:text-text" onClick={() => void reload()}>↻ live</button>
+        <button type="button" className={`ml-auto hover:text-text ${board.error ? 'text-danger' : 'text-text-muted'}`} onClick={() => void reload()}>
+          {board.loading && board.data ? '↻ memuat…' : board.error ? '↻ gagal — coba lagi' : '↻ live'}
+        </button>
       </div>
       {error && <div className="px-4 pt-3 md:px-6"><Alert>{error}</Alert></div>}
+      {board.error ? (
+        <div className="px-4 pt-3 md:px-6">
+          <Alert>Board belum bisa diperbarui: {errorMessage(board.error)}{board.data ? ' Menampilkan data terakhir.' : ''}</Alert>
+        </div>
+      ) : null}
       {board.loading && !board.data ? <Loading /> : (
         <div className="grid gap-3 p-4 md:grid-cols-2 md:p-6 xl:grid-cols-5">
           {COLUMNS.map(({ key, label }) => {

@@ -7,6 +7,7 @@ import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
 import type { BillCard, BillDetail, ShiftRow, TableRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
+import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, LinkButton, Loading, Select, TextInput } from '../ui/kit'
 
@@ -136,6 +137,7 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
   const { api, outlet } = useSession()
   const bill = useLoad(() => api.get<BillDetail>(`/ops/bills/${billId}`), billId)
   const shifts = useLoad(() => api.get<ShiftRow[]>(`/ops/outlets/${outlet!.id}/shifts/current`), outlet!.id)
+  usePolling(bill) // orders added from the counter show up, and the total to pay stays current
   const [method, setMethod] = useState<'cash' | 'qris'>('cash')
   const [received, setReceived] = useState('')
   const [busy, setBusy] = useState(false)
@@ -159,7 +161,19 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
             </div>
           </li>
         ))}
-        {b.orders.length === 0 && <li className="text-text-muted">Belum ada order di bill ini.</li>}
+        {b.orders.length === 0 && (
+          <li className="text-text-muted">
+            Belum ada order di bill ini.{' '}
+            <LinkButton className="text-danger" onClick={async () => {
+              try {
+                await api.post(`/ops/bills/${b.id}/void`)
+                await onClosed('Bill kosong dibatalkan.')
+              } catch (e) {
+                setError(errorMessage(e))
+              }
+            }}>Batalkan bill</LinkButton>
+          </li>
+        )}
       </ul>
       <dl className="mt-3 space-y-0.5 border-t border-border pt-2 text-[12px]">
         <div className="flex justify-between"><dt>Subtotal</dt><dd>{formatRupiah(b.subtotal)}</dd></div>
