@@ -295,23 +295,17 @@ async def create_counter_order(
             pb1_amount=priced.quote.pb1_amount,
             order_id=order["id"],
         )
-        await conn.execute(
-            "update app.orders set payment_status = 'paid' where id = %s", (order["id"],)
-        )
-        await _event(
+        await mark_paid(
             conn,
             ctx,
             order,
-            "payment_changed",
             from_payment="unpaid",
-            to_payment="paid",
             data={
                 "method": result.method,
                 "amount": result.amount,
                 "cash_received": draft.payment.cash_received,
             },
         )
-        order["payment_status"] = "paid"
         change = result.change_due
     return {
         "id": order["id"],
@@ -440,6 +434,64 @@ async def _load(conn: AsyncConnection, order_id: UUID, *, lock: bool = False) ->
     if row is None:
         raise NotFoundError("order")
     return row
+
+
+FINAL_STATUSES = order_flow.FINAL
+
+
+async def load_for_update(conn: AsyncConnection, order_id: UUID) -> dict[str, Any]:
+    """The order row (with outlet prefix and time zone), locked for a payment decision."""
+    return await _load(conn, order_id, lock=True)
+
+
+async def mark_paid(
+    conn: AsyncConnection,
+    ctx: ActorContext,
+    order: dict[str, Any],
+    *,
+    from_payment: str,
+    data: dict[str, Any],
+) -> None:
+    """Payment confirmed (the ledger was posted by `payments.capture`). An order waiting for
+    payment (pay-first, online) becomes `confirmed` at the same moment (glossary §5)."""
+    await conn.execute(
+        "update app.orders set payment_status = 'paid',"
+        " status = case when status = 'pending_payment' then 'confirmed' else status end"
+        " where id = %s",
+        (order["id"],),
+    )
+    await _event(
+        conn, ctx, order, "payment_changed", from_payment=from_payment, to_payment="paid", data=data
+    )
+    if order["status"] == "pending_payment":
+        await _event(
+            conn, ctx, order, "status_changed", from_status="pending_payment", to_status="confirmed"
+        )
+        order["status"] = "confirmed"
+    order["payment_status"] = "paid"
+
+
+async def cancel_rejected_proof(
+    conn: AsyncConnection, ctx: ActorContext, order: dict[str, Any], proof_id: UUID
+) -> None:
+    """S4 rejection: cancelled at once, payment back to `unpaid`, stock returned, no ledger.
+    `ctx.reason` carries the rejection reason (required on the event)."""
+    await _return_stock(conn, ctx, order, as_waste=False)
+    await conn.execute(
+        "update app.orders set status = 'cancelled', payment_status = 'unpaid' where id = %s",
+        (order["id"],),
+    )
+    await _event(
+        conn,
+        ctx,
+        order,
+        "proof_rejected",
+        from_status=order["status"],
+        to_status="cancelled",
+        from_payment="proof_submitted",
+        to_payment="unpaid",
+        data={"proof_id": str(proof_id), "stock": "returned"},
+    )
 
 
 async def transition(

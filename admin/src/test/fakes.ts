@@ -27,6 +27,7 @@ export function fakeApi(routes: Record<string, unknown> = {}): Api & { calls: [s
     put: vi.fn(handle('PUT')) as Api['put'],
     patch: vi.fn(handle('PATCH')) as Api['patch'],
     del: vi.fn(handle('DELETE')) as Api['del'],
+    blob: vi.fn(handle('BLOB')) as Api['blob'],
   }
 }
 

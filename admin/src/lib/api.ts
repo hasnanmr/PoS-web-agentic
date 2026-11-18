@@ -24,12 +24,15 @@ export interface Api {
   put<T>(path: string, body: unknown): Promise<T>
   patch<T>(path: string, body: unknown): Promise<T>
   del<T = void>(path: string): Promise<T>
+  /** Raw file download (e.g. O10 "Ekspor CSV"). */
+  blob(path: string): Promise<Blob>
 }
 
 export function createApi(baseUrl: string, token: TokenSource): Api {
   const root = baseUrl.replace(/\/+$/, '') + '/api/v1'
 
-  async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+  async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>,
+    asBlob = false): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json', ...extra }
     const access = await token()
     if (access) headers.Authorization = `Bearer ${access}`
@@ -45,6 +48,7 @@ export function createApi(baseUrl: string, token: TokenSource): Api {
       throw new ApiError(0, 'network_error', 'Tidak bisa terhubung ke server')
     }
     if (res.status === 204) return undefined as T
+    if (asBlob && res.ok) return (await res.blob()) as T
     const data: unknown = await res.json().catch(() => null)
     if (!res.ok) {
       const err = (data as { error?: { code?: string; message?: string; details?: Record<string, unknown> } } | null)
@@ -60,6 +64,7 @@ export function createApi(baseUrl: string, token: TokenSource): Api {
     put: (path, body) => request('PUT', path, body),
     patch: (path, body) => request('PATCH', path, body),
     del: (path) => request('DELETE', path),
+    blob: (path) => request<Blob>('GET', path, undefined, { Accept: 'text/csv' }, true),
   }
 }
 
@@ -102,6 +107,10 @@ const ERROR_COPY: Record<string, string> = {
   idempotency_key_reused: 'Permintaan ini sudah dikirim dengan isi berbeda. Muat ulang lalu coba lagi.',
   payment_mode_pay_first: 'Outlet ini memakai mode pay first.',
   addon_group_in_use: 'Opsi grup ini sudah dipakai di order; ubah opsinya saja.',
+  proof_not_pending: 'Bukti bayar ini sudah direview atau order tidak lagi menunggu bayar. Muat ulang.',
+  shift_closed: 'Shift ini sudah ditutup.',
+  already_reversed: 'Entry ini sudah pernah di-reversal.',
+  not_reversible: 'Hanya pengeluaran yang bisa di-reversal di sini.',
 }
 
 export function errorMessage(error: unknown): string {
@@ -111,6 +120,12 @@ export function errorMessage(error: unknown): string {
     }
     if (error.code === 'validation_failed' && error.details.field === 'drawer_id') {
       return 'Ada lebih dari satu shift terbuka. Pilih drawer dulu.'
+    }
+    if (error.code === 'validation_failed' && error.details.field === 'business_date') {
+      return 'Tanggal pengeluaran tidak boleh di masa depan.'
+    }
+    if (error.code === 'validation_failed' && error.details.field === 'merchant_account_checked') {
+      return 'Centang dulu: transaksi sudah ditemukan di akun merchant QRIS.'
     }
     if (error.code === 'item_sold_out' && typeof error.details.name === 'string') {
       return `${error.details.name} habis. Hapus atau ganti item ini.`

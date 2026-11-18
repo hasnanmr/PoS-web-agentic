@@ -229,7 +229,7 @@ describe('S2 Order Board + S3', () => {
       'POST /ops/orders/o1/transitions': detail,
       'POST /ops/orders/o1/reversal': { ...detail, refund: { amount: 46200, method: 'cash' } },
     })
-    render(<WithSession session={fakeSession('staff', { api })}><OrderBoardPage /></WithSession>)
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api })}><OrderBoardPage /></WithSession></MemoryRouter>)
     const column = await screen.findByRole('region', { name: 'CONFIRMED' })
     expect(within(column).getByText('Rp 46.200 · paid (cash)')).toBeInTheDocument()
     await userEvent.click(within(column).getByRole('button', { name: 'Mulai siapkan →' }))

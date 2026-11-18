@@ -2,7 +2,7 @@
 
 Ledger entries are created only when a payment is confirmed (AC3.2): menu revenue,
 PB1, and delivery fee as separate rows, tagged with outlet and payment method. A
-reversal posts one negative `refund` row. The ledger is append-only.
+reversal posts one negative `refund` row. Rows are written by `app.core.ledger` (append-only).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection
 
-from app.core import shifts
+from app.core import ledger, shifts
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, ValidationFailedError
 from app.core.localtime import local_date
@@ -37,11 +37,6 @@ class PaymentResult:
     amount: int
     change_due: int | None
     shift_id: UUID | None
-
-
-async def _outlet_timezone(conn: AsyncConnection, outlet_id: UUID) -> str:
-    cur = await conn.execute("select timezone from app.outlets where id = %s", (outlet_id,))
-    return (await cur.fetchone())[0]  # type: ignore[index]
 
 
 async def capture(
@@ -93,14 +88,14 @@ async def capture(
             ctx.user_id,
         ),
     )
-    business_date = local_date(datetime.now(UTC), await _outlet_timezone(conn, outlet_id))
+    business_date = local_date(datetime.now(UTC), await ledger.outlet_timezone(conn, outlet_id))
     for entry_type, value in (
         ("revenue", subtotal),
         ("pb1", pb1_amount),
         ("delivery_fee", delivery_fee),
     ):
         if value:
-            await _post(
+            await ledger.post(
                 conn,
                 ctx,
                 outlet_id,
@@ -129,7 +124,7 @@ async def post_refund(
     """Refund for a reversed paid order (money goes back outside the system). One negative
     entry for the whole amount; `pb1_portion` is the PB1 part of it, so reports can net PB1
     collected against PB1 refunded."""
-    business_date = local_date(datetime.now(UTC), await _outlet_timezone(conn, outlet_id))
+    business_date = local_date(datetime.now(UTC), await ledger.outlet_timezone(conn, outlet_id))
     shift_id = None
     description = ctx.reason
     if method == "cash":
@@ -139,7 +134,7 @@ async def post_refund(
         shift_id = await shifts.shift_for_refund(conn, ctx, outlet_id)
         if shift_id is None:
             description = f"[tunai tanpa shift terbuka] {ctx.reason or ''}".strip()
-    await _post(
+    await ledger.post(
         conn,
         ctx,
         outlet_id,
@@ -151,46 +146,4 @@ async def post_refund(
         shift_id=shift_id,
         description=description,
         pb1_portion=pb1_portion,
-    )
-
-
-async def _post(
-    conn: AsyncConnection,
-    ctx: ActorContext,
-    outlet_id: UUID,
-    entry_type: str,
-    amount: int,
-    method: Method | None,
-    business_date: object,
-    *,
-    order_id: UUID | None = None,
-    bill_id: UUID | None = None,
-    payment_id: UUID | None = None,
-    shift_id: UUID | None = None,
-    description: str | None = None,
-    pb1_portion: int = 0,
-) -> None:
-    await conn.execute(
-        """
-        insert into app.ledger_entries (tenant_id, outlet_id, type, amount, payment_method,
-          order_id, bill_id, payment_id, shift_id, description, business_date, actor_type, actor_id,
-          pb1_portion)
-        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            ctx.tenant_id,
-            outlet_id,
-            entry_type,
-            amount,
-            method,
-            order_id,
-            bill_id,
-            payment_id,
-            shift_id,
-            description,
-            business_date,
-            ctx.actor_type.value,
-            ctx.actor_id,
-            pb1_portion,
-        ),
     )

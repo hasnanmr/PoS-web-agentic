@@ -1,6 +1,19 @@
 {
   "components": {
     "schemas": {
+      "AcceptIn": {
+        "properties": {
+          "merchant_account_checked": {
+            "title": "Merchant Account Checked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "merchant_account_checked"
+        ],
+        "title": "AcceptIn",
+        "type": "object"
+      },
       "AddonGroupInput": {
         "properties": {
           "is_required": {
@@ -660,6 +673,54 @@
         "title": "Board",
         "type": "object"
       },
+      "Breakdown": {
+        "properties": {
+          "cash": {
+            "title": "Cash",
+            "type": "integer"
+          },
+          "cash_difference": {
+            "title": "Cash Difference",
+            "type": "integer"
+          },
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "expenses": {
+            "title": "Expenses",
+            "type": "integer"
+          },
+          "pb1": {
+            "title": "Pb1",
+            "type": "integer"
+          },
+          "qris": {
+            "title": "Qris",
+            "type": "integer"
+          },
+          "refunds": {
+            "title": "Refunds",
+            "type": "integer"
+          },
+          "revenue_excl_pb1": {
+            "title": "Revenue Excl Pb1",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revenue_excl_pb1",
+          "pb1",
+          "delivery_fee",
+          "cash",
+          "qris",
+          "refunds",
+          "expenses",
+          "cash_difference"
+        ],
+        "title": "Breakdown",
+        "type": "object"
+      },
       "CancelIn": {
         "properties": {
           "reason": {
@@ -676,6 +737,240 @@
           }
         },
         "title": "CancelIn",
+        "type": "object"
+      },
+      "CashCount": {
+        "properties": {
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CashCountRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CashCountSummary"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "summary",
+          "rows"
+        ],
+        "title": "CashCount",
+        "type": "object"
+      },
+      "CashCountRow": {
+        "properties": {
+          "closed_at": {
+            "format": "date-time",
+            "title": "Closed At",
+            "type": "string"
+          },
+          "counted_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counted By"
+          },
+          "counted_cash": {
+            "title": "Counted Cash",
+            "type": "integer"
+          },
+          "difference": {
+            "title": "Difference",
+            "type": "integer"
+          },
+          "drawer": {
+            "$ref": "#/components/schemas/DrawerRef"
+          },
+          "expected_cash": {
+            "title": "Expected Cash",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "shortage",
+              "surplus",
+              "none"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/OutletRef"
+          },
+          "shift_id": {
+            "format": "uuid",
+            "title": "Shift Id",
+            "type": "string"
+          },
+          "starting_cash": {
+            "title": "Starting Cash",
+            "type": "integer"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "shift_id",
+          "opened_at",
+          "closed_at",
+          "timezone",
+          "outlet",
+          "drawer",
+          "starting_cash",
+          "expected_cash",
+          "counted_cash",
+          "difference",
+          "kind",
+          "counted_by"
+        ],
+        "title": "CashCountRow",
+        "type": "object"
+      },
+      "CashCountSummary": {
+        "properties": {
+          "shifts": {
+            "title": "Shifts",
+            "type": "integer"
+          },
+          "shifts_with_difference": {
+            "title": "Shifts With Difference",
+            "type": "integer"
+          },
+          "total_shortage": {
+            "description": "Sum of negative differences (zero or less)",
+            "title": "Total Shortage",
+            "type": "integer"
+          },
+          "total_surplus": {
+            "title": "Total Surplus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shifts",
+          "shifts_with_difference",
+          "total_shortage",
+          "total_surplus"
+        ],
+        "title": "CashCountSummary",
+        "type": "object"
+      },
+      "Cashflow": {
+        "properties": {
+          "breakdown": {
+            "$ref": "#/components/schemas/Breakdown"
+          },
+          "expenses_by_outlet": {
+            "items": {
+              "$ref": "#/components/schemas/OutletExpense"
+            },
+            "title": "Expenses By Outlet",
+            "type": "array"
+          },
+          "expenses_count": {
+            "title": "Expenses Count",
+            "type": "integer"
+          },
+          "expenses_total": {
+            "title": "Expenses Total",
+            "type": "integer"
+          },
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "granularity": {
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "title": "Granularity",
+            "type": "string"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/Period"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesPoint"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/CashflowTotals"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "granularity",
+          "previous",
+          "totals",
+          "series",
+          "breakdown",
+          "expenses_by_outlet",
+          "expenses_total",
+          "expenses_count"
+        ],
+        "title": "Cashflow",
+        "type": "object"
+      },
+      "CashflowTotals": {
+        "properties": {
+          "cash_in": {
+            "$ref": "#/components/schemas/Tile"
+          },
+          "cash_out": {
+            "$ref": "#/components/schemas/Tile"
+          },
+          "net": {
+            "$ref": "#/components/schemas/Tile"
+          },
+          "pb1_collected": {
+            "$ref": "#/components/schemas/Tile"
+          }
+        },
+        "required": [
+          "cash_in",
+          "cash_out",
+          "net",
+          "pb1_collected"
+        ],
+        "title": "CashflowTotals",
         "type": "object"
       },
       "Drawer": {
@@ -742,6 +1037,30 @@
         "title": "DrawerName",
         "type": "object"
       },
+      "DrawerRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "number"
+        ],
+        "title": "DrawerRef",
+        "type": "object"
+      },
       "DrawerShift": {
         "properties": {
           "cash_in": {
@@ -792,6 +1111,137 @@
           "cash_refunds"
         ],
         "title": "DrawerShift",
+        "type": "object"
+      },
+      "Expense": {
+        "properties": {
+          "amount": {
+            "description": "Positive amount spent",
+            "title": "Amount",
+            "type": "integer"
+          },
+          "business_date": {
+            "format": "date",
+            "title": "Business Date",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/OutletRef"
+          },
+          "recorded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By"
+          },
+          "reversal_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversal Reason"
+          },
+          "reversed": {
+            "title": "Reversed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "business_date",
+          "outlet",
+          "description",
+          "amount",
+          "recorded_by",
+          "created_at",
+          "reversed",
+          "reversal_reason"
+        ],
+        "title": "Expense",
+        "type": "object"
+      },
+      "ExpenseIn": {
+        "properties": {
+          "amount": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000.0,
+            "title": "Amount",
+            "type": "integer"
+          },
+          "business_date": {
+            "format": "date",
+            "title": "Business Date",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "amount",
+          "business_date",
+          "description"
+        ],
+        "title": "ExpenseIn",
+        "type": "object"
+      },
+      "ExpensePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Expense"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ExpensePage",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2293,6 +2743,35 @@
         "title": "OutletDetail",
         "type": "object"
       },
+      "OutletExpense": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "outlet": {
+            "title": "Outlet",
+            "type": "string"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "outlet",
+          "amount",
+          "count"
+        ],
+        "title": "OutletExpense",
+        "type": "object"
+      },
       "OutletIds": {
         "properties": {
           "outlet_ids": {
@@ -2507,6 +2986,25 @@
         "title": "OutletPriceRow",
         "type": "object"
       },
+      "OutletRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "OutletRef",
+        "type": "object"
+      },
       "OutletSummary": {
         "properties": {
           "id": {
@@ -2590,6 +3088,26 @@
           }
         },
         "title": "PaymentIn",
+        "type": "object"
+      },
+      "Period": {
+        "properties": {
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "Period",
         "type": "object"
       },
       "ProductCreate": {
@@ -2899,6 +3417,218 @@
         "title": "ProductRow",
         "type": "object"
       },
+      "ProofDetail": {
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "customer_phone_masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Phone Masked"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "order_status": {
+            "title": "Order Status",
+            "type": "string"
+          },
+          "order_type": {
+            "title": "Order Type",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "proof_id": {
+            "format": "uuid",
+            "title": "Proof Id",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "timer_stopped": {
+            "title": "Timer Stopped",
+            "type": "boolean"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "proof_id",
+          "status",
+          "image_url",
+          "order_id",
+          "order_no",
+          "channel",
+          "order_type",
+          "table",
+          "total",
+          "order_status",
+          "payment_status",
+          "customer_phone_masked",
+          "received_at",
+          "timezone",
+          "timer_stopped",
+          "reviewed_by",
+          "reviewed_at",
+          "rejection_reason"
+        ],
+        "title": "ProofDetail",
+        "type": "object"
+      },
+      "ProofQueueItem": {
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "order_type": {
+            "title": "Order Type",
+            "type": "string"
+          },
+          "proof_id": {
+            "format": "uuid",
+            "title": "Proof Id",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "proof_id",
+          "order_id",
+          "order_no",
+          "channel",
+          "order_type",
+          "table",
+          "total",
+          "received_at",
+          "timezone"
+        ],
+        "title": "ProofQueueItem",
+        "type": "object"
+      },
       "QuoteLine": {
         "properties": {
           "addons": {
@@ -3072,23 +3802,8 @@
         "title": "RecipeLineRow",
         "type": "object"
       },
-      "ReversalIn": {
+      "RejectIn": {
         "properties": {
-          "ingredients": {
-            "anyOf": [
-              {
-                "enum": [
-                  "waste",
-                  "return"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ingredients"
-          },
           "reason": {
             "maxLength": 300,
             "title": "Reason",
@@ -3098,7 +3813,165 @@
         "required": [
           "reason"
         ],
-        "title": "ReversalIn",
+        "title": "RejectIn",
+        "type": "object"
+      },
+      "ReversalOut": {
+        "properties": {
+          "expense": {
+            "$ref": "#/components/schemas/Expense"
+          },
+          "reversal_id": {
+            "title": "Reversal Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reversal_id",
+          "expense"
+        ],
+        "title": "ReversalOut",
+        "type": "object"
+      },
+      "SeriesPoint": {
+        "properties": {
+          "cash_in": {
+            "title": "Cash In",
+            "type": "integer"
+          },
+          "cash_out": {
+            "title": "Cash Out",
+            "type": "integer"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "cash_in",
+          "cash_out"
+        ],
+        "title": "SeriesPoint",
+        "type": "object"
+      },
+      "ShiftCloseIn": {
+        "properties": {
+          "count_breakdown": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Note counts per denomination (\"100000\" … \"2000\") plus \"coins\" as an amount",
+            "examples": [
+              {
+                "10000": 5,
+                "100000": 12,
+                "2000": 3,
+                "20000": 9,
+                "5000": 4,
+                "50000": 6,
+                "coins": 4400
+              }
+            ],
+            "title": "Count Breakdown",
+            "type": "object"
+          }
+        },
+        "required": [
+          "count_breakdown"
+        ],
+        "title": "ShiftCloseIn",
+        "type": "object"
+      },
+      "ShiftClosed": {
+        "properties": {
+          "cash_in": {
+            "title": "Cash In",
+            "type": "integer"
+          },
+          "cash_refunds": {
+            "title": "Cash Refunds",
+            "type": "integer"
+          },
+          "closed_at": {
+            "format": "date-time",
+            "title": "Closed At",
+            "type": "string"
+          },
+          "counted_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counted By"
+          },
+          "counted_cash": {
+            "title": "Counted Cash",
+            "type": "integer"
+          },
+          "difference": {
+            "title": "Difference",
+            "type": "integer"
+          },
+          "drawer": {
+            "additionalProperties": true,
+            "title": "Drawer",
+            "type": "object"
+          },
+          "expected_cash": {
+            "title": "Expected Cash",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "shortage",
+              "surplus",
+              "none"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "starting_cash": {
+            "title": "Starting Cash",
+            "type": "integer"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "drawer",
+          "opened_at",
+          "closed_at",
+          "timezone",
+          "starting_cash",
+          "cash_in",
+          "cash_refunds",
+          "expected_cash",
+          "counted_cash",
+          "difference",
+          "kind",
+          "counted_by"
+        ],
+        "title": "ShiftClosed",
         "type": "object"
       },
       "ShiftOpen": {
@@ -3566,6 +4439,31 @@
         "title": "ThresholdItem",
         "type": "object"
       },
+      "Tile": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          }
+        },
+        "required": [
+          "amount",
+          "change_pct"
+        ],
+        "title": "Tile",
+        "type": "object"
+      },
       "TransitionIn": {
         "properties": {
           "to_status": {
@@ -3627,6 +4525,35 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "app__api__v1__ops__orders__ReversalIn": {
+        "properties": {
+          "ingredients": {
+            "anyOf": [
+              {
+                "enum": [
+                  "waste",
+                  "return"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients"
+          },
+          "reason": {
+            "maxLength": 300,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReversalIn",
+        "type": "object"
+      },
       "app__api__v1__owner__catalog__Created": {
         "properties": {
           "catalog_sync": {
@@ -3644,6 +4571,20 @@
           "id"
         ],
         "title": "Created",
+        "type": "object"
+      },
+      "app__api__v1__owner__finance__ReversalIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReversalIn",
         "type": "object"
       },
       "app__api__v1__owner__outlets__Created": {
@@ -4011,7 +4952,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReversalIn"
+                "$ref": "#/components/schemas/app__api__v1__ops__orders__ReversalIn"
               }
             }
           },
@@ -4501,6 +5442,64 @@
         ]
       }
     },
+    "/api/v1/ops/outlets/{outlet_id}/payment-proofs": {
+      "get": {
+        "operationId": "proof_queue_api_v1_ops_outlets__outlet_id__payment_proofs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "const": "pending",
+              "default": "pending",
+              "title": "Status",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProofQueueItem"
+                  },
+                  "title": "Response Proof Queue Api V1 Ops Outlets  Outlet Id  Payment Proofs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Proof Queue",
+        "tags": [
+          "ops: payment proofs"
+        ]
+      }
+    },
     "/api/v1/ops/outlets/{outlet_id}/quotes": {
       "post": {
         "operationId": "create_quote_api_v1_ops_outlets__outlet_id__quotes_post",
@@ -4862,6 +5861,225 @@
         ]
       }
     },
+    "/api/v1/ops/payment-proofs/{proof_id}": {
+      "get": {
+        "operationId": "proof_detail_api_v1_ops_payment_proofs__proof_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proof_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proof Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProofDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Proof Detail",
+        "tags": [
+          "ops: payment proofs"
+        ]
+      }
+    },
+    "/api/v1/ops/payment-proofs/{proof_id}/accept": {
+      "post": {
+        "operationId": "accept_proof_api_v1_ops_payment_proofs__proof_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proof_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proof Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProofDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Proof",
+        "tags": [
+          "ops: payment proofs"
+        ]
+      }
+    },
+    "/api/v1/ops/payment-proofs/{proof_id}/reject": {
+      "post": {
+        "operationId": "reject_proof_api_v1_ops_payment_proofs__proof_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proof_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proof Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProofDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Proof",
+        "tags": [
+          "ops: payment proofs"
+        ]
+      }
+    },
+    "/api/v1/ops/shifts/{shift_id}/close": {
+      "post": {
+        "description": "S8 \"Submit hitungan & tutup shift\". Expected cash is revealed only in this response.",
+        "operationId": "close_shift_api_v1_ops_shifts__shift_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "shift_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Shift Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftCloseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftClosed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Shift",
+        "tags": [
+          "ops: bills & shifts"
+        ]
+      }
+    },
     "/api/v1/owner/addon-groups/{group_id}": {
       "delete": {
         "operationId": "delete_addon_group_api_v1_owner_addon_groups__group_id__delete",
@@ -5132,6 +6350,230 @@
         "summary": "Rename Drawer",
         "tags": [
           "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/expenses": {
+      "get": {
+        "operationId": "list_expenses_api_v1_owner_expenses_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Expenses",
+        "tags": [
+          "owner: finance"
+        ]
+      },
+      "post": {
+        "description": "O9 \"Simpan pengeluaran\". Append-only; a mistake is corrected with a reversal.",
+        "operationId": "create_expense_api_v1_owner_expenses_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Expense"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Expense",
+        "tags": [
+          "owner: finance"
+        ]
+      }
+    },
+    "/api/v1/owner/ledger-entries/{entry_id}/reversal": {
+      "post": {
+        "description": "O9 \"Salah input? Buat entry reversal, bukan edit.\" (expenses only).",
+        "operationId": "reverse_entry_api_v1_owner_ledger_entries__entry_id__reversal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__owner__finance__ReversalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReversalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reverse Entry",
+        "tags": [
+          "owner: finance"
         ]
       }
     },
@@ -6089,6 +7531,225 @@
         "summary": "Set Product Recipe",
         "tags": [
           "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/reports/cash-count": {
+      "get": {
+        "operationId": "cash_count_report_api_v1_owner_reports_cash_count_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "drawer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Drawer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashCount"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cash Count Report",
+        "tags": [
+          "owner: finance"
+        ]
+      }
+    },
+    "/api/v1/owner/reports/cashflow": {
+      "get": {
+        "operationId": "cashflow_report_api_v1_owner_reports_cashflow_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "granularity",
+            "required": false,
+            "schema": {
+              "default": "daily",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ],
+              "title": "Granularity",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cashflow"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cashflow Report",
+        "tags": [
+          "owner: finance"
         ]
       }
     },
