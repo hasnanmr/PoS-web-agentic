@@ -13,7 +13,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 |---|---|---|
 | 00 · Sitemap & Flow | Sitemap per role, user flows A–H, and a story-to-screen coverage table | [00-sitemap-flow.png](previews/00-sitemap-flow.png) |
 | 01 · Admin — Owner | O1–O17 | [01-admin-owner.png](previews/01-admin-owner.png) |
-| 02 · Admin — Staff Ops | S1–S11 | [02-admin-staff.png](previews/02-admin-staff.png) |
+| 02 · Admin — Staff Ops | S1–S12 | [02-admin-staff.png](previews/02-admin-staff.png) |
 | 03 · WhatsApp Customer | W1–W12 (MVP), A1–A2 (Phase 2) | [03-whatsapp-customer.png](previews/03-whatsapp-customer.png) |
 | 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
 | 05 · Tablet Absensi Outlet | K0–K4 | [05-tablet-absensi.png](previews/05-tablet-absensi.png) |
@@ -40,7 +40,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O13 Dead-letter & Antrean Pesan | US-036, US-037, US-050 | T-081, T-112 |
 | O14 Kehadiran Staf, Selfie & Koreksi | US-053, US-054 | T-118, T-119, T-122 |
 | O15 Pengeluaran — tab Purchase Order (KPI hutang/jatuh tempo/dibayar belum diterima, daftar PO dengan filter status, detail PO dengan alur, riwayat, sisa hutang) | US-031, US-057, US-058, US-059, US-060, US-061 | T-125, T-126, T-127, T-128, T-130 |
-| O16 Buka PO (owner & staf; skema bayar mundur / bayar di muka, item bahan atau teks bebas) | US-057 | T-126, T-130 |
+| O16 Buka PO (owner; staf memakai S12 dengan form yang sama; skema bayar mundur / bayar di muka, item bahan atau teks bebas) | US-057 | T-126, T-130 |
 | O17 Dashboard owner — Ringkasan PO, Pembayaran supplier, PO ada selisih (tutup dengan catatan, owner saja) + dialog Catat pembayaran; kartu tambahan untuk O2 | US-058, US-059, US-061 | T-128, T-130 |
 
 ### Staff (web admin)
@@ -58,6 +58,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | S9 Absensi Saya (own history and selfies; no clock-in here) | US-053 | T-116, T-117, T-122 |
 | S10 Purchase Order outlet (staf: daftar PO outlet, buka PO, status bayar hanya baca) | US-057, US-060 | T-126, T-130 |
 | S11 Cross-check barang datang vs PO (qty PO / diterima / datang sekarang / sisa, ada selisih, Tutup PO) | US-060 | T-127, T-130 |
+| S12 Buka PO (staf; outlet yang ditugaskan, langsung terbuka tanpa persetujuan) — same form as O16 | US-057 | T-126, T-130 |
 
 ### Customer (WhatsApp)
 
@@ -156,7 +157,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-054 | O14 |
 | US-055 | K0, K1, K4, O3 |
 | US-056 | O2 |
-| US-057 | O16, O15, S10 |
+| US-057 | S12, O16, O15, S10 |
 | US-058 | O15, O17 |
 | US-059 | O15, O17, S10 |
 | US-060 | S11, S10, O15 |

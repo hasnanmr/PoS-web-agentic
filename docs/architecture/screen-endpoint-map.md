@@ -161,7 +161,7 @@ The sidebar item **Pengeluaran** opens tabs **Pengeluaran** (direct expenses: th
 | Tutup dengan catatan | `POST /owner/purchase-orders/{id}/close` | `note*`; only the owner, only for a PO with a difference. |
 | Daftar supplier | `GET/POST /owner/suppliers`, `PATCH /owner/suppliers/{id}` | `name, phone?, note?`. |
 
-### O16 · Buka PO (owner & staf) — planned
+### O16 / S12 · Buka PO (owner: O16, staf: S12) — planned
 
 | Action | Endpoint | Fields |
 |---|---|---|
@@ -265,7 +265,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | Part | Endpoint | Fields |
 |---|---|---|
 | Daftar PO outlet | `GET /ops/outlets/{id}/purchase-orders?status=` | Same rows as O15 plus `created_by`; payment status read-only; no debt totals. |
-| + Buka PO | O16 endpoint | |
+| + Buka PO | opens S12 (O16 endpoint) | |
 
 ### S11 · Cross-check barang datang (staf & owner) — planned
 
