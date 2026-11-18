@@ -1,17 +1,18 @@
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
+import { fakeSession } from '../test/fakes'
+import { WithSession } from '../test/session'
 import type { Role } from './nav'
-import { RoleProvider } from './role'
 import { AppRoutes } from './routes'
 
 function renderAt(path: string, role: Role) {
   return render(
-    <RoleProvider initial={role}>
+    <WithSession session={fakeSession(role)}>
       <MemoryRouter initialEntries={[path]}>
         <AppRoutes />
       </MemoryRouter>
-    </RoleProvider>,
+    </WithSession>,
   )
 }
 
@@ -19,6 +20,7 @@ describe('app shell', () => {
   it('owner lands on the dashboard with all four groups', () => {
     renderAt('/', 'owner')
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Ganti outlet' })).toHaveValue('o-dago')
     const nav = screen.getByRole('navigation', { name: 'Navigasi utama' })
     for (const heading of ['OPERASIONAL', 'KATALOG', 'KEUANGAN (OWNER)', 'PENGATURAN']) {
       expect(within(nav).getByRole('group', { name: heading })).toBeInTheDocument()

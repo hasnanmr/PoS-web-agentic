@@ -54,7 +54,8 @@ class UserDirectory(Protocol):
 
 
 _USER_SQL = """
-select id, tenant_id, email, display_name, role::text, is_active
+select id, tenant_id, email, display_name, role::text, is_active,
+       invitation_accepted_at is null as first_sign_in
 from app.users where id = %s
 """
 
@@ -73,10 +74,16 @@ class PgUserDirectory:
         async with db.transaction(self._pool, ctx) as conn:
             cur = await conn.execute(_USER_SQL, (token.user_id,))
             row = await cur.fetchone()
+            if row is not None and row[5] and row[6]:
+                # First request after accepting the invitation: O4 shows "Aktif" from now on.
+                await conn.execute(
+                    "update app.users set invitation_accepted_at = now() where id = %s",
+                    (token.user_id,),
+                )
         if row is None:
             # Not in this tenant (RLS) or deleted: never trust the claim alone.
             raise AuthError(401, "account_unknown", "account not found for this tenant")
-        user_id, tenant_id, email, display_name, role, is_active = row
+        user_id, tenant_id, email, display_name, role, is_active, _ = row
         if not is_active:
             raise AuthError(403, "account_inactive", "account is deactivated")
         return Principal(user_id, role, tenant_id, email, display_name)

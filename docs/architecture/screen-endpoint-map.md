@@ -21,7 +21,7 @@ Every list/action response for an order includes **`allowed_actions`**, computed
 
 | Action | Endpoint | Fields (as on screen) |
 |---|---|---|
-| Create business + first outlet + sample menu | `POST /owner/onboarding` | `business:{name, type: cafe\|restaurant}`, `outlet:{name, timezone (default Asia/Jakarta), address, whatsapp_phone}`. Dropshipper shown disabled ("Segera, Phase 3"), so not accepted. Seeds the sample menu (FR2.12). |
+| Create business + first outlet + sample menu | `POST /owner/onboarding` ✅ implemented (sample menu: T-024, Wave 2) | `business:{name, type: cafe\|restaurant}`, `outlet:{name, timezone (default Asia/Jakarta), address, whatsapp_phone}`. Dropshipper shown disabled ("Segera, Phase 3"), so not accepted. Seeds the sample menu (FR2.12). |
 
 ### O2 · Dashboard + keramaian (T-071, T-123, T-124)
 
@@ -41,22 +41,22 @@ Staff calling it → `403` (AC7.7).
 
 | Section | Endpoint | Fields |
 |---|---|---|
-| Outlet picker, + Tambah outlet | `GET /owner/outlets`, `POST /owner/outlets` | New outlet gets default drawer and reservation settings. |
-| Umum + Order, pajak & pembayaran | `GET/PATCH /owner/outlets/{id}` | `name, address, timezone (WIB/WITA/WIT), whatsapp_phone, whatsapp_status, catalog_synced_at, pb1_enabled, pb1_rate_bps, payment_mode, delivery_fee, unpaid_timeout_minutes, attendance_grace_minutes`. "Simpan perubahan" sends one PATCH. |
-| Jam buka (atur per hari) | `PUT /owner/outlets/{id}/opening-hours` | `[{weekday, opens_at, closes_at}]`. |
+| Outlet picker, + Tambah outlet | `GET /owner/outlets`, `POST /owner/outlets` ✅ | New outlet gets default drawer and reservation settings. |
+| Umum + Order, pajak & pembayaran | `GET/PATCH /owner/outlets/{id}` ✅ | `name, address, timezone (WIB/WITA/WIT), whatsapp_phone, whatsapp_status, catalog_synced_at, pb1_enabled, pb1_rate_bps, payment_mode, delivery_fee, unpaid_timeout_minutes, attendance_grace_minutes`. "Simpan perubahan" sends one PATCH. `GET` also returns `opening_hours` (shown as "Sen–Min 08:00 – 22:00"). |
+| Jam buka (atur per hari) | `PUT /owner/outlets/{id}/opening-hours` ✅ | `[{weekday, opens_at, closes_at}]`. |
 | QRIS statis | `POST /owner/outlets/{id}/qris` (returns signed upload URL), `GET` (signed view URL + uploaded_at) | PNG/JPG, max 2 MB. |
-| Cash drawer | `GET/POST /owner/outlets/{id}/drawers`, `PATCH/DELETE /owner/drawers/{id}` | `name`; delete refused while a shift is open. |
+| Cash drawer | `GET/POST /owner/outlets/{id}/drawers`, `PATCH/DELETE /owner/drawers/{id}` ✅ | `name` (max 40), `has_open_shift`; delete refused while a shift is open (`shift_open`) or for the last drawer (`last_drawer`). |
 | Tablet absensi | `GET /owner/outlets/{id}/attendance-devices` (`name, last_seen_at, revoked_at`), `POST /owner/outlets/{id}/attendance-pairing-codes` → `{code (6 digits), expires_at (10 min)}`, `POST /owner/attendance-devices/{id}/revoke` | Tenggang lupa clock out = `attendance_grace_minutes` above. |
 
 ### O4 · Staf & Akses (T-012, T-013)
 
 | Action | Endpoint | Fields |
 |---|---|---|
-| Staff table | `GET /owner/staff` | `[{id, display_name, email, outlets:[…], status: active\|inactive\|invited}]`. |
-| Undang staf | `POST /owner/staff/invitations` | `display_name, email, outlet_ids[]`. Sends Supabase invite email. |
-| Menu ⋯: Edit outlet | `PUT /owner/staff/{id}/outlets` | `outlet_ids[]`. |
-| Menu ⋯: Kirim ulang undangan | `POST /owner/staff/{id}/invitations/resend` | |
-| Menu ⋯: Nonaktifkan | `POST /owner/staff/{id}/deactivate` | Revokes sessions immediately. |
+| Staff table | `GET /owner/staff` ✅ | `[{id, display_name, email, outlets:[…], status: active\|inactive\|invited}]`. |
+| Undang staf | `POST /owner/staff/invitations` ✅ | `display_name, email, outlet_ids[]`. Sends Supabase invite email. |
+| Menu ⋯: Edit outlet | `PUT /owner/staff/{id}/outlets` ✅ | `outlet_ids[]`. |
+| Menu ⋯: Kirim ulang undangan | `POST /owner/staff/{id}/invitations/resend` ✅ | |
+| Menu ⋯: Nonaktifkan | `POST /owner/staff/{id}/deactivate` ✅ | Revokes sessions immediately. |
 | Matriks akses | static in the UI (FR1.5) | No endpoint. |
 
 ### O5 · Menu, Add-on & Harga Outlet (T-016, T-017, T-018, T-051)

@@ -16,7 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 # Effectively permanent; reactivation sets "none".
@@ -33,6 +33,16 @@ class SupabaseAdminError(RuntimeError):
 class InvitedUser:
     user_id: UUID
     email: str
+
+
+class AuthAdmin(Protocol):
+    """What the API needs from the auth admin API (tests inject a fake)."""
+
+    def invite_user(
+        self, email: str, *, data: dict[str, Any] | None = None, redirect_to: str | None = None
+    ) -> InvitedUser: ...
+
+    def ban_user(self, user_id: UUID, duration: str = ...) -> None: ...
 
 
 class SupabaseAdmin:

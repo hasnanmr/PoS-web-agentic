@@ -2,8 +2,7 @@
 // light 220px sidebar, logo, outlet switcher, grouped nav with uppercase headings.
 import { NavLink } from 'react-router'
 import { NAV, STAFF_SIDEBAR_NOTE, type Role } from '../app/nav'
-import { DEV_IDENTITY } from '../app/dev-identity'
-import { DevRoleSwitch } from './DevRoleSwitch'
+import { useSession } from '../app/session'
 
 interface SidebarProps {
   role: Role
@@ -11,6 +10,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ role, onNavigate }: SidebarProps) {
+  const { me, outlet, setOutletId, signOut } = useSession()
   return (
     <nav
       aria-label="Navigasi utama"
@@ -20,14 +20,24 @@ export function Sidebar({ role, onNavigate }: SidebarProps) {
         <div className="text-[15px] font-bold text-primary">
           <span aria-hidden="true">◼</span> SME POS
         </div>
-        {/* Outlet switcher — wired to real outlets in T-011/T-013. */}
-        <button
-          type="button"
-          className="mt-0.5 text-left text-[11px] text-text-muted hover:text-text"
-          title="Ganti outlet"
-        >
-          Outlet: {DEV_IDENTITY.businessName} – {DEV_IDENTITY.outletName} ▾
-        </button>
+        {/* Outlet switcher: outlets from GET /me (owner: all, staff: assigned only). */}
+        <label className="mt-0.5 block text-[11px] text-text-muted">
+          <span>Outlet: {me.tenant?.name} – </span>
+          <select
+            aria-label="Ganti outlet"
+            className="max-w-full cursor-pointer appearance-none bg-transparent text-[11px] text-text-muted hover:text-text focus:outline-none"
+            value={outlet?.id ?? ''}
+            onChange={(event) => setOutletId(event.target.value)}
+          >
+            {me.outlets.length === 0 && <option value="">belum ada outlet</option>}
+            {me.outlets.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+          <span aria-hidden="true"> ▾</span>
+        </label>
       </div>
 
       {NAV[role].map((group) => (
@@ -63,13 +73,18 @@ export function Sidebar({ role, onNavigate }: SidebarProps) {
 
       {role === 'staff' && (
         <p className="mt-6 px-2 text-[11px] leading-4 text-text-muted">
-          Staf: {DEV_IDENTITY.staffName} ({DEV_IDENTITY.staffTitle})
+          Staf: {me.user.display_name ?? me.user.email}
           <br />
           {STAFF_SIDEBAR_NOTE}
         </p>
       )}
 
-      {import.meta.env.DEV && <DevRoleSwitch />}
+      <div className="mt-auto px-2 pt-6 text-[11px] text-text-muted">
+        <div className="truncate">{me.user.email}</div>
+        <button type="button" onClick={() => void signOut()} className="mt-1 text-primary hover:underline">
+          Keluar
+        </button>
+      </div>
     </nav>
   )
 }

@@ -64,13 +64,15 @@ class Settings(BaseSettings):
     # Service role key: used ONLY for the Supabase Auth admin API (owner invitations by the
     # platform admin CLI, banning deactivated staff). Never used for tenant data.
     supabase_service_role_key: SecretStr | None = None
+    # Admin app URL: where invitation emails send people to set their password.
+    admin_app_url: AnyHttpUrl | None = None
 
     # Connection pool (transaction pooler, port 6543 on Supabase; Appendix A.1/B.4).
     db_pool_min_size: int = Field(default=1, ge=0, le=50)
     db_pool_max_size: int = Field(default=5, ge=1, le=100)
 
     default_timezone: str = "Asia/Jakarta"
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5170"]
 
     @field_validator(
         "database_url",
@@ -79,6 +81,7 @@ class Settings(BaseSettings):
         "supabase_jwt_issuer",
         "rabbitmq_url",
         "supabase_service_role_key",
+        "admin_app_url",
         mode="before",
     )
     @classmethod

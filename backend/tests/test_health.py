@@ -47,9 +47,9 @@ def test_readyz_with_unreachable_database_returns_503() -> None:
 
 
 def test_cors_allows_configured_origin() -> None:
-    client = make_client(cors_origins=["http://localhost:5173"])
+    client = make_client(cors_origins=["http://localhost:5170"])
     response = client.options(
         "/healthz",
-        headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"},
+        headers={"Origin": "http://localhost:5170", "Access-Control-Request-Method": "GET"},
     )
-    assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:5170"

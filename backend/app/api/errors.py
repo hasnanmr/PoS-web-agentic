@@ -13,6 +13,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.core.errors import DomainError
+
 
 class ApiError(Exception):
     def __init__(
@@ -42,6 +44,12 @@ def install_error_handlers(app: FastAPI) -> None:
             status_code=exc.status_code,
             content=_body(exc.code, exc.message, exc.details),
             headers=exc.headers,
+        )
+
+    @app.exception_handler(DomainError)
+    async def _domain_error(_: Request, exc: DomainError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code, content=_body(exc.code, exc.message, exc.details)
         )
 
     @app.exception_handler(RequestValidationError)

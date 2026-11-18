@@ -100,8 +100,8 @@ exits with a list of problems if the configuration is invalid. Default time zone
 
 ```bash
 cd admin
-pnpm dev        # http://localhost:5173  (or: make admin)
-pnpm build && pnpm preview   # production build on http://localhost:4173
+pnpm dev        # http://localhost:5170  (or: make admin)
+pnpm build && pnpm preview   # production build on http://localhost:4170
 ```
 
 Requires `VITE_API_BASE_URL`, `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in
