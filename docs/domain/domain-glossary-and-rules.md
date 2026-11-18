@@ -148,10 +148,11 @@ Rules:
 
 - Scheme 1, pay later: open → goods arrive and are checked against PO quantities → PO closed → payment reminder on the owner dashboard until paid.
 - Scheme 2, pay in advance: open → payment request on the owner dashboard → paid → goods arrive and are checked → PO closed (not allowed while unpaid).
+- Who: owner, or staff for an assigned outlet, open POs (no approval; creator recorded) and cross-check goods; staff may close only a matching PO. Suppliers, payments, cancellation, close-with-difference, debt, and dashboard reminders are owner-only.
 - Cash basis: opening, checking, or closing a PO never posts to the ledger; each supplier payment posts one `expense` entry (negative amount) on the payment date with method, PO number, and supplier.
 - Pay later: payments may be split; the sum never exceeds the PO total. Pay in advance: the full payment is recorded before goods arrive; the PO then waits for goods.
 - A cash supplier payment may be taken from an open shift's drawer; it is then cash paid out in that shift's expected cash (§7).
-- Goods check: owner or assigned staff enter received vs ordered per line; quantity never above the ordered quantity; a short line keeps the PO in `difference_found` until the rest arrives or the owner closes it with a reason (pay later: amount owed = received × unit price, proposed); ingredient lines create `restock` movements (base units) referencing the PO; free-text lines add no stock. Staff never see prices or amounts.
+- Goods check: owner or assigned staff enter received vs ordered per line; quantity never above the ordered quantity; a short line keeps the PO in `difference_found` until the rest arrives or the owner closes it with a reason (pay later: amount owed = received × unit price, proposed); ingredient lines create `restock` movements (base units) referencing the PO; free-text lines add no stock.
 - Cancel: only with no payment and no receipt, reason required. Payments and receipts are append-only.
 - Open (PRD §13): short deliveries and supplier returns, separate PPN, approvals and WhatsApp reminders.
 

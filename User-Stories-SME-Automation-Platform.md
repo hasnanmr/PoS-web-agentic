@@ -421,16 +421,17 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 ### US-057 — Membuat purchase order ke supplier
 
-**Sebagai** owner, **saya ingin** mencatat pesanan barang ke supplier sebagai purchase order (PO) per outlet, **sehingga** pembelian bahan tercatat sejak dipesan, bukan hanya saat dibayar.
+**Sebagai** owner atau staf outlet, **saya ingin** mencatat pesanan barang ke supplier sebagai purchase order (PO) per outlet, **sehingga** pembelian bahan tercatat sejak dipesan, bukan hanya saat dibayar.
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
   - Owner dapat mengelola daftar supplier (nama, nomor telepon opsional, catatan) untuk seluruh bisnis.
-  - Owner membuat PO untuk satu outlet dan satu supplier: tanggal order, baris item (bahan dari daftar stok atau item teks bebas, jumlah, satuan, harga satuan dalam rupiah bulat), dan total; PO mendapat nomor per outlet (mis. `PO-A-0012`).
-  - Owner memilih satu termin pembayaran: **bayar mundur (tempo)** dengan tanggal jatuh tempo, atau **bayar di muka** dengan perkiraan tanggal barang datang.
+  - Owner, atau staf untuk outlet yang ditugaskan kepadanya, membuka PO untuk satu outlet dan satu supplier: tanggal order, baris item (bahan dari daftar stok atau item teks bebas, jumlah, satuan, harga satuan dalam rupiah bulat), dan total; PO mendapat nomor per outlet (mis. `PO-A-0012`).
+  - Pembuat PO memilih satu termin pembayaran: **bayar mundur (tempo)** dengan tanggal jatuh tempo, atau **bayar di muka** dengan perkiraan tanggal barang datang.
   - Membuat PO tidak membuat ledger entry dan tidak mengubah stok.
   - PO tanpa pembayaran dan tanpa penerimaan barang dapat dibatalkan dengan alasan wajib; PO yang sudah dibayar atau sudah menerima barang tidak dapat dibatalkan.
-  - Staf tidak dapat membuat, membatalkan, atau melihat harga PO, termasuk lewat API langsung.
+  - PO yang dibuka staf langsung berstatus terbuka tanpa persetujuan dan mencatat pembuatnya; PO bayar di muka langsung memunculkan permintaan bayar di dashboard owner.
+  - Staf tidak dapat membuka PO untuk outlet lain, membatalkan PO, mengelola supplier, atau mencatat pembayaran, termasuk lewat API langsung.
 - **Traceability:** FR1.5, FR3.5, FR3.6, FR3.9, AC3.6, AC3.11, AC3.13
 - **Catatan alur:** Skema 1 (bayar mundur): PO dibuka → barang datang dan dicek → PO ditutup → pengingat bayar di dashboard owner. Skema 2 (bayar di muka): PO dibuka → notifikasi bayar di dashboard owner → barang tiba dan dicek → PO ditutup.
 
@@ -468,12 +469,12 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Owner atau staf yang ditugaskan di outlet PO mengisi qty yang datang di samping qty PO untuk setiap baris, beserta tanggal terima dan catatan opsional; aplikasi menandai baris yang sesuai dan yang kurang.
+  - Saat barang datang, staf (atau owner) melakukan cross-check: mengisi qty yang datang di samping qty PO untuk setiap baris, beserta tanggal terima dan catatan opsional; aplikasi menandai baris yang sesuai dan yang kurang.
   - Baris yang terhubung ke bahan menambah stok lewat movement restock yang merujuk PO, dikonversi ke satuan dasar bahan; baris teks bebas tidak mengubah stok.
   - Barang boleh datang dalam beberapa kali pengiriman; qty yang diterima tidak boleh melebihi qty PO.
   - Jika semua baris sesuai, owner atau staf dapat **menutup PO**.
   - Jika ada selisih, PO tetap terbuka dengan status **ada selisih** dan kekurangan per baris, sampai sisanya datang atau owner menutupnya dengan alasan wajib; untuk PO tempo, hutang menjadi qty diterima × harga satuan (default usulan).
-  - Staf hanya melihat item dan qty, tanpa harga atau nominal; setiap pengecekan dan penutupan mencatat siapa dan kapan, dan PO yang ditutup tidak dapat dibuka lagi.
+  - Setiap pengecekan dan penutupan mencatat siapa dan kapan, dan PO yang ditutup tidak dapat dibuka lagi.
 - **Traceability:** FR1.5, FR4.2, FR4.10, FR4.11, AC4.9, AC4.10
 
 ### US-061 — Tab Purchase Order dan pengingat pembayaran di dashboard
@@ -482,7 +483,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Layar Pengeluaran memiliki tab **Pengeluaran** (pengeluaran langsung) dan **Purchase Order**.
+  - Layar Pengeluaran owner memiliki tab **Pengeluaran** (pengeluaran langsung) dan **Purchase Order**; staf mendapat layar Purchase Order untuk outletnya (daftar PO, buka PO, cross-check barang) tanpa pembayaran dan hutang.
   - Tab Purchase Order memiliki filter terbuka (menunggu barang), ada selisih, menunggu pembayaran, overdue, dan ditutup, serta detail PO berisi baris item, riwayat pengecekan barang, dan riwayat pembayaran beserta pencatatnya.
   - Dashboard owner memiliki kartu **Pembayaran supplier**: PO tempo yang sudah ditutup dan belum lunas (overdue dulu, lalu jatuh tempo terdekat) dan PO bayar di muka yang terbuka dan belum dibayar, masing-masing dengan tombol catat pembayaran.
   - Kartu itu dan laporan cashflow menampilkan total hutang supplier (jumlah overdue dan jatuh tempo 7 hari) serta barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
