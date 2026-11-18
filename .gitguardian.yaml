@@ -1,0 +1,8 @@
+version: 2
+
+# Allowlist one known value instead of whole paths, so a real secret committed to an
+# env template or compose file is still caught.
+secret:
+  ignored_matches:
+    - name: Local docker database password (backend/.env.example)
+      match: app_backend_local

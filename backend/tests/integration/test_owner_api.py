@@ -6,12 +6,10 @@ TEST_APP_DATABASE_URL (see test_db_session.py).
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from typing import Any
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,9 +18,8 @@ from app.config import Settings
 from app.main import create_app
 
 from ..auth.keys import make_token, make_verifier
+from ._db import ADMIN_URL, APP_URL, admin_sql, cleanup_domain, invite_owner
 
-ADMIN_URL = os.environ.get("TEST_DATABASE_URL")
-APP_URL = os.environ.get("TEST_APP_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
     not (ADMIN_URL and APP_URL), reason="TEST_DATABASE_URL / TEST_APP_DATABASE_URL not set"
 )
@@ -31,44 +28,20 @@ DOMAIN = "w1.test"
 OWNER = UUID("20000000-0000-0000-0000-0000000000f0")
 OTHER_OWNER = UUID("20000000-0000-0000-0000-0000000000f9")
 
-CLEANUP = f"""
-create temp table w1_tenants on commit drop as
-  select tenant_id as id from app.users where email like '%@{DOMAIN}'
-  union select tenant_id from app.owner_invitations where email like '%@{DOMAIN}'
-        and tenant_id is not null;
-delete from app.audit_events where tenant_id in (select id from w1_tenants);
-delete from app.staff_outlets where tenant_id in (select id from w1_tenants);
-delete from app.outlet_opening_hours where tenant_id in (select id from w1_tenants);
-delete from app.cash_drawers where tenant_id in (select id from w1_tenants);
-delete from app.reservation_settings where tenant_id in (select id from w1_tenants);
-delete from app.owner_invitations where email like '%@{DOMAIN}';
-delete from app.users where tenant_id in (select id from w1_tenants);
-delete from app.outlets where tenant_id in (select id from w1_tenants);
-delete from app.tenants where id in (select id from w1_tenants);
-delete from auth.users where email like '%@{DOMAIN}';
-"""
-
 
 def _admin(sql: str, params: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:
-    assert ADMIN_URL
-    with psycopg.connect(ADMIN_URL, autocommit=True) as conn:
-        cur = conn.execute(sql, params)
-        return cur.fetchall() if cur.description else []
+    return admin_sql(sql, params)
 
 
 def _cleanup() -> None:
-    assert ADMIN_URL
-    with psycopg.connect(ADMIN_URL) as conn:
-        conn.execute("set local session_replication_role = replica")
-        conn.execute(CLEANUP)
+    cleanup_domain(DOMAIN)
 
 
 @pytest.fixture(scope="module", autouse=True)
 def fixtures() -> Iterator[None]:
     _cleanup()
     for uid, email in ((OWNER, f"olga@{DOMAIN}"), (OTHER_OWNER, f"lain@{DOMAIN}")):
-        _admin("insert into auth.users (id, email) values (%s, %s)", (uid, email))
-        _admin("select app.record_owner_invitation(%s, %s, 'platform@test', null)", (email, uid))
+        invite_owner(uid, email)
     yield
     _cleanup()
 

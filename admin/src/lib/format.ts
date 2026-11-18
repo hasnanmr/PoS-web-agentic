@@ -34,3 +34,47 @@ export function timeAgo(iso: string, now: Date = new Date()): string {
   if (hours < 24) return `${hours} jam lalu`
   return `${Math.round(hours / 24)} hari lalu`
 }
+
+const LARGE: Record<string, { unit: string; factor: number }> = {
+  kg: { unit: 'kg', factor: 1000 },
+  L: { unit: 'L', factor: 1000 },
+}
+
+function idNumber(value: number, maxFraction = 3): string {
+  return new Intl.NumberFormat('id-ID', { maximumFractionDigits: maxFraction }).format(value)
+}
+
+/** Base-unit quantity in the item's display unit, like S7: "2,4 kg", "180 g", "140 pcs". */
+export function formatQty(qty: string | number, unit: string, displayUnit?: string | null): string {
+  const value = Number(qty)
+  const large = displayUnit ? LARGE[displayUnit] : undefined
+  if (large) return `${idNumber(value / large.factor)} ${large.unit}`
+  if (!displayUnit && unit !== 'pcs' && Math.abs(value) >= 1000) {
+    return `${idNumber(value / 1000)} ${unit === 'g' ? 'kg' : 'L'}`
+  }
+  return `${idNumber(value)} ${unit}`
+}
+
+/** Signed delta for recipes and movements: "+ 6 g", "− 150 ml". */
+export function formatDelta(qty: string | number, unit: string, displayUnit?: string | null): string {
+  const value = Number(qty)
+  return `${value < 0 ? '−' : '+'} ${formatQty(Math.abs(value), unit, displayUnit)}`
+}
+
+/** Factor from the display unit the user types in to the base unit stored. */
+export function displayFactor(displayUnit?: string | null): number {
+  return displayUnit && LARGE[displayUnit] ? LARGE[displayUnit].factor : 1
+}
+
+export function formatTime(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone })
+    .format(new Date(iso))
+    .replace('.', ':')
+}
+
+/** A decimal string from the API (e.g. "125.000", "0.500") as editable id-ID text ("125", "0,5"), without rounding through Number. */
+export function plainQuantity(value: string | number): string {
+  const text = String(value)
+  if (!text.includes('.')) return text
+  return text.replace(/\.?0+$/, '').replace('.', ',')
+}

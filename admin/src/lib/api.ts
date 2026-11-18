@@ -84,6 +84,9 @@ const ERROR_COPY: Record<string, string> = {
   invite_failed: 'Email undangan gagal dikirim. Coba lagi.',
   auth_admin_not_configured: 'Undangan email belum dikonfigurasi di server.',
   already_onboarded: 'Akun ini sudah punya bisnis.',
+  insufficient_stock: 'Stok tidak cukup; stok tidak boleh minus.',
+  stock_item_name_taken: 'Nama bahan sudah dipakai.',
+  addon_group_in_use: 'Opsi grup ini sudah dipakai di order; ubah opsinya saja.',
 }
 
 export function errorMessage(error: unknown): string {

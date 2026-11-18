@@ -168,8 +168,29 @@ values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000
         '00000000-0000-0000-0000-0000000000d1', 'restock', 500, 'user', '00000000-0000-0000-0000-0000000000f1');
 select pg_temp.check((select on_hand = 500 from app.outlet_stock), 'restock by staff updates stock through the trigger');
 select pg_temp.expect_error($$update app.outlet_stock set on_hand = 9999$$, 'editing the stock level directly (AC4.1)');
+-- Waste (outgoing) movement succeeds with enough stock and is rejected below zero.
+insert into app.stock_movements (tenant_id, outlet_id, stock_item_id, type, quantity, actor_type, actor_id)
+values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a1',
+        '00000000-0000-0000-0000-0000000000d1', 'waste', -100, 'user', '00000000-0000-0000-0000-0000000000f1');
+select pg_temp.check((select on_hand = 400 from app.outlet_stock), 'waste by staff reduces stock through the trigger');
+select pg_temp.expect_error(
+  $$insert into app.stock_movements (tenant_id, outlet_id, stock_item_id, type, quantity, actor_type, actor_id)
+    values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a1',
+            '00000000-0000-0000-0000-0000000000d1', 'waste', -9999, 'user', '00000000-0000-0000-0000-0000000000f1')$$,
+  'a movement that would take stock below zero');
+-- Thresholds go through a definer function: owner of the outlet's tenant only.
+select pg_temp.expect_error(
+  $$select app.set_stock_threshold('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 50)$$,
+  'staff setting a stock threshold');
 select pg_temp.expect_error($$update app.ledger_entries set amount = 1$$, 'updating a ledger entry as app_backend (AC3.1)');
 select pg_temp.expect_error($$delete from app.stock_movements$$, 'deleting stock movements as app_backend');
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000f0');
+select app.set_stock_threshold('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 50);
+select pg_temp.check((select low_threshold = 50 from app.outlet_stock), 'owner sets a stock threshold');
+select pg_temp.expect_error(
+  $$select app.set_stock_threshold('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000ff', 50)$$,
+  'threshold for an unknown stock item');
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000f2');
 select pg_temp.check((select count(*) = 0 from app.orders), 'deactivated staff sees nothing, even with a valid tenant');
@@ -179,6 +200,9 @@ select pg_temp.check((select count(*) = 1 from app.outlets), 'attendance tablet 
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-0000000000f9');
 select pg_temp.check((select count(*) = 1 from app.orders), 'owner B sees only tenant B');
+select pg_temp.expect_error(
+  $$select app.set_stock_threshold('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 50)$$,
+  'owner B setting a threshold for tenant A''s outlet');
 select pg_temp.expect_error($$select * from app.owner_invitations$$, 'reading owner invitations directly (definer functions only)');
 
 select pg_temp.as_user(null, null);

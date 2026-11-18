@@ -63,23 +63,23 @@ Staff calling it → `403` (AC7.7).
 
 | Action | Endpoint | Fields |
 |---|---|---|
-| List with price for one outlet | `GET /owner/products?price_outlet_id=&q=&category=&status=` | `[{id, name, category, is_owner_pick, is_sample, addon_group_count, price, status: active\|sold_out\|inactive}]`. |
-| + Item menu / Edit | `POST /owner/products`, `GET/PATCH /owner/products/{id}` | `name*, category, is_owner_pick, tags[], description, is_active, photo` (upload URL via `POST /owner/products/{id}/photo`). |
-| Harga per outlet | `PUT /owner/products/{id}/prices` | `[{outlet_id, price}]`. |
-| Grup add-on | `POST /owner/products/{id}/addon-groups`, `PATCH/DELETE /owner/addon-groups/{id}`, `PUT /owner/products/{id}/addon-groups/order` | `name, selection: single\|multiple, is_required`, options `[{name, prices:[{outlet_id, price}]}]`, max 10 options. Option availability per outlet returned (`unavailable` when ingredients run out). |
-| Simpan & sync katalog | the save calls above enqueue catalog sync automatically | Response includes `catalog_sync: queued`. |
-| ✕ Hapus item | `DELETE /owner/products/{id}` | Soft delete if referenced by orders. |
+| List with price for one outlet | `GET /owner/products?price_outlet_id=&q=&category=&status=` ✅ | `[{id, name, category, is_owner_pick, is_sample, addon_group_count, price, status: active\|sold_out\|inactive}]`. |
+| + Item menu / Edit | `POST /owner/products`, `GET/PATCH /owner/products/{id}` ✅ (photo upload pending) | `name*, category, is_owner_pick, tags[], description, is_active, photo` (upload URL via `POST /owner/products/{id}/photo`). |
+| Harga per outlet | `PUT /owner/products/{id}/prices` ✅ | `[{outlet_id, price}]`. |
+| Grup add-on | `POST /owner/products/{id}/addon-groups`, `PATCH/DELETE /owner/addon-groups/{id}`, `PUT /owner/products/{id}/addon-groups/order` ✅ | `name, selection: single\|multiple, is_required`, options `[{name, prices:[{outlet_id, price}]}]`, max 10 options. Removed options are deactivated, not deleted (orders may reference them); only active options count toward the 10-option limit. Per-option availability is not returned yet (O5 shows none); product availability is `GET /owner/products/{id}/availability`. |
+| Simpan & sync katalog | the save calls above enqueue catalog sync automatically | Response includes `catalog_sync: queued` once T-051 exists; until then `not_configured`. |
+| ✕ Hapus item | `DELETE /owner/products/{id}` ✅ | Soft delete if referenced by orders. |
 
 ### O6 · Resep & Bahan (T-019, T-021, T-022)
 
 | Tab / action | Endpoint | Fields |
 |---|---|---|
-| Resep menu list | `GET /owner/products?include=recipe_summary` | `ingredient_count`. |
-| Resep (1 porsi) | `GET/PUT /owner/products/{id}/recipe` | `[{stock_item_id, quantity}]`, min 1 line; unit from stock item. |
-| Delta resep dari add-on | `GET/PUT /owner/addon-options/{id}/recipe` | `[{stock_item_id, quantity (±)}]`. |
-| Simulasi ketersediaan per outlet | `GET /owner/products/{id}/availability` | `[{outlet_id, portions_available, sold_out, limiting_stock_item}]`. |
-| Daftar bahan | `GET/POST /owner/stock-items`, `PATCH /owner/stock-items/{id}` | `name, unit: g\|ml\|pcs`. |
-| Threshold per outlet | `PUT /owner/stock-items/{id}/thresholds` | `[{outlet_id, low_threshold}]`. |
+| Resep menu list | `GET /owner/products` ✅ (always returns `ingredient_count`) | `ingredient_count`. |
+| Resep (1 porsi) | `GET/PUT /owner/products/{id}/recipe` ✅ | `[{stock_item_id, quantity}]`, min 1 line; unit from stock item. |
+| Delta resep dari add-on | `GET/PUT /owner/addon-options/{id}/recipe` ✅ | `[{stock_item_id, quantity (±)}]`. |
+| Simulasi ketersediaan per outlet | `GET /owner/products/{id}/availability` ✅ | `[{outlet_id, portions_available, sold_out, limiting_stock_item}]`. |
+| Daftar bahan | `GET/POST /owner/stock-items`, `PATCH /owner/stock-items/{id}` ✅ | `name, unit: g\|ml\|pcs`. |
+| Threshold per outlet | `PUT /owner/stock-items/{id}/thresholds` ✅ | `[{outlet_id, low_threshold}]`. |
 
 ### O7 · Rekomendasi (T-073, T-074)
 
@@ -211,9 +211,9 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Table + filters | `GET /ops/outlets/{id}/stock?status=all\|low\|out&q=` | `counts:{low, out}`, `[{stock_item_id, name, unit, on_hand, low_threshold, status: ok\|low\|out, affected_products:[…]}]`. |
-| Catat pergerakan | `POST /ops/outlets/{id}/stock-movements` (`Idempotency-Key`) | `type: restock\|waste\|adjustment, stock_item_id, quantity (signed for adjustment), note`. |
-| Riwayat movement | `GET /ops/outlets/{id}/stock-movements?stock_item_id=&cursor=` | `[{at, type, quantity, unit, stock_item, order_no?, note, actor}]`. |
+| Table + filters | `GET /ops/outlets/{id}/stock?status=all\|low\|out&q=` ✅ | `counts:{low, out}`, `[{stock_item_id, name, unit, on_hand, low_threshold, status: ok\|low\|out, affected_products:[…]}]`. |
+| Catat pergerakan | `POST /ops/outlets/{id}/stock-movements` ✅ (`Idempotency-Key` with Wave 3) | `type: restock\|waste\|adjustment, stock_item_id, quantity (signed for adjustment), note`. |
+| Riwayat movement | `GET /ops/outlets/{id}/stock-movements?stock_item_id=&cursor=` ✅ | `[{at, type, quantity, unit, stock_item, order_no?, note, actor}]`. |
 
 ### S8 · Shift Kasir & Blind Count (T-039, T-040)
 
