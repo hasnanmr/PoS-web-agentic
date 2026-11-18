@@ -1,7 +1,7 @@
 # Local development shortcuts. Run `make help` for the list.
 .DEFAULT_GOAL := help
 .PHONY: help setup up down api worker admin test lint fmt build check \
-        backend-test backend-lint admin-test admin-lint db-reset db-test check-migrations openapi
+        backend-test backend-lint admin-test admin-lint db-reset db-migrate db-new db-test check-migrations openapi
 
 # Local service passwords live only in backend/.env (copied from backend/.env.example).
 -include backend/.env
@@ -37,9 +37,17 @@ db-reset: ## Recreate the local docker DB schema: shim, migrations, seed, app_ba
 	@test -n "$(APP_BACKEND_DB_PASSWORD)" || { echo "APP_BACKEND_DB_PASSWORD missing: run make setup or update backend/.env from backend/.env.example"; exit 1; }
 	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -c "drop schema if exists app cascade; drop schema if exists auth cascade"
 	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -f supabase/tests/supabase_shim.sql
-	for f in supabase/migrations/*.sql; do psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -f $$f || exit 1; done
+	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -c "drop schema if exists alembic cascade"
+	cd backend && MIGRATION_DATABASE_URL="$(LOCAL_DB_ADMIN_URL)" uv run python -m app.tools.migrate
 	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
 	psql "$(LOCAL_DB_ADMIN_URL)" -v ON_ERROR_STOP=1 -q -c "alter role app_backend password '$(APP_BACKEND_DB_PASSWORD)'"
+
+db-migrate: ## Apply pending migrations to the local docker DB (Alembic)
+	cd backend && MIGRATION_DATABASE_URL="$(LOCAL_DB_ADMIN_URL)" uv run python -m app.tools.migrate
+
+db-new: ## New migration: make db-new name=add_something (SQL file + Alembic revision)
+	@test -n "$(name)" || { echo "usage: make db-new name=snake_case_name"; exit 1; }
+	scripts/new-migration.sh "$(name)"
 
 db-test: ## Migrations + SQL tests on an EMPTY database (TEST_DB_URL=postgresql://...)
 	DATABASE_URL="$(TEST_DB_URL)" scripts/db-test.sh

@@ -2,8 +2,9 @@
 # RabbitMQ on Railway. Passwords come from backend/.env (template: backend/.env.example).
 # Start with `make up` (or `docker compose --env-file backend/.env up -d`).
 #
-# Apply schema migrations (plain SQL in supabase/migrations/) with, e.g.:
-#   make db-reset   (shim + migrations + seed + app_backend password)
+# Apply schema migrations (Alembic, backend/migrations/) with, e.g.:
+#   make db-reset     (shim + migrations + seed + app_backend password)
+#   make db-migrate   (pending migrations only)
 name: sme-pos
 
 services:

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Apply every migration to an empty database, then run the SQL test suites.
+# Apply every migration (Alembic, backend/migrations) to an empty database, then run the SQL
+# test suites. Needs uv (backend dependencies).
 # Usage: DATABASE_URL=postgresql://postgres@localhost:5432/sme_test scripts/db-test.sh
 # Run as a superuser on an EMPTY database (it is not dropped or reset by this script).
 # On plain PostgreSQL the Supabase shim (roles anon/authenticated/supabase_auth_admin
@@ -14,10 +15,7 @@ if [ "$(run -tAc "select to_regclass('auth.users') is null")" = "t" ]; then
   echo "shim: supabase_shim.sql (plain PostgreSQL)"
   run -f "$root/supabase/tests/supabase_shim.sql"
 fi
-for f in "$root"/supabase/migrations/*.sql; do
-  echo "migrate: $(basename "$f")"
-  run -f "$f"
-done
+(cd "$root/backend" && MIGRATION_DATABASE_URL="$DATABASE_URL" uv run --quiet python -m app.tools.migrate)
 run -f "$root/supabase/seed.sql"
 echo "--- schema_smoke.sql"
 run -f "$root/supabase/tests/schema_smoke.sql" 2>&1 | notices
