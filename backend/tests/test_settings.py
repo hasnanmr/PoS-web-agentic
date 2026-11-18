@@ -43,9 +43,9 @@ def test_deployed_envs_require_infrastructure_vars(
         "SUPABASE_URL",
         "SUPABASE_JWKS_URL",
         "SUPABASE_JWT_ISSUER",
-        "RABBITMQ_URL",
     ):
         assert name in message
+    assert "RABBITMQ_URL" not in message  # optional until the WhatsApp worker exists
 
 
 @pytest.mark.parametrize("app_env", ["demo", "staging", "production"])

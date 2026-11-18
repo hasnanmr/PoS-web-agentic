@@ -1,5 +1,9 @@
 # CI (T-009): migrations, SQL tests (schema, RLS, token hook), backend tests and lint,
 # API contract check, and the admin app build. Runs on every push and pull request.
+#
+# CD: on a push to main, once CI is green, the changed service is deployed to Railway
+# (backend/ -> "backend" service, admin/ -> "admin" service). Needs the repository secret
+# RAILWAY_TOKEN (project token of the Railway environment); see README "Deployment".
 name: CI
 
 on:
@@ -101,3 +105,56 @@ jobs:
           VITE_API_BASE_URL: http://localhost:8000
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+
+  changes:
+    name: Detect changed services
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      admin: ${{ steps.filter.outputs.admin }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'supabase/**'
+            admin:
+              - 'admin/**'
+
+  deploy-backend:
+    name: Deploy backend to Railway
+    needs: [backend, admin, changes]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-backend
+      cancel-in-progress: false
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli@5.75.0
+      - name: Deploy
+        run: railway up backend --path-as-root --service backend --ci --message "$GITHUB_SHA"
+
+  deploy-admin:
+    name: Deploy admin to Railway
+    needs: [backend, admin, changes]
+    if: needs.changes.outputs.admin == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-admin
+      cancel-in-progress: false
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli@5.75.0
+      - name: Deploy
+        run: railway up admin --path-as-root --service admin --ci --message "$GITHUB_SHA"

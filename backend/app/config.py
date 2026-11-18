@@ -25,13 +25,14 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 AppEnv = Literal["local", "demo", "staging", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-# Variables that must be set in every environment except `local`.
+# Variables that must be set in every environment except `local`. RABBITMQ_URL is optional
+# until the WhatsApp worker exists (the API does not use the queue yet); add it back here
+# together with the worker.
 REQUIRED_OUTSIDE_LOCAL: tuple[str, ...] = (
     "database_url",
     "supabase_url",
     "supabase_jwks_url",
     "supabase_jwt_issuer",
-    "rabbitmq_url",
 )
 
 

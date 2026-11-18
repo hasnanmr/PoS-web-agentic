@@ -1,12 +1,13 @@
-# Railway config for the backend API service (config only; the Railway project is not set
-# up yet). In the Railway service settings set Root Directory = /backend so the build context
-# is backend/ and this file is picked up via "Config as code" path /railway.toml.
+# Railway config for the backend API service. The deploy workflow (.github/workflows/ci.yml)
+# uploads backend/ as the service root, so this file and Dockerfile sit at the root of the
+# build context (for Railway-side GitHub deploys set Root Directory = /backend instead).
 #
 # WhatsApp worker: a SEPARATE Railway service later, same image (backend/Dockerfile), start
 # command `python -m app.worker.main`, no healthcheck/public domain.
 #
 # Required variables (see backend/.env.example): APP_ENV, DATABASE_URL, SUPABASE_URL,
-# SUPABASE_JWKS_URL, SUPABASE_JWT_ISSUER, RABBITMQ_URL, CORS_ORIGINS, DEFAULT_TIMEZONE.
+# SUPABASE_JWKS_URL, SUPABASE_JWT_ISSUER, CORS_ORIGINS, DEFAULT_TIMEZONE
+# (RABBITMQ_URL is optional until the WhatsApp worker exists).
 # Railway injects PORT.
 
 [build]
