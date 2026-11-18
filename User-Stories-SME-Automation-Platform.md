@@ -487,8 +487,9 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Tab Purchase Order memiliki filter terbuka (menunggu barang), ada selisih, menunggu pembayaran, overdue, dan ditutup, serta detail PO berisi baris item, riwayat pengecekan barang, dan riwayat pembayaran beserta pencatatnya.
   - Dashboard owner memiliki kartu **Pembayaran supplier**: PO tempo yang sudah ditutup dan belum lunas (overdue dulu, lalu jatuh tempo terdekat) dan PO bayar di muka yang terbuka dan belum dibayar, masing-masing dengan tombol catat pembayaran.
   - Kartu itu dan laporan cashflow menampilkan total hutang supplier (jumlah overdue dan jatuh tempo 7 hari) serta barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
-  - Staf tidak melihat kartu ini, termasuk lewat API langsung.
-- **Traceability:** FR3.10, FR3.11, FR7.2, AC3.12, AC3.13
+  - Dashboard owner memiliki laporan **Ringkasan PO** per outlet dan periode: jumlah dan nilai PO yang dibuka vs ditutup, barang belum datang / sebagian / sudah datang, dan pembayaran belum dibayar / sebagian / lunas, dipisah bayar mundur dan bayar di muka; setiap angka membuka daftar PO yang sesuai.
+  - Staf tidak melihat kartu dan laporan ini, termasuk lewat API langsung.
+- **Traceability:** FR3.10, FR3.11, FR3.12, FR7.2, AC3.12, AC3.13, AC3.14
 
 ### US-033 — Menggunakan dashboard admin sesuai peran
 
