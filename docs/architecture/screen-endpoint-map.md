@@ -147,6 +147,35 @@ The sidebar item **Pengeluaran** opens this screen until its own detailed wirefr
 | Riwayat koreksi | `GET /owner/attendance/{id}` | `original`, `flagged_at`, `corrections:[{at, by, from, to, reason}]`. |
 | ⭳ Ekspor CSV | `GET /owner/attendance?format=csv` | |
 
+### O15 · Pengeluaran — tab Purchase Order (T-125–T-128) — planned
+
+The sidebar item **Pengeluaran** opens tabs **Pengeluaran** (direct expenses: the O9 endpoints `GET/POST /owner/expenses`) and **Purchase Order**.
+
+| Card / action | Endpoint | Fields |
+|---|---|---|
+| KPI cards | `GET /owner/purchase-orders/summary?outlet_id=` | `supplier_debt, overdue_count, due_7d_amount, due_7d_count, prepaid_not_received, open_count, difference_count`. |
+| List + filters | `GET /owner/purchase-orders?outlet_id=&status=open\|difference_found\|awaiting_payment\|overdue\|closed&cursor=` | `[{id, number ("PO-A-0012"), supplier, outlet, payment_term, due_date?, expected_date?, status, payment_status, overdue, total, amount_paid, amount_owed}]`. |
+| Detail | `GET /owner/purchase-orders/{id}` | Lines `[{item, stock_item_id?, quantity, unit, unit_price, received_quantity, subtotal}]`, `events:[{at, kind: opened\|received\|closed\|paid\|cancelled, actor:{name, role}, data}]`, `amount_owed`. |
+| Catat pembayaran | `POST /owner/purchase-orders/{id}/payments` (`Idempotency-Key`) | `paid_on, amount (≤ amount_owed), method: cash\|transfer, drawer_id?` (cash from an open shift). Posts one `expense` ledger entry. |
+| Batalkan PO | `POST /owner/purchase-orders/{id}/cancel` | `reason*`; refused once paid or received. |
+| Tutup dengan catatan | `POST /owner/purchase-orders/{id}/close` | `note*`; only the owner, only for a PO with a difference. |
+| Daftar supplier | `GET/POST /owner/suppliers`, `PATCH /owner/suppliers/{id}` | `name, phone?, note?`. |
+
+### O16 / S12 · Buka PO (owner: O16, staf: S12) — planned
+
+| Action | Endpoint | Fields |
+|---|---|---|
+| Buka PO | `POST /ops/outlets/{id}/purchase-orders` (`Idempotency-Key`) | `supplier_id, ordered_on, payment_term: pay_later\|pay_in_advance, due_date (pay_later) \| expected_date (pay_in_advance), lines:[{stock_item_id? \| item_name, quantity, unit, unit_price}], note?`. Staff only for assigned outlets; no approval; creator recorded. |
+| Supplier dropdown | `GET /ops/suppliers` | `[{id, name}]` (read-only for staff). |
+
+### O17 · Dashboard owner — Ringkasan PO & Pembayaran supplier — planned
+
+| Card | Endpoint | Fields |
+|---|---|---|
+| Ringkasan PO | `GET /owner/dashboard` ↳ `po_summary` (query `outlet_id`, `period`) | `{total:{count, amount}, status:{open, closed}, goods:{not_arrived, partly_arrived, arrived}, payment:{unpaid, partly_paid, paid}, by_term:{pay_later, pay_in_advance}}`, each `{count, amount}`; by PO open date. |
+| PO ada selisih | ↳ `po_differences` | `[{po_id, number, supplier, outlet, short_lines:[{item, ordered, received, unit}], last_received_at}]`; action: O15 close-with-note. |
+| Pembayaran supplier | ↳ `supplier_payments` | `debt_total, overdue_count, due_7d_amount, prepaid_not_received, items:[{po_id, number, supplier, outlet, payment_term, reason: overdue\|due\|pay_in_advance, due_date?, amount_owed}]` (overdue first, then due date). |
+
 ## Staff operational screens (owner can use them too)
 
 All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
@@ -230,6 +259,21 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | Status hari ini + banner | `GET /ops/me/attendance/today` | `status: working\|not_clocked_in`, `clock_in_at, device_name, outlet`, `flagged_records:[{date, outlet}]`. |
 | Riwayat minggu ini | `GET /ops/me/attendance?from=&to=` | Own records only + `total_minutes` (flagged excluded). |
 | Lihat selfie sendiri | `GET /ops/me/attendance/{id}/selfies` | Signed URLs. No clock-in endpoint exists for staff tokens. |
+
+### S10 · Purchase Order outlet (staf) — planned
+
+| Part | Endpoint | Fields |
+|---|---|---|
+| Daftar PO outlet | `GET /ops/outlets/{id}/purchase-orders?status=` | Same rows as O15 plus `created_by`; payment status read-only; no debt totals. |
+| + Buka PO | opens S12 (O16 endpoint) | |
+
+### S11 · Cross-check barang datang (staf & owner) — planned
+
+| Part | Endpoint | Fields |
+|---|---|---|
+| Form | `GET /ops/purchase-orders/{id}` | Lines with `quantity, received_quantity, unit`. |
+| Simpan penerimaan | `POST /ops/purchase-orders/{id}/receipts` (`Idempotency-Key`) | `received_on, note?, lines:[{line_id, quantity}]` (never above the remaining quantity). Creates restock movements for ingredient lines; returns per-line `match\|short` and PO `status`. |
+| Tutup PO | `POST /ops/purchase-orders/{id}/close` | Staff, only when every line matches (`difference_found` → refused; the owner closes it with a note from O17/O15); pay-in-advance POs must be paid first. |
 
 ## Attendance tablet (K0–K4)
 

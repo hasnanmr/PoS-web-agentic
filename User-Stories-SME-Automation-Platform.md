@@ -1,6 +1,6 @@
 # User Stories — SME Business Automation Platform
 
-Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story. Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
+Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story (baseline PRD v0.14). Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
 
 ## Konvensi
 
@@ -400,6 +400,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
+  - Pengeluaran langsung ini berada di tab **Pengeluaran**; pembelian ke supplier lewat PO ada di tab **Purchase Order** (US-057–US-061).
   - Owner dapat memasukkan nominal, deskripsi, tanggal, dan outlet.
   - Sistem membuat ledger entry dengan identitas owner.
   - Staff tidak dapat membuka atau menggunakan layar expense.
@@ -417,6 +418,79 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Staff tidak dapat melihat angka cashflow owner.
   - Laporan menampilkan kas masuk, kas keluar, dan kas bersih beserta perubahan terhadap periode sebelumnya, pengeluaran per outlet, dan daftar pengeluaran terbaru.
 - **Traceability:** FR3.3, FR7.2, AC3.4–AC3.5, AC7.1
+
+### US-057 — Membuat purchase order ke supplier
+
+**Sebagai** owner atau staf outlet, **saya ingin** mencatat pesanan barang ke supplier sebagai purchase order (PO) per outlet, **sehingga** pembelian bahan tercatat sejak dipesan, bukan hanya saat dibayar.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Owner dapat mengelola daftar supplier (nama, nomor telepon opsional, catatan) untuk seluruh bisnis.
+  - Owner, atau staf untuk outlet yang ditugaskan kepadanya, membuka PO untuk satu outlet dan satu supplier: tanggal order, baris item (bahan dari daftar stok atau item teks bebas, jumlah, satuan, harga satuan dalam rupiah bulat), dan total; PO mendapat nomor per outlet (mis. `PO-A-0012`).
+  - Pembuat PO memilih satu termin pembayaran: **bayar mundur (tempo)** dengan tanggal jatuh tempo, atau **bayar di muka** dengan perkiraan tanggal barang datang.
+  - Membuat PO tidak membuat ledger entry dan tidak mengubah stok.
+  - PO tanpa pembayaran dan tanpa penerimaan barang dapat dibatalkan dengan alasan wajib; PO yang sudah dibayar atau sudah menerima barang tidak dapat dibatalkan.
+  - PO yang dibuka staf langsung berstatus terbuka tanpa persetujuan dan mencatat pembuatnya; PO bayar di muka langsung memunculkan permintaan bayar di dashboard owner.
+  - Staf tidak dapat membuka PO untuk outlet lain, membatalkan PO, mengelola supplier, atau mencatat pembayaran, termasuk lewat API langsung.
+- **Traceability:** FR1.5, FR3.5, FR3.6, FR3.9, AC3.6, AC3.11, AC3.13
+- **Catatan alur:** Skema 1 (bayar mundur): PO dibuka → barang datang dan dicek → PO ditutup → pengingat bayar di dashboard owner. Skema 2 (bayar di muka): PO dibuka → notifikasi bayar di dashboard owner → barang tiba dan dicek → PO ditutup.
+
+### US-058 — PO bayar mundur: cek barang, tutup PO, lalu bayar
+
+**Sebagai** owner, **saya ingin** PO tempo baru muncul sebagai pengingat bayar setelah barangnya dicek dan PO ditutup, **sehingga** saya hanya membayar barang yang benar-benar diterima dan tidak melewatkan jatuh tempo.
+
+- **Fase/Prioritas:** MVP / P0
+- **Alur:** PO dibuka → barang datang → admin cek qty sesuai PO → PO ditutup → pengingat pembayaran muncul di dashboard owner → owner mencatat pembayaran.
+- **Acceptance criteria:**
+  - Setelah PO tempo ditutup, kartu **Pembayaran supplier** di dashboard owner menampilkan PO tersebut dengan supplier, outlet, sisa hutang, dan tanggal jatuh tempo.
+  - Owner mencatat satu atau beberapa pembayaran (tanggal, nominal, metode cash atau transfer bank) sampai lunas; pembayaran yang melebihi sisa hutang ditolak.
+  - Setiap pembayaran membuat satu ledger entry `expense` pada tanggal bayar dengan metode, nomor PO, dan supplier.
+  - Pembayaran cash dapat diambil dari laci shift kasir yang sedang terbuka sehingga ekspektasi kas shift itu berkurang; jika tidak, dianggap dibayar di luar laci.
+  - Lewat tanggal jatuh tempo (zona waktu outlet) dengan sisa hutang, pengingat ditandai **overdue** dan tampil paling atas; pengingat hilang setelah lunas.
+  - Pembayaran tidak dapat diedit atau dihapus.
+- **Traceability:** FR3.7, FR3.9, FR3.11, FR11.8, AC3.7, AC3.8, AC3.10
+
+### US-059 — PO bayar di muka: notifikasi bayar, barang tiba, cek, tutup PO
+
+**Sebagai** owner, **saya ingin** diingatkan membayar PO bayar di muka begitu PO dibuka, lalu PO ditutup setelah barang tiba dan dicek, **sehingga** pembayaran di muka tidak terlupa dan barang yang ditunggu tetap terpantau.
+
+- **Fase/Prioritas:** MVP / P0
+- **Alur:** PO dibuka → notifikasi pembayaran muncul di dashboard owner → owner membayar → barang tiba → admin cek qty sesuai PO → PO ditutup.
+- **Acceptance criteria:**
+  - Begitu PO bayar di muka dibuka, kartu **Pembayaran supplier** di dashboard owner menampilkan permintaan bayar untuk PO itu.
+  - Owner mencatat pembayaran penuh; ledger `expense` diposting pada tanggal bayar dan permintaan bayar hilang dari dashboard.
+  - Setelah dibayar, PO berstatus **menunggu barang**; PO bayar di muka yang belum dibayar tidak dapat ditutup.
+  - Laporan menampilkan nilai barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar, sampai PO ditutup.
+- **Traceability:** FR3.8, FR3.9, FR3.11, AC3.9
+
+### US-060 — Mengecek barang datang terhadap PO dan menutup PO
+
+**Sebagai** owner atau staf outlet, **saya ingin** mengecek apakah qty barang yang datang sesuai PO lalu menutup PO jika sesuai, **sehingga** stok bertambah sesuai barang yang benar-benar diterima dan selisih tidak terlewat.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Saat barang datang, staf (atau owner) melakukan cross-check: mengisi qty yang datang di samping qty PO untuk setiap baris, beserta tanggal terima dan catatan opsional; aplikasi menandai baris yang sesuai dan yang kurang.
+  - Baris yang terhubung ke bahan menambah stok lewat movement restock yang merujuk PO, dikonversi ke satuan dasar bahan; baris teks bebas tidak mengubah stok.
+  - Barang boleh datang dalam beberapa kali pengiriman; qty yang diterima tidak boleh melebihi qty PO.
+  - Jika semua baris sesuai, staf **menutup PO**.
+  - Jika ada selisih, staf tidak dapat menutup PO: PO tetap terbuka dengan status **ada selisih** dan kekurangan per baris, serta muncul di daftar **PO ada selisih** pada dashboard owner. Setelah sisanya datang dan sesuai, staf dapat menutupnya; jika tidak, **hanya owner** yang dapat menutup PO itu dengan **catatan wajib**. Untuk PO tempo, hutang menjadi qty diterima × harga satuan (diputuskan). Refund supplier untuk PO bayar di muka yang kurang belum termasuk MVP.
+  - Setiap pengecekan dan penutupan mencatat siapa dan kapan, dan PO yang ditutup tidak dapat dibuka lagi.
+- **Traceability:** FR1.5, FR3.11, FR4.2, FR4.10, FR4.11, AC4.9, AC4.10
+
+### US-061 — Tab Purchase Order dan pengingat pembayaran di dashboard
+
+**Sebagai** owner, **saya ingin** melihat seluruh PO di tab tersendiri dan semua pembayaran supplier yang perlu dilakukan di dashboard, **sehingga** saya tahu apa yang harus dibayar dan barang apa yang masih ditunggu.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Layar Pengeluaran owner memiliki tab **Pengeluaran** (pengeluaran langsung) dan **Purchase Order**; staf mendapat layar Purchase Order untuk outletnya (daftar PO, buka PO, cross-check barang) tanpa pembayaran dan hutang.
+  - Tab Purchase Order memiliki filter terbuka (menunggu barang), ada selisih, menunggu pembayaran, overdue, dan ditutup, serta detail PO berisi baris item, riwayat pengecekan barang, dan riwayat pembayaran beserta pencatatnya.
+  - Dashboard owner memiliki kartu **Pembayaran supplier**: PO tempo yang sudah ditutup dan belum lunas (overdue dulu, lalu jatuh tempo terdekat) dan PO bayar di muka yang terbuka dan belum dibayar, masing-masing dengan tombol catat pembayaran.
+  - Dashboard owner memiliki daftar **PO ada selisih** (supplier, outlet, baris yang kurang, sejak kapan) dengan tombol **Tutup dengan catatan** yang hanya tersedia untuk owner.
+  - Kartu itu dan laporan cashflow menampilkan total hutang supplier (jumlah overdue dan jatuh tempo 7 hari) serta barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
+  - Dashboard owner memiliki laporan **Ringkasan PO** per outlet dan periode: jumlah dan nilai PO yang dibuka vs ditutup, barang belum datang / sebagian / sudah datang, dan pembayaran belum dibayar / sebagian / lunas, dipisah bayar mundur dan bayar di muka; setiap angka membuka daftar PO yang sesuai.
+  - Staf tidak melihat kartu dan laporan ini, termasuk lewat API langsung.
+- **Traceability:** FR3.10, FR3.11, FR3.12, FR7.2, AC3.12, AC3.13, AC3.14
 
 ### US-033 — Menggunakan dashboard admin sesuai peran
 
@@ -723,8 +797,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 |---|---|
 | FR1 Business, outlet, staff | US-001–US-004 |
 | FR2 Order intake & WhatsApp catalog | US-008–US-015, US-034, US-042 |
-| FR3 Cashflow | US-030–US-032, US-045 |
-| FR4 Menu, stock, inventory | US-005–US-008, US-014, US-021, US-045 |
+| FR3 Cashflow | US-030–US-032, US-045, US-057–US-061 |
+| FR4 Menu, stock, inventory | US-005–US-008, US-014, US-021, US-045, US-060 |
 | FR5 Staff attendance (MVP) and scheduling (Phase 3) | US-046, US-053–US-055 |
 | FR6 WhatsApp bot | US-015, US-036–US-037, US-042–US-045, US-052 |
 | FR7 Admin web app | US-003, US-033–US-035, US-056 |

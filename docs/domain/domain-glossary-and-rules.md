@@ -1,6 +1,6 @@
 # Domain glossary, business rules, and enums (T-001)
 
-Status: **draft v1 — 2026-11-17**. Baseline: PRD v0.13, US-001–US-056.
+Status: **draft v1 — 2026-11-17**. Baseline: PRD v0.14, US-001–US-061.
 This document is the single reference for names, enums, and rules used by the database (T-004), API (T-002), and admin app. When code and this document disagree, fix one of them in the same change.
 
 Decisions recorded from the product owner on 2026-11-17:
@@ -36,7 +36,13 @@ Decisions recorded from the product owner on 2026-11-17:
 | Cash drawer | `cash_drawer` | A physical cash drawer at an outlet (e.g. "Kasir depan", "Bar"; shown as "Drawer 1 · Kasir depan"). Every outlet starts with one. |
 | Shift kasir | `cashier_shift` | Period a drawer is in use: starting cash → blind count. Not staff scheduling. |
 | Ledger | `ledger_entry` | Append-only financial record per outlet. Corrections are new reversal entries. |
-| Pengeluaran | ledger entry type `expense` | Manual cash expense logged by the owner. |
+| Pengeluaran | ledger entry type `expense` | Money paid out: a direct expense logged by the owner, or a supplier payment for a purchase order. |
+| Supplier | `supplier` | A business the tenant buys from (name, optional phone, note). Tenant-level. |
+| Purchase order (PO) | `purchase_order` | An order to a supplier for one outlet, numbered per outlet (`PO-A-0012`), with lines, a payment term, a goods status, and a payment status. |
+| Bayar mundur / tempo | payment term `pay_later` | Goods first; the outlet owes the supplier until the due date and may pay in instalments. |
+| Bayar di muka | payment term `pay_in_advance` | Paid when ordered; goods arrive later. |
+| Hutang supplier | derived | Amount still owed on pay-later POs. Shown in reports, never posted to the ledger until paid. |
+| Penerimaan barang | `purchase_order_receipt` | One delivery against a PO; ingredient lines add stock through restock movements. |
 | PB1 | `pb1` | Regional restaurant tax (PBJT F&B, Law No. 1/2022), set per outlet, up to 10%. |
 | Meja | `table` | A table at an outlet with seat capacity and optional area. |
 | Reservasi | `reservation` | A table booking (or a walk-in occupancy) for a time range. |
@@ -81,13 +87,16 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in. Counter: dine_in/takeaway. |
 | `order_status` | `pending_payment`, `confirmed`, `preparing`, `ready`, `out_for_delivery`, `served`, `completed`, `cancelled` | Flows in §5. |
 | `payment_status` | `unpaid`, `proof_submitted`, `paid`, `refunded` | `refunded` only through a reversal. |
-| `payment_method` | `cash`, `qris` | Online orders: QRIS only. |
+| `payment_method` | `cash`, `qris`, `transfer` (proposed, T-125) | Online orders: QRIS only. `transfer` only for supplier payments. |
 | `payment_proof_status` | `pending`, `accepted`, `rejected` | Rejection needs a reason. |
 | `bill_status` | `open`, `closed`, `voided` | `voided`: every order on the bill was cancelled. |
 | `cashier_shift_status` | `open`, `closed` | One open shift per drawer. |
 | `stock_unit` | `g`, `ml`, `pcs` | Base units. kg/L are display conversions (T-007). |
 | `stock_movement_type` | `sale`, `sale_reversal`, `restock`, `waste`, `adjustment` | Signed quantity. `adjustment` can be + or −. |
 | `ledger_entry_type` | `revenue`, `pb1`, `delivery_fee`, `refund`, `expense`, `cash_shortage`, `cash_surplus`, `reversal` | Signed amount (+ cash in, − cash out). |
+| `po_payment_term` (proposed, T-125) | `pay_later`, `pay_in_advance` | Fixed when the PO is created. |
+| `po_status` (proposed) | `open`, `difference_found`, `closed`, `cancelled` | `open` until goods are checked; `difference_found` while a line is short; `closed` by staff when every line matches, or only by the owner with a note; `cancelled` only with no payment and no goods. |
+| `po_payment_status` (proposed) | `unpaid`, `partially_paid`, `paid` | From payments; never above the PO total. Overdue = pay later, not paid, past the due date (outlet time zone). |
 | `addon_selection` | `single`, `multiple` | Plus `is_required` flag. |
 | `reservation_status` | `booked`, `seated`, `completed`, `cancelled`, `no_show` | |
 | `reservation_source` | `whatsapp`, `phone`, `in_person`, `walk_in` | `walk_in` = table occupancy without booking (FR9.7). |
@@ -135,6 +144,18 @@ Rules:
 - Each new outlet gets one drawer ("Kasir depan"). One open shift per drawer. Cash payments require an open shift and are linked to it.
 - Blind count: staff enter counted cash before seeing expected cash. Expected = starting cash + cash received − cash paid out. Difference posts `cash_shortage` or `cash_surplus` to the ledger.
 
+## 7a. Purchase orders (PRD v0.14, FR3.5–FR3.10, FR4.10)
+
+- Scheme 1, pay later: open → goods arrive and are checked against PO quantities → PO closed → payment reminder on the owner dashboard until paid.
+- Scheme 2, pay in advance: open → payment request on the owner dashboard → paid → goods arrive and are checked → PO closed (not allowed while unpaid).
+- Who: owner, or staff for an assigned outlet, open POs (no approval; creator recorded) and cross-check goods; staff close a matching PO. Suppliers, payments, cancellation, close-with-difference (note required), debt, and dashboard reminders are owner-only.
+- Cash basis: opening, checking, or closing a PO never posts to the ledger; each supplier payment posts one `expense` entry (negative amount) on the payment date with method, PO number, and supplier.
+- Pay later: payments may be split; the sum never exceeds the PO total. Pay in advance: the full payment is recorded before goods arrive; the PO then waits for goods.
+- A cash supplier payment may be taken from an open shift's drawer; it is then cash paid out in that shift's expected cash (§7).
+- Goods check: owner or assigned staff enter received vs ordered per line; quantity never above the ordered quantity; a short line keeps the PO in `difference_found` (staff can't close; listed on the owner dashboard) until the rest arrives or the owner closes it with a note (pay later: amount owed = received × unit price, decided; refunds for short pay-in-advance POs are out of the MVP); ingredient lines create `restock` movements (base units) referencing the PO; free-text lines add no stock.
+- Cancel: only with no payment and no receipt, reason required. Payments and receipts are append-only.
+- Open (PRD §13): short deliveries and supplier returns, separate PPN, approvals and WhatsApp reminders.
+
 ## 8. Reservations
 
 - Tables have seat capacity and optional area. Booking assigns the smallest free table that fits.
@@ -166,5 +187,5 @@ Permission matrix as in PRD FR1.5. Key points:
 | 2 | PB1 on open bills: per order vs once per bill | Product owner | T-033 (open bills), T-041 (ledger posting) |
 | 3 | Busy/quiet/crowd thresholds | Development (T-123) | T-123 |
 | 4 | Who delivers (outlet staff vs courier) | Product owner | T-053 copy only |
-| 6 | Detailed wireframe for the Pengeluaran menu (currently uses O9) | Design | Pengeluaran screen; until then the menu opens O9 |
+| 6 | Detailed wireframe for the Pengeluaran menu with tabs Pengeluaran and Purchase Order (T-129) | Design | Pengeluaran screen and PO flows (T-130); until then the menu opens O9 |
 | 5 | Cross-border data transfer basis | Legal (T-108) | Any real merchant data |
