@@ -16,7 +16,9 @@ from app import db
 from app.api import health
 from app.api.errors import install_error_handlers
 from app.api.v1 import me
+from app.api.v1.owner import onboarding, outlets, staff
 from app.auth.principal import PgUserDirectory, UserDirectory
+from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
 from app.config import Settings, get_settings
 from app.logging import configure_logging
@@ -39,11 +41,20 @@ def build_token_verifier(settings: Settings) -> TokenVerifier | None:
     )
 
 
+def build_auth_admin(settings: Settings) -> AuthAdmin | None:
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        return None
+    return SupabaseAdmin(
+        str(settings.supabase_url), settings.supabase_service_role_key.get_secret_value()
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     *,
     token_verifier: TokenVerifier | None = None,
     user_directory: UserDirectory | None = None,
+    auth_admin: AuthAdmin | None = None,
 ) -> FastAPI:
     """Build the app. Tests may inject a verifier and a user directory."""
     settings = settings or get_settings()
@@ -79,6 +90,7 @@ def create_app(
     app.state.db_pool = None
     app.state.token_verifier = token_verifier or build_token_verifier(settings)
     app.state.user_directory = user_directory
+    app.state.auth_admin = auth_admin or build_auth_admin(settings)
 
     app.add_middleware(
         CORSMiddleware,
@@ -90,6 +102,9 @@ def create_app(
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(me.router)
+    app.include_router(onboarding.router)
+    app.include_router(outlets.router)
+    app.include_router(staff.router)
 
     logger.info(
         "api configured",

@@ -2,13 +2,13 @@
 // hamburger drawer + bottom nav on mobile 360px (M1–M6). No horizontal scroll (AC7.2).
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router'
-import { useRole } from '../app/role'
+import { useSession } from '../app/session'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ShellContext } from './shell-context'
 import { Sidebar } from './Sidebar'
 
 export function AppShell() {
-  const { role } = useRole()
+  const { role } = useSession()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
   const shell = useMemo(() => ({ openDrawer: () => setDrawerOpen(true) }), [])

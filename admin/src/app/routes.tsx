@@ -23,7 +23,7 @@ import StockPage from '../pages/StockPage'
 import TablesPage from '../pages/TablesPage'
 import WhatsAppSetupPage from '../pages/WhatsAppSetupPage'
 import { HOME_PATH, navItemsFor, ROUTES } from './nav'
-import { useRole } from './role'
+import { useSession } from './session'
 
 const PAGES: Record<keyof typeof ROUTES, ComponentType> = {
   dashboard: DashboardPage,
@@ -58,7 +58,7 @@ const PAGE_BY_PATH = new Map<string, ComponentType>(
  * role's home. This is UX only — real authorization is enforced by the API (T-006/T-013).
  */
 export function AppRoutes() {
-  const { role } = useRole()
+  const { role } = useSession()
   const home = HOME_PATH[role]
   return (
     <Routes>

@@ -1,6 +1,104 @@
 {
   "components": {
     "schemas": {
+      "Created": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Created",
+        "type": "object"
+      },
+      "Drawer": {
+        "properties": {
+          "has_open_shift": {
+            "title": "Has Open Shift",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "has_open_shift"
+        ],
+        "title": "Drawer",
+        "type": "object"
+      },
+      "DrawerName": {
+        "properties": {
+          "name": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DrawerName",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InviteRequest": {
+        "properties": {
+          "display_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 254,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Email",
+            "type": "string"
+          },
+          "outlet_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Outlet Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "display_name",
+          "email",
+          "outlet_ids"
+        ],
+        "title": "InviteRequest",
+        "type": "object"
+      },
       "MeOutlet": {
         "properties": {
           "id": {
@@ -150,6 +248,615 @@
         ],
         "title": "MeUser",
         "type": "object"
+      },
+      "OnboardingBusiness": {
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "cafe",
+              "restaurant"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "OnboardingBusiness",
+        "type": "object"
+      },
+      "OnboardingOutlet": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "timezone": {
+            "default": "Asia/Jakarta",
+            "enum": [
+              "Asia/Jakarta",
+              "Asia/Makassar",
+              "Asia/Jayapura"
+            ],
+            "title": "Timezone",
+            "type": "string"
+          },
+          "whatsapp_phone": {
+            "anyOf": [
+              {
+                "pattern": "^\\+?[0-9]{8,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Phone"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OnboardingOutlet",
+        "type": "object"
+      },
+      "OnboardingRequest": {
+        "properties": {
+          "business": {
+            "$ref": "#/components/schemas/OnboardingBusiness"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/OnboardingOutlet"
+          }
+        },
+        "required": [
+          "business",
+          "outlet"
+        ],
+        "title": "OnboardingRequest",
+        "type": "object"
+      },
+      "OnboardingResponse": {
+        "properties": {
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "outlet_id"
+        ],
+        "title": "OnboardingResponse",
+        "type": "object"
+      },
+      "OpeningHoursItem": {
+        "properties": {
+          "closes_at": {
+            "description": "Not after opens_at means the outlet closes after midnight",
+            "format": "time",
+            "title": "Closes At",
+            "type": "string"
+          },
+          "opens_at": {
+            "format": "time",
+            "title": "Opens At",
+            "type": "string"
+          },
+          "weekday": {
+            "description": "ISO weekday, 1 = Monday",
+            "maximum": 7.0,
+            "minimum": 1.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday",
+          "opens_at",
+          "closes_at"
+        ],
+        "title": "OpeningHoursItem",
+        "type": "object"
+      },
+      "OutletCreate": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "timezone": {
+            "default": "Asia/Jakarta",
+            "enum": [
+              "Asia/Jakarta",
+              "Asia/Makassar",
+              "Asia/Jayapura"
+            ],
+            "title": "Timezone",
+            "type": "string"
+          },
+          "whatsapp_phone": {
+            "anyOf": [
+              {
+                "pattern": "^\\+?[0-9]{8,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Phone"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OutletCreate",
+        "type": "object"
+      },
+      "OutletDetail": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "attendance_grace_minutes": {
+            "title": "Attendance Grace Minutes",
+            "type": "integer"
+          },
+          "catalog_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Synced At"
+          },
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "opening_hours": {
+            "items": {
+              "$ref": "#/components/schemas/OpeningHoursItem"
+            },
+            "title": "Opening Hours",
+            "type": "array"
+          },
+          "order_prefix": {
+            "title": "Order Prefix",
+            "type": "string"
+          },
+          "payment_mode": {
+            "enum": [
+              "pay_first",
+              "open_bill"
+            ],
+            "title": "Payment Mode",
+            "type": "string"
+          },
+          "pb1_enabled": {
+            "title": "Pb1 Enabled",
+            "type": "boolean"
+          },
+          "pb1_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Rate Bps"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "unpaid_timeout_minutes": {
+            "title": "Unpaid Timeout Minutes",
+            "type": "integer"
+          },
+          "whatsapp_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Phone"
+          },
+          "whatsapp_status": {
+            "enum": [
+              "not_started",
+              "pending_verification",
+              "connected",
+              "error"
+            ],
+            "title": "Whatsapp Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "timezone",
+          "whatsapp_phone",
+          "whatsapp_status",
+          "catalog_synced_at",
+          "order_prefix",
+          "payment_mode",
+          "pb1_enabled",
+          "pb1_rate_bps",
+          "delivery_fee",
+          "unpaid_timeout_minutes",
+          "attendance_grace_minutes",
+          "is_active",
+          "opening_hours"
+        ],
+        "title": "OutletDetail",
+        "type": "object"
+      },
+      "OutletIds": {
+        "properties": {
+          "outlet_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Outlet Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outlet_ids"
+        ],
+        "title": "OutletIds",
+        "type": "object"
+      },
+      "OutletPatch": {
+        "description": "O3 \"Simpan perubahan\": only the fields sent are changed.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "attendance_grace_minutes": {
+            "anyOf": [
+              {
+                "maximum": 720.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Grace Minutes"
+          },
+          "delivery_fee": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Fee"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "payment_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pay_first",
+                  "open_bill"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Mode"
+          },
+          "pb1_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Enabled"
+          },
+          "pb1_rate_bps": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Rate Bps"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Asia/Jakarta",
+                  "Asia/Makassar",
+                  "Asia/Jayapura"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "unpaid_timeout_minutes": {
+            "anyOf": [
+              {
+                "maximum": 1440.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unpaid Timeout Minutes"
+          },
+          "whatsapp_phone": {
+            "anyOf": [
+              {
+                "pattern": "^\\+?[0-9]{8,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Phone"
+          }
+        },
+        "title": "OutletPatch",
+        "type": "object"
+      },
+      "OutletSummary": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "order_prefix": {
+            "title": "Order Prefix",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "timezone",
+          "order_prefix",
+          "is_active"
+        ],
+        "title": "OutletSummary",
+        "type": "object"
+      },
+      "StaffMember": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "outlets": {
+            "items": {
+              "$ref": "#/components/schemas/StaffOutlet"
+            },
+            "title": "Outlets",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive",
+              "invited"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "email",
+          "outlets",
+          "status"
+        ],
+        "title": "StaffMember",
+        "type": "object"
+      },
+      "StaffOutlet": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "StaffOutlet",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
       }
     }
   },
@@ -177,6 +884,635 @@
         "summary": "Me",
         "tags": [
           "session"
+        ]
+      }
+    },
+    "/api/v1/owner/drawers/{drawer_id}": {
+      "delete": {
+        "operationId": "delete_drawer_api_v1_owner_drawers__drawer_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "drawer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Drawer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Drawer",
+        "tags": [
+          "owner: outlets"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_drawer_api_v1_owner_drawers__drawer_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "drawer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Drawer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrawerName"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Drawer",
+        "tags": [
+          "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/onboarding": {
+      "post": {
+        "operationId": "create_business_api_v1_owner_onboarding_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Business",
+        "tags": [
+          "owner: onboarding"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets": {
+      "get": {
+        "operationId": "list_outlets_api_v1_owner_outlets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OutletSummary"
+                  },
+                  "title": "Response List Outlets Api V1 Owner Outlets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Outlets",
+        "tags": [
+          "owner: outlets"
+        ]
+      },
+      "post": {
+        "operationId": "create_outlet_api_v1_owner_outlets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutletCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutletDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Outlet",
+        "tags": [
+          "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}": {
+      "get": {
+        "operationId": "get_outlet_api_v1_owner_outlets__outlet_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutletDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Outlet",
+        "tags": [
+          "owner: outlets"
+        ]
+      },
+      "patch": {
+        "operationId": "update_outlet_api_v1_owner_outlets__outlet_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutletPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutletDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Outlet",
+        "tags": [
+          "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/drawers": {
+      "get": {
+        "operationId": "list_drawers_api_v1_owner_outlets__outlet_id__drawers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Drawer"
+                  },
+                  "title": "Response List Drawers Api V1 Owner Outlets  Outlet Id  Drawers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Drawers",
+        "tags": [
+          "owner: outlets"
+        ]
+      },
+      "post": {
+        "operationId": "create_drawer_api_v1_owner_outlets__outlet_id__drawers_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrawerName"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Created"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Drawer",
+        "tags": [
+          "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/opening-hours": {
+      "put": {
+        "operationId": "set_opening_hours_api_v1_owner_outlets__outlet_id__opening_hours_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/OpeningHoursItem"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OpeningHoursItem"
+                  },
+                  "title": "Response Set Opening Hours Api V1 Owner Outlets  Outlet Id  Opening Hours Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Opening Hours",
+        "tags": [
+          "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/staff": {
+      "get": {
+        "operationId": "list_staff_api_v1_owner_staff_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StaffMember"
+                  },
+                  "title": "Response List Staff Api V1 Owner Staff Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Staff",
+        "tags": [
+          "owner: staff"
+        ]
+      }
+    },
+    "/api/v1/owner/staff/invitations": {
+      "post": {
+        "operationId": "invite_staff_api_v1_owner_staff_invitations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffMember"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invite Staff",
+        "tags": [
+          "owner: staff"
+        ]
+      }
+    },
+    "/api/v1/owner/staff/{user_id}/deactivate": {
+      "post": {
+        "operationId": "deactivate_staff_api_v1_owner_staff__user_id__deactivate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deactivate Staff",
+        "tags": [
+          "owner: staff"
+        ]
+      }
+    },
+    "/api/v1/owner/staff/{user_id}/invitations/resend": {
+      "post": {
+        "operationId": "resend_invitation_api_v1_owner_staff__user_id__invitations_resend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Invitation",
+        "tags": [
+          "owner: staff"
+        ]
+      }
+    },
+    "/api/v1/owner/staff/{user_id}/outlets": {
+      "put": {
+        "operationId": "set_staff_outlets_api_v1_owner_staff__user_id__outlets_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutletIds"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffMember"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Staff Outlets",
+        "tags": [
+          "owner: staff"
         ]
       }
     },

@@ -1,7 +1,7 @@
 // Page title bar. Desktop: white header band (O2/S1 layout). Mobile ≤ 767px: hamburger + title,
 // outlet line underneath (M1–M6). Filter chips/actions are added per screen later.
 import type { ReactNode } from 'react'
-import { DEV_IDENTITY } from '../app/dev-identity'
+import { useSession } from '../app/session'
 import { useShell } from './shell-context'
 
 interface PageHeaderProps {
@@ -11,6 +11,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, actions }: PageHeaderProps) {
   const { openDrawer } = useShell()
+  const { me, outlet } = useSession()
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-surface px-4 py-3 md:px-6 md:py-4">
       <div className="flex items-center gap-3">
@@ -28,7 +29,7 @@ export function PageHeader({ title, actions }: PageHeaderProps) {
         {actions}
       </div>
       <p className="mt-0.5 pl-10 text-[11px] text-text-muted md:hidden">
-        {DEV_IDENTITY.businessName} – {DEV_IDENTITY.outletName} ▾
+        {me.tenant?.name} – {outlet?.name ?? 'belum ada outlet'}
       </p>
     </header>
   )
