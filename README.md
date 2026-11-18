@@ -100,7 +100,7 @@ exits with a list of problems if the configuration is invalid. Default time zone
 
 ```bash
 cd admin
-pnpm dev        # http://localhost:5173  (or: make admin)
+pnpm dev        # http://localhost:5170  (or: make admin)
 pnpm build && pnpm preview   # production build on http://localhost:4173
 ```
 

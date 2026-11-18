@@ -28,7 +28,7 @@ api: ## Run the FastAPI service with auto-reload on :8000
 worker: ## Run the WhatsApp worker process (stub)
 	cd backend && uv run python -m app.worker.main
 
-admin: ## Run the admin web app dev server on :5173
+admin: ## Run the admin web app dev server on :5170
 	cd admin && pnpm dev
 
 LOCAL_DB_ADMIN_URL ?= postgresql://pos:$(LOCAL_POSTGRES_PASSWORD)@localhost:5432/pos

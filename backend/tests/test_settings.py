@@ -13,19 +13,19 @@ def test_local_defaults() -> None:
     assert settings.timezone.key == "Asia/Jakarta"
     assert settings.database_url is None
     assert settings.log_level == "INFO"
-    assert settings.cors_origins == ["http://localhost:5173"]
+    assert settings.cors_origins == ["http://localhost:5170"]
 
 
 def test_reads_environment_and_normalises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_ENV", "LOCAL")
     monkeypatch.setenv("LOG_LEVEL", "debug")
-    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173, https://admin.example.com ,")
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5170, https://admin.example.com ,")
     monkeypatch.setenv("DATABASE_URL", "postgresql://pos@localhost:5432/pos")
     monkeypatch.setenv("SUPABASE_URL", "")  # empty means unset
     settings = load_settings()
     assert settings.app_env == "local"
     assert settings.log_level == "DEBUG"
-    assert settings.cors_origins == ["http://localhost:5173", "https://admin.example.com"]
+    assert settings.cors_origins == ["http://localhost:5170", "https://admin.example.com"]
     assert str(settings.database_url).startswith("postgresql://")
     assert settings.supabase_url is None
 
@@ -77,7 +77,7 @@ def test_deployed_env_rejects_wildcard_cors(monkeypatch: pytest.MonkeyPatch) -> 
         ("DATABASE_URL", "mysql://x@localhost/db", "DATABASE_URL"),
         ("RABBITMQ_URL", "http://mq.example.com", "RABBITMQ_URL"),
         ("SUPABASE_URL", "not-a-url", "SUPABASE_URL"),
-        ("CORS_ORIGINS", "localhost:5173", "must start with http"),
+        ("CORS_ORIGINS", "localhost:5170", "must start with http"),
         ("PORT", "0", "PORT"),
     ],
 )

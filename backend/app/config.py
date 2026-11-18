@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     db_pool_max_size: int = Field(default=5, ge=1, le=100)
 
     default_timezone: str = "Asia/Jakarta"
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5170"]
 
     @field_validator(
         "database_url",
