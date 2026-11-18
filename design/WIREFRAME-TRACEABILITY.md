@@ -2,7 +2,7 @@
 
 This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME-POS-Wireframe.figcraft) to the user stories in [User-Stories-SME-Automation-Platform.md](../User-Stories-SME-Automation-Platform.md) and the tasks in [Task-Breakdown-SME-Automation-Platform.md](../Task-Breakdown-SME-Automation-Platform.md).
 
-- **Baseline:** PRD v0.13, US-001–US-056, T-001–T-124.
+- **Baseline:** PRD v0.14, US-001–US-061, T-001–T-131.
 - **Open the file:** FigCraft (`figcraft SME-POS-Wireframe.figcraft`). PNG previews of each page are in [`previews/`](previews/).
 - **Labels:** every screen on the canvas has a label above it in the form `Code · Name — US-xxx · T-xxx`, matching the tables below.
 - **Fidelity:** low-to-mid fidelity wireframes. The colours follow the agreed reference (light sidebar, navy primary `#1E4FA3`, light-blue background `#F3F6FB`). Copy is in Bahasa Indonesia, as in the product.
@@ -12,8 +12,8 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Page | Contents | Preview |
 |---|---|---|
 | 00 · Sitemap & Flow | Sitemap per role, user flows A–H, and a story-to-screen coverage table | [00-sitemap-flow.png](previews/00-sitemap-flow.png) |
-| 01 · Admin — Owner | O1–O14 | [01-admin-owner.png](previews/01-admin-owner.png) |
-| 02 · Admin — Staff Ops | S1–S9 | [02-admin-staff.png](previews/02-admin-staff.png) |
+| 01 · Admin — Owner | O1–O17 | [01-admin-owner.png](previews/01-admin-owner.png) |
+| 02 · Admin — Staff Ops | S1–S11 | [02-admin-staff.png](previews/02-admin-staff.png) |
 | 03 · WhatsApp Customer | W1–W12 (MVP), A1–A2 (Phase 2) | [03-whatsapp-customer.png](previews/03-whatsapp-customer.png) |
 | 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
 | 05 · Tablet Absensi Outlet | K0–K4 | [05-tablet-absensi.png](previews/05-tablet-absensi.png) |
@@ -39,6 +39,9 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O12 WhatsApp Setup & Template | US-002, US-008, US-015, US-036 | T-045, T-051, T-084, T-100 |
 | O13 Dead-letter & Antrean Pesan | US-036, US-037, US-050 | T-081, T-112 |
 | O14 Kehadiran Staf, Selfie & Koreksi | US-053, US-054 | T-118, T-119, T-122 |
+| O15 Pengeluaran — tab Purchase Order (KPI hutang/jatuh tempo/dibayar belum diterima, daftar PO dengan filter status, detail PO dengan alur, riwayat, sisa hutang) | US-031, US-057, US-058, US-059, US-060, US-061 | T-125, T-126, T-127, T-128, T-130 |
+| O16 Buka PO (owner & staf; skema bayar mundur / bayar di muka, item bahan atau teks bebas) | US-057 | T-126, T-130 |
+| O17 Dashboard owner — Ringkasan PO & Pembayaran supplier (+ dialog Catat pembayaran); kartu tambahan untuk O2 | US-058, US-059, US-061 | T-128, T-130 |
 
 ### Staff (web admin)
 
@@ -53,6 +56,8 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | S7 Stok & Pergerakan | US-006, US-007 | T-020, T-022, T-069 |
 | S8 Shift Kasir & Blind Count | US-018, US-030 | T-039, T-040, T-070 |
 | S9 Absensi Saya (own history and selfies; no clock-in here) | US-053 | T-116, T-117, T-122 |
+| S10 Purchase Order outlet (staf: daftar PO outlet, buka PO, status bayar hanya baca) | US-057, US-060 | T-126, T-130 |
+| S11 Cross-check barang datang vs PO (qty PO / diterima / datang sekarang / sisa, ada selisih, Tutup PO) | US-060 | T-127, T-130 |
 
 ### Customer (WhatsApp)
 
@@ -132,7 +137,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-028 | O7, W9 |
 | US-029 | W9, O7 |
 | US-030 | O9, S8 |
-| US-031 | O9 |
+| US-031 | O9, O15 |
 | US-032 | O2, O9 |
 | US-033 | O2, O4, sidebars |
 | US-034 | S1, M2 |
@@ -151,6 +156,11 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-054 | O14 |
 | US-055 | K0, K1, K4, O3 |
 | US-056 | O2 |
+| US-057 | O16, O15, S10 |
+| US-058 | O15, O17 |
+| US-059 | O15, O17, S10 |
+| US-060 | S11, S10, O15 |
+| US-061 | O15, O17 |
 | US-042 (Phase 2) | A1 |
 | US-043 (Phase 2) | A2 |
 | US-044, US-045 (Phase 2) | Not drawn yet |
