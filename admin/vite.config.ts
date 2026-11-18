@@ -6,7 +6,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: { port: 5170, strictPort: true },
-  preview: { port: 4173, strictPort: true },
+  preview: { port: 4170, strictPort: true },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
