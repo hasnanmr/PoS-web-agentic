@@ -153,7 +153,8 @@ jobs:
       - name: Pending migrations
         run: supabase db push --remote="$SUPABASE_DB_URL" --skip-vault --dry-run
       - name: Apply
-        run: supabase db push --remote="$SUPABASE_DB_URL" --skip-vault
+        # --yes: CI has no terminal for the CLI's confirmation prompt (v3).
+        run: supabase db push --remote="$SUPABASE_DB_URL" --skip-vault --yes
 
   deploy-backend:
     name: Deploy backend to Railway
