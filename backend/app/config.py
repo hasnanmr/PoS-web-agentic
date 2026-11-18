@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     # Service role key: used ONLY for the Supabase Auth admin API (owner invitations by the
     # platform admin CLI, banning deactivated staff). Never used for tenant data.
     supabase_service_role_key: SecretStr | None = None
+    # Admin app URL: where invitation emails send people to set their password.
+    admin_app_url: AnyHttpUrl | None = None
 
     # Connection pool (transaction pooler, port 6543 on Supabase; Appendix A.1/B.4).
     db_pool_min_size: int = Field(default=1, ge=0, le=50)
@@ -79,6 +81,7 @@ class Settings(BaseSettings):
         "supabase_jwt_issuer",
         "rabbitmq_url",
         "supabase_service_role_key",
+        "admin_app_url",
         mode="before",
     )
     @classmethod
