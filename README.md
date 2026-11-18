@@ -16,7 +16,8 @@ admin/              Admin web app (React + TypeScript + Vite + Tailwind, pnpm)
   src/app/nav.ts    role-aware navigation (wireframe Sidebar/Owner, Sidebar/Staff)
   src/layout/       app shell: sidebar, page header, mobile bottom nav
   src/pages/        placeholder pages, one per wireframe screen
-supabase/migrations/ plain SQL schema migrations (no Alembic)
+backend/migrations/ schema migrations: Alembic revisions, each running one plain-SQL file
+supabase/           Supabase config, seed.sql, SQL tests (schema, RLS)
 design/             wireframes (source of truth for every frontend screen)
 docs/               project documentation
 docker-compose.yml  local Postgres 16 + RabbitMQ 3 (management UI)
@@ -129,10 +130,14 @@ Two Railway services in one project, both deployed by GitHub Actions (`.github/w
 | `backend` | `backend/` | `backend/Dockerfile`, `backend/railway.toml` |
 | `admin` | `admin/` | `admin/Dockerfile`, `admin/railway.toml` |
 
-On every push to `main`, CI runs first; if it is green, only the service whose files changed
-is redeployed (`backend/**` or `supabase/**` -> backend, `admin/**` -> admin). When the
-backend changes, pending `supabase/migrations/` are applied to the hosted Supabase project
-first (job "Apply Supabase migrations"); the backend is deployed only if that succeeds.
+On every push to `main` (each merged PR), CI runs first. If it is green:
+
+1. **Migrate database (Alembic)**: `python -m app.tools.migrate` applies pending revisions
+   from `backend/migrations` to the hosted Supabase database. It prints the current revision
+   and the head, and does nothing when the database is already at head.
+2. **Deploy backend** and **Deploy admin**: both services are always redeployed, after the
+   migration succeeds.
+
 Pull requests and other branches run CI only.
 
 One-time setup:
@@ -150,5 +155,20 @@ One-time setup:
 
 Migrations must stay additive (new tables/columns, no drops or renames in the same release),
 because they are applied before the new backend replaces the old one.
+
+### Migrations (Alembic)
+
+Since 2026-11-18 (product owner decision) migrations run with Alembic instead of the Supabase
+CLI. Each revision in `backend/migrations/versions/` runs one plain-SQL file from
+`backend/migrations/sql/`, so the schema stays reviewable SQL. Revision ids are the 14-digit
+file timestamps; the chain is forward-only.
+
+- New migration: `make db-new name=add_something`, then write the SQL file.
+- Local DB: `make db-migrate` (or `make db-reset` to rebuild).
+- Any DB: `MIGRATION_DATABASE_URL=<owner URL> uv run python -m app.tools.migrate [--dry-run | --check]`.
+- The hosted database was migrated with the Supabase CLI up to `20261118000310`. On the first
+  Alembic run, `app.tools.migrate` stamps the newest version found in
+  `supabase_migrations.schema_migrations`, then applies only later revisions.
+- Alembic keeps its version in schema `alembic` (not exposed by the Data API).
 The WhatsApp worker will be a separate Railway service using the backend image with start
 command `python -m app.worker.main`.

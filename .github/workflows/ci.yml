@@ -1,11 +1,12 @@
 # CI (T-009): migrations, SQL tests (schema, RLS, token hook), backend tests and lint,
 # API contract check, and the admin app build. Runs on every push and pull request.
 #
-# CD: on a push to main, once CI is green, pending Supabase migrations are applied to the
-# hosted database first, then the changed service is deployed to Railway (backend/ ->
-# "backend" service, admin/ -> "admin" service). Needs the repository secrets RAILWAY_TOKEN
-# (project token of the Railway environment) and SUPABASE_DB_URL (session pooler connection
-# string of the hosted project, with the database password); see README "Deployment".
+# CD: on every push to main (each merged PR), once CI is green, pending Alembic migrations
+# (backend/migrations) are applied to the hosted database, then BOTH services are redeployed
+# to Railway (backend/ -> "backend", admin/ -> "admin"). Needs the repository secrets
+# RAILWAY_TOKEN (project token of the Railway environment) and SUPABASE_DB_URL (session
+# pooler connection string of the hosted project, owner role `postgres`, with the database
+# password); see README "Deployment".
 name: CI
 
 on:
@@ -45,6 +46,14 @@ jobs:
         with:
           fetch-depth: 0 # check-migrations compares against origin/main
 
+      - uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: backend
+
+      - name: Backend dependencies
+        working-directory: backend
+        run: uv sync --locked
+
       - name: Migration hygiene
         run: scripts/check-migrations.sh
         env:
@@ -53,21 +62,19 @@ jobs:
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
 
-      - name: Migrations, seed, schema and RLS tests
+      - name: Migrations (Alembic), seed, schema and RLS tests
         run: |
           scripts/db-test.sh | tee db-test.log
           if grep -q "FAIL" db-test.log; then exit 1; fi
 
+      - name: Migrations are a no-op at head
+        working-directory: backend
+        env:
+          MIGRATION_DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: uv run python -m app.tools.migrate --check
+
       - name: Seed is idempotent
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
-
-      - uses: astral-sh/setup-uv@v6
-        with:
-          working-directory: backend
-
-      - name: Backend dependencies
-        working-directory: backend
-        run: uv sync --locked
 
       - name: Lint
         working-directory: backend
@@ -108,57 +115,39 @@ jobs:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
 
-  changes:
-    name: Detect changed services
+  # CD on every push to main (a merged PR), once CI is green: migrate, then redeploy every
+  # service. Deploys wait for the migration, so new code never runs against an old schema.
+  migrate:
+    name: Migrate database (Alembic)
+    needs: [backend, admin]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      admin: ${{ steps.filter.outputs.admin }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-              - 'supabase/**'
-            admin:
-              - 'admin/**'
-
-  migrate:
-    name: Apply Supabase migrations
-    needs: [backend, admin, changes]
-    if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
     concurrency:
-      group: migrate-supabase
+      group: migrate-database
       cancel-in-progress: false
     env:
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      MIGRATION_DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: astral-sh/setup-uv@v6
         with:
-          version: 3.2.0
+          working-directory: backend
+      - name: Backend dependencies
+        working-directory: backend
+        run: uv sync --locked
       - name: Check the secret
         run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
+          if [ -z "$MIGRATION_DATABASE_URL" ]; then
             echo "::error::Repository secret SUPABASE_DB_URL is not set (see README 'Deployment')"; exit 1
           fi
-      # Migrations are additive and run before the new backend is deployed, so the running
-      # code never reads a table or column that does not exist yet. Already-applied
-      # migrations are skipped (supabase_migrations.schema_migrations).
-      - name: Pending migrations
-        run: supabase db push --remote="$SUPABASE_DB_URL" --skip-vault --dry-run
-      - name: Apply
-        run: supabase db push --remote="$SUPABASE_DB_URL" --skip-vault
+      # Prints current and head; applies only pending revisions (a no-op at head).
+      - name: Upgrade to head
+        working-directory: backend
+        run: uv run python -m app.tools.migrate
 
   deploy-backend:
     name: Deploy backend to Railway
-    needs: [backend, admin, changes, migrate]
-    if: needs.changes.outputs.backend == 'true'
+    needs: [migrate]
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-backend
@@ -174,8 +163,7 @@ jobs:
 
   deploy-admin:
     name: Deploy admin to Railway
-    needs: [backend, admin, changes]
-    if: needs.changes.outputs.admin == 'true'
+    needs: [migrate]
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-admin

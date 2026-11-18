@@ -1,10 +1,10 @@
 # Database (Supabase Postgres)
 
-Plain SQL migrations in Supabase CLI format. They target Supabase Postgres but also run on plain PostgreSQL 16+ so CI can test them without the Supabase stack.
+Supabase config, seed data, and the SQL test suites. **Schema migrations moved to Alembic** in `backend/migrations/` (2026-11-18): each revision runs one plain-SQL file from `backend/migrations/sql/`. They target Supabase Postgres but also run on plain PostgreSQL 16+ so CI can test them without the Supabase stack.
 
 | Path | Purpose |
 |---|---|
-| `migrations/` | Schema, in order. Never edit a migration that has run on a shared environment; add a new one. |
+| `../backend/migrations/` | Schema (Alembic + SQL), in order. Never edit a migration that has run on a shared environment; add a new one (`make db-new name=…`). |
 | `tests/rls.sql` | RLS isolation, privileges, token hook (T-005, T-113). |
 | `tests/schema_smoke.sql` | Constraint tests (append-only, no double booking, one open shift/bill/attendance record, cross-tenant FKs, PB1 setting). Runs in a transaction and rolls back. |
 | `seed.sql` | Dummy data only (NFR1). |
@@ -20,9 +20,10 @@ DATABASE_URL=postgresql://postgres@localhost:5432/sme_test scripts/db-test.sh
 ## Run with the Supabase CLI (once installed)
 
 ```bash
-supabase start          # local stack, applies migrations + seed.sql
-supabase db reset       # re-apply from scratch
-supabase link --project-ref <ref> && supabase db push   # hosted project (after T-079)
+supabase start          # local stack (no migrations here any more)
+cd backend && MIGRATION_DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres \
+  uv run python -m app.tools.migrate     # schema via Alembic
+# Hosted project: migrations run from CI on every merge to main (job "Migrate database").
 ```
 
 ## Conventions

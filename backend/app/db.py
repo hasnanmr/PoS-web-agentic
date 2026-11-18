@@ -7,8 +7,8 @@
   settings from the `ActorContext` (`set_config(..., true)`), so RLS sees the
   caller's tenant, user, and actor, and nothing leaks to the next request on a
   pooled connection (Appendix B.4).
-- Schema migrations live in `supabase/migrations/` and run with a direct/session
-  connection, not through this module.
+- Schema migrations live in `backend/migrations/` (Alembic) and run with an owner role
+  over a session connection (`python -m app.tools.migrate`), not through this module.
 """
 
 from __future__ import annotations
