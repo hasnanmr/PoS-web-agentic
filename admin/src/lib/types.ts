@@ -314,6 +314,8 @@ export interface ShiftRow {
   drawer_number: number
   opened_at: string
   starting_cash: number
+  /** Who opened the shift: the counter prefers the cashier's own shift when several are open. */
+  opened_by: string | null
   opened_by_name: string | null
 }
 

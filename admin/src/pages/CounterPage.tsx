@@ -38,7 +38,7 @@ function addonText(line: CartLine): string {
 }
 
 export default function CounterPage() {
-  const { api, outlet } = useSession()
+  const { api, me, outlet } = useSession()
   const outletId = outlet?.id ?? ''
   const menu = useLoad(() => api.get<MenuItem[]>(`/ops/outlets/${outletId}/menu`), outletId)
   const tables = useLoad(() => api.get<TableRow[]>(`/ops/outlets/${outletId}/tables`), outletId)
@@ -59,11 +59,18 @@ export default function CounterPage() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
   const [idemKey, setIdemKey] = useState(newKey)
+  const [drawerId, setDrawerId] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
   const openBillOutlet = outlet?.payment_mode === 'open_bill'
   const toBill = type === 'dine_in' && openBillOutlet
-  const shift = shifts.data?.[0]
+  // With several shifts open and none of them the cashier's own, the cash has to name a
+  // drawer: the server rejects an ambiguous cash payment instead of guessing.
+  const openShifts = shifts.data ?? []
+  const myShift = openShifts.find((s) => s.opened_by === me.user.id)
+  const shift = openShifts.find((s) => s.drawer_id === drawerId) ?? myShift ??
+    (openShifts.length === 1 ? openShifts[0] : undefined)
+  const drawerAmbiguous = !shift && openShifts.length > 1
   const effectiveMethod: Method | undefined = toBill ? 'open_bill' : method === 'open_bill' ? undefined : method
 
   const items = useMemo(() => cart.map((l) => ({
@@ -86,7 +93,9 @@ export default function CounterPage() {
 
   const total = items.length ? quote?.total ?? 0 : 0
   const cashReceived = Number(received.replace(/\D/g, '') || 0)
-  const change = effectiveMethod === 'cash' && cashReceived >= total ? cashReceived - total : null
+  const change = quote && effectiveMethod === 'cash' && cashReceived >= total
+    ? cashReceived - total
+    : null
   const canSubmit = !busy && cart.length > 0 && Boolean(quote) && Boolean(effectiveMethod) &&
     (!toBill || Boolean(tableId)) && (effectiveMethod !== 'cash' || (Boolean(shift) && cashReceived >= total))
 
@@ -96,7 +105,9 @@ export default function CounterPage() {
     setNotice(undefined)
     try {
       const payment = effectiveMethod === 'open_bill' ? { to_open_bill: true }
-        : effectiveMethod === 'cash' ? { method: 'cash', cash_received: cashReceived } : { method: 'qris' }
+        : effectiveMethod === 'cash'
+          ? { method: 'cash', cash_received: cashReceived, drawer_id: shift?.drawer_id }
+          : { method: 'qris' }
       const created = await api.post<OrderCreated>(`/ops/outlets/${outlet.id}/orders`, {
         type, table_id: type === 'dine_in' && tableId ? tableId : null, items, payment,
       }, { 'Idempotency-Key': idemKey })
@@ -113,7 +124,7 @@ export default function CounterPage() {
     } finally {
       setBusy(false)
     }
-  }, [canSubmit, outlet, effectiveMethod, cashReceived, api, type, tableId, items, idemKey, menu, tables])
+  }, [canSubmit, outlet, effectiveMethod, cashReceived, api, type, tableId, items, idemKey, menu, tables, shift])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -147,6 +158,8 @@ export default function CounterPage() {
         title="Kasir"
         actions={shift ? (
           <span className="text-[12px] text-success">● Shift aktif · Drawer {shift.drawer_number} · {formatTime(shift.opened_at, outlet.timezone)}</span>
+        ) : drawerAmbiguous ? (
+          <span className="text-[12px] text-warning">{openShifts.length} shift terbuka · pilih drawer untuk cash</span>
         ) : (
           <Link to={ROUTES.shifts.path} className="text-[12px] text-warning hover:underline">○ Belum ada shift · Buka shift</Link>
         )}
@@ -246,10 +259,23 @@ export default function CounterPage() {
               <PayButton active={effectiveMethod === 'open_bill'} disabled={!toBill} onClick={() => setMethod('open_bill')}>
                 Ke open bill<br /><span className="text-[10px] text-text-muted">(bayar nanti)</span>
               </PayButton>
-              <PayButton active={effectiveMethod === 'cash'} disabled={toBill || !shift} onClick={() => setMethod('cash')}>▤ Cash</PayButton>
+              <PayButton active={effectiveMethod === 'cash'} disabled={toBill || openShifts.length === 0} onClick={() => setMethod('cash')}>▤ Cash</PayButton>
               <PayButton active={effectiveMethod === 'qris'} disabled={toBill} onClick={() => setMethod('qris')}>▦ QRIS</PayButton>
             </div>
-            {!shift && !toBill && (
+            {drawerAmbiguous && effectiveMethod === 'cash' && (
+              <label className="mt-2 block text-[12px]">
+                <span className="mb-1 block font-semibold">Drawer penerima cash</span>
+                <Select aria-label="Drawer" value={drawerId} onChange={(e) => setDrawerId(e.target.value)}>
+                  <option value="">Pilih drawer</option>
+                  {openShifts.map((s) => (
+                    <option key={s.id} value={s.drawer_id}>
+                      Drawer {s.drawer_number} · {s.drawer_name}{s.opened_by_name ? ` (${s.opened_by_name})` : ''}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            )}
+            {!shift && !drawerAmbiguous && !toBill && (
               <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka. <Link to={ROUTES.shifts.path} className="text-primary hover:underline">Buka shift</Link></p>
             )}
           </div>

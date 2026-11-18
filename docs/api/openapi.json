@@ -3141,6 +3141,18 @@
             "title": "Opened At",
             "type": "string"
           },
+          "opened_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened By"
+          },
           "opened_by_name": {
             "anyOf": [
               {
@@ -3164,6 +3176,7 @@
           "drawer_number",
           "opened_at",
           "starting_cash",
+          "opened_by",
           "opened_by_name"
         ],
         "title": "ShiftRow",

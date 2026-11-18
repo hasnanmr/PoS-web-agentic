@@ -94,6 +94,8 @@ class ShiftRow(BaseModel):
     drawer_number: int
     opened_at: datetime
     starting_cash: int
+    # Who opened it: the counter picks the cashier's own shift when several are open.
+    opened_by: UUID | None
     opened_by_name: str | None
 
 
@@ -197,7 +199,7 @@ async def current_shifts(outlet_id: UUID, request: Request, user: TenantUser) ->
     async with db.transaction(_pool(request), user.actor()) as conn:
         await outlets.require_outlet(conn, outlet_id)
         rows = await shifts.open_shifts(conn, outlet_id)
-    return [ShiftRow(**{k: v for k, v in r.items() if k != "opened_by"}) for r in rows]
+    return [ShiftRow(**r) for r in rows]
 
 
 @router.get("/outlets/{outlet_id}/drawers")

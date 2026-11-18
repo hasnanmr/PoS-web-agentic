@@ -155,11 +155,11 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Header "Shift aktif · Drawer 1 · 08:00" | `GET /ops/outlets/{id}/shifts/current` ✅ | Open shifts per drawer (also used to enable/disable Cash). |
+| Header "Shift aktif · Drawer 1 · 08:00" | `GET /ops/outlets/{id}/shifts/current` ✅ | Open shifts per drawer (also used to enable/disable Cash). Each row carries `opened_by`, so the counter prefills the cashier's own shift and only shows a drawer picker when several are open and none is theirs. |
 | Product grid, search, category tabs, Owner's picks | `GET /ops/outlets/{id}/menu?q=&category=&owner_picks=` ✅ | `[{product_id, name, price, photo_url, sold_out, sold_out_reason ("Bahan tidak cukup"), addon_groups:[{…, options:[{id, name, price, available}]}]}]`. |
 | Table dropdown (Dine-in) | `GET /ops/outlets/{id}/tables` ✅ (always includes `open_bill`; no query parameters) | `[{id, name, area, open_bill:{id, total}?}]`. |
 | Live totals | `POST /ops/outlets/{id}/quotes` ✅ | Items + add-ons + order type → `subtotal, pb1_rate_bps, pb1_amount, total` (server is the only source of PB1). |
-| Buat order & terima bayar (F9) | `POST /ops/outlets/{id}/orders` (`Idempotency-Key`) ✅ | `type: dine_in\|takeaway, table_id?, items[{product_id, quantity, addon_option_ids[]}], payment: {method: cash, cash_received} \| {method: qris} \| {to_open_bill: true}`. Errors: `item_sold_out` (names the item), `shift_not_open`, `cash_insufficient`, `addon_required`, `addon_invalid`. Response includes `change_due`. Dine-in at an open-bill outlet must use `{to_open_bill: true}` with a `table_id`; the order joins the table's open bill (opened if needed). |
+| Buat order & terima bayar (F9) | `POST /ops/outlets/{id}/orders` (`Idempotency-Key`) ✅ | `type: dine_in\|takeaway, table_id?, items[{product_id, quantity, addon_option_ids[]}], payment: {method: cash, cash_received, drawer_id?} \| {method: qris} \| {to_open_bill: true}`. Errors: `item_sold_out` (names the item), `shift_not_open`, `cash_insufficient`, `addon_required`, `addon_invalid`, `idempotency_key_reused` (same key, different body or user). `drawer_id` is required (422, `details.field = "drawer_id"`) when several shifts are open and none is the cashier's own. Response includes `change_due`; a replayed key returns 200 with `Idempotent-Replay`. Dine-in at an open-bill outlet must use `{to_open_bill: true}` with a `table_id`; the order joins the table's open bill (opened if needed). |
 
 ### S2 / M1 · Order Board (T-030, T-068)
 

@@ -134,19 +134,25 @@ function OpenBillForm({ onOpened, onCancel }: { onOpened: (id: string) => Promis
 }
 
 function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: string) => Promise<void> }) {
-  const { api, outlet } = useSession()
+  const { api, me, outlet } = useSession()
   const bill = useLoad(() => api.get<BillDetail>(`/ops/bills/${billId}`), billId)
   const shifts = useLoad(() => api.get<ShiftRow[]>(`/ops/outlets/${outlet!.id}/shifts/current`), outlet!.id)
   usePolling(bill) // orders added from the counter show up, and the total to pay stays current
   const [method, setMethod] = useState<'cash' | 'qris'>('cash')
   const [received, setReceived] = useState('')
+  const [drawerId, setDrawerId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const [key] = useState(() => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `bill-${Date.now()}`))
   const b = bill.data
   if (!b || !outlet) return <Loading />
   const cash = Number(received || 0)
-  const shift = shifts.data?.[0]
+  // The server needs a drawer when several shifts are open and none is the cashier's own.
+  const openShifts = shifts.data ?? []
+  const myShift = openShifts.find((s) => s.opened_by === me.user.id)
+  const shift = openShifts.find((s) => s.drawer_id === drawerId) ?? myShift ??
+    (openShifts.length === 1 ? openShifts[0] : undefined)
+  const drawerAmbiguous = !shift && openShifts.length > 1
   const canPay = b.orders.length > 0 && (method === 'qris' || (Boolean(shift) && cash >= b.total))
 
   return (
@@ -185,7 +191,7 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
       <div className="grid grid-cols-2 gap-2 text-[12px]">
         {(['cash', 'qris'] as const).map((m) => (
           <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)}
-            disabled={m === 'cash' && !shift}
+            disabled={m === 'cash' && openShifts.length === 0}
             className={`h-9 rounded-md border ${method === m ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-border'} disabled:opacity-50`}>
             {m === 'cash' ? 'Cash' : 'QRIS'}
           </button>
@@ -200,7 +206,20 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
           {cash >= b.total && <span className="text-success">→ Kembalian {formatRupiah(cash - b.total)}</span>}
         </label>
       )}
-      {method === 'cash' && !shift && <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka.</p>}
+      {method === 'cash' && drawerAmbiguous && (
+        <label className="mt-2 block text-[12px]">
+          <span className="mb-1 block font-semibold">Drawer penerima cash</span>
+          <Select aria-label="Drawer" value={drawerId} onChange={(e) => setDrawerId(e.target.value)}>
+            <option value="">Pilih drawer</option>
+            {openShifts.map((s) => (
+              <option key={s.id} value={s.drawer_id}>
+                Drawer {s.drawer_number} · {s.drawer_name}{s.opened_by_name ? ` (${s.opened_by_name})` : ''}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {method === 'cash' && !shift && !drawerAmbiguous && <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka.</p>}
       <p className="mt-2 text-[11px] text-text-muted">Split bill tidak didukung di MVP.</p>
       {error && <div className="mt-2"><Alert>{error}</Alert></div>}
       <Button variant="action" className="mt-3 w-full" disabled={!canPay || busy} onClick={async () => {
@@ -209,7 +228,7 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
         try {
           const res = await api.post<{ total: number; change_due: number | null; orders_completed: number }>(
             `/ops/bills/${b.id}/close`,
-            method === 'cash' ? { method, cash_received: cash } : { method },
+            method === 'cash' ? { method, cash_received: cash, drawer_id: shift?.drawer_id } : { method },
             { 'Idempotency-Key': key })
           await onClosed(`Bill ditutup · ${formatRupiah(res.total)} · ${res.orders_completed} order completed${res.change_due != null ? ` · kembalian ${formatRupiah(res.change_due)}` : ''}`)
         } catch (e) {

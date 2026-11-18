@@ -95,8 +95,11 @@ const ERROR_COPY: Record<string, string> = {
   cash_insufficient: 'Uang diterima kurang dari total.',
   invalid_transition: 'Status order sudah berubah. Muat ulang.',
   reason_required: 'Alasan wajib diisi — reversal tanpa alasan ditolak.',
-  bill_not_open: 'Bill sudah ditutup.',
+  bill_not_open: 'Bill sudah ditutup atau dibatalkan.',
   bill_empty: 'Bill belum punya order.',
+  bill_not_empty: 'Bill masih punya order; cancel order-nya dulu sebelum membatalkan bill.',
+  bills_open: 'Tutup atau batalkan semua open bill dulu sebelum mengubah PB1.',
+  idempotency_key_reused: 'Permintaan ini sudah dikirim dengan isi berbeda. Muat ulang lalu coba lagi.',
   payment_mode_pay_first: 'Outlet ini memakai mode pay first.',
   addon_group_in_use: 'Opsi grup ini sudah dipakai di order; ubah opsinya saja.',
 }
@@ -105,6 +108,9 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'validation_failed' && error.details.field === 'pb1_rate_bps') {
       return 'Isi tarif PB1 saat PB1 aktif.'
+    }
+    if (error.code === 'validation_failed' && error.details.field === 'drawer_id') {
+      return 'Ada lebih dari satu shift terbuka. Pilih drawer dulu.'
     }
     if (error.code === 'item_sold_out' && typeof error.details.name === 'string') {
       return `${error.details.name} habis. Hapus atau ganti item ini.`

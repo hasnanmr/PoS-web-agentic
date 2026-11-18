@@ -28,7 +28,7 @@ const PAY_FIRST = { ...OUTLETS[0], payment_mode: 'pay_first' as const }
 describe('S1 Counter', () => {
   it('requires the add-on, quotes on the server, and pays cash with change', async () => {
     const shift = { id: 's1', drawer_id: 'd1', drawer_name: 'Kasir depan', drawer_number: 1,
-      opened_at: '2026-11-18T01:00:00Z', starting_cash: 500000, opened_by_name: 'Rina' }
+      opened_at: '2026-11-18T01:00:00Z', starting_cash: 500000, opened_by: 'u1', opened_by_name: 'Rina' }
     const api = fakeApi({
       'GET /ops/outlets/o-dago/menu': [KOPI, CROISSANT],
       'GET /ops/outlets/o-dago/tables': [],
@@ -59,7 +59,7 @@ describe('S1 Counter', () => {
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/outlets/o-dago/orders', {
       type: 'dine_in', table_id: null,
       items: [{ product_id: 'p-kopi', quantity: 1, addon_option_ids: ['o-reg'] }],
-      payment: { method: 'cash', cash_received: 50000 } }]))
+      payment: { method: 'cash', cash_received: 50000, drawer_id: 'd1' } }]))
     expect(await screen.findByText('Order #A-1001 dibuat · Rp 27.500 · Kembalian Rp 22.500')).toBeInTheDocument()
   })
 
@@ -109,6 +109,67 @@ describe('S1 Counter: stale quote', () => {
     await act(async () => { pending[1](quote(50000)) })
     await waitFor(() => expect(screen.getByText('Total').nextSibling).toHaveTextContent('Rp 50.000'))
     expect(submit()).toBeEnabled()
+  })
+})
+
+describe('S1 Counter: cash change and drawer', () => {
+  const shift = (id: string, drawer: string, number: number, openedBy: string | null, name: string) => ({
+    id, drawer_id: drawer, drawer_name: name, drawer_number: number,
+    opened_at: '2026-11-18T01:00:00Z', starting_cash: 500000, opened_by: openedBy, opened_by_name: null,
+  })
+
+  it('shows no change while the next quote is still loading', async () => {
+    const quote = (total: number): Quote => ({ lines: [], subtotal: total, pb1_rate_bps: null, pb1_amount: 0, total })
+    const pending: ((q: Quote) => void)[] = []
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/menu': [{ ...KOPI, addon_groups: [] }],
+      'GET /ops/outlets/o-dago/tables': [],
+      'GET /ops/outlets/o-dago/shifts/current': [shift('s1', 'd1', 1, 'u1', 'Kasir depan')],
+    })
+    const base = api.post
+    api.post = vi.fn(async (path: string, body?: unknown) => {
+      if (path.endsWith('/quotes')) return new Promise<Quote>((resolve) => { pending.push(resolve) })
+      return base(path, body)
+    }) as typeof api.post
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api, outlet: PAY_FIRST })}><CounterPage /></WithSession></MemoryRouter>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    await userEvent.click(screen.getByRole('button', { name: '▤ Cash' }))
+    await userEvent.type(screen.getByLabelText('Uang diterima'), '50000')
+    // Nothing is quoted yet: the cash received must not be shown as change.
+    expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('—')
+    await act(async () => { pending[0](quote(25000)) })
+    await waitFor(() => expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('Rp 25.000'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah jumlah Es Kopi Susu Senja' }))
+    expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('—')
+    await act(async () => { pending[1](quote(50000)) })
+    await waitFor(() => expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('Rp 0'))
+  })
+
+  it('asks which drawer receives cash when several shifts are open', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/menu': [{ ...KOPI, addon_groups: [] }],
+      'GET /ops/outlets/o-dago/tables': [],
+      'GET /ops/outlets/o-dago/shifts/current': [
+        shift('s1', 'd1', 1, 'u2', 'Kasir depan'),
+        shift('s2', 'd2', 2, 'u3', 'Kasir belakang'),
+      ],
+      'POST /ops/outlets/o-dago/quotes': { lines: [], subtotal: 25000, pb1_rate_bps: null, pb1_amount: 0, total: 25000 },
+      'POST /ops/outlets/o-dago/orders': { id: 'ord1', order_no: '#A-1001', status: 'confirmed', payment_status: 'paid',
+        subtotal: 25000, pb1_amount: 0, total: 25000, change_due: 0, bill_id: null },
+    })
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api, outlet: PAY_FIRST })}><CounterPage /></WithSession></MemoryRouter>)
+    expect(await screen.findByText('2 shift terbuka · pilih drawer untuk cash')).toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    await userEvent.click(screen.getByRole('button', { name: '▤ Cash' }))
+    // No single drawer can be inferred, so cash stays blocked until one is picked.
+    expect(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' })).toBeDisabled()
+
+    await userEvent.selectOptions(screen.getByLabelText('Drawer'), 'd2')
+    await userEvent.type(screen.getByLabelText('Uang diterima'), '25000')
+    await userEvent.click(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' }))
+    await waitFor(() => expect(api.calls.find(([m, p]) => m === 'POST' && p.endsWith('/orders'))?.[2])
+      .toMatchObject({ payment: { method: 'cash', cash_received: 25000, drawer_id: 'd2' } }))
   })
 })
 

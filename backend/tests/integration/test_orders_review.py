@@ -316,6 +316,14 @@ def test_cash_needs_a_drawer_when_several_shifts_are_open(client, ctx) -> None:
         f"/api/v1/ops/drawers/{second}/shifts", headers=ctx["owner"], json={"starting_cash": 50000}
     )
     assert res.status_code == 201, res.text
+    # Both shifts report who opened them, so the counter can pick the cashier's own one.
+    current = client.get(
+        f"/api/v1/ops/outlets/{outlet}/shifts/current", headers=ctx["staff2"]
+    ).json()
+    assert {s["drawer_id"]: s["opened_by"] for s in current} == {
+        ctx["drawer"]: str(STAFF),
+        str(second): str(OWNER),
+    }
     americano = _menu(client, ctx)["Americano"]["product_id"]
     body = {
         "type": "takeaway",

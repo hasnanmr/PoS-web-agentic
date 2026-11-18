@@ -94,7 +94,9 @@ async def _require_open_bill_outlet(conn: AsyncConnection, outlet_id: UUID) -> N
 async def open_bill_for_table(
     conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID, table_id: UUID
 ) -> UUID:
-    existing = "select id from app.bills where table_id = %s and status = 'open'"
+    # FOR UPDATE, not a plain select: `void_empty` locks the same row, so a void and a new
+    # order on the table serialize instead of leaving an order on a bill that got voided.
+    existing = "select id from app.bills where table_id = %s and status = 'open' for update"
     cur = await conn.execute(existing, (table_id,))
     row = await cur.fetchone()
     if row:
