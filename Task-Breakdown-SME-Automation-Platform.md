@@ -11,6 +11,7 @@ This backlog breaks down the 61 user stories in [User-Stories-SME-Automation-Pla
 - `P0` is required for the relevant release; `P1` is important follow-up work; `P2` is expansion.
 - Task IDs are stable. Tasks added after the first version use T-100 and up, and some tasks moved to a different wave; IDs were not renumbered so existing tracker issues keep their keys.
 - Hosting: Supabase provides Auth, PostgreSQL, and Storage; Railway runs the FastAPI app, the WhatsApp worker, and RabbitMQ. The demo runs on Supabase Free and Railway Hobby with dummy data only. A pilot with real merchants needs Supabase Pro, a RabbitMQ volume, and the region decision from T-108.
+- Scope decision (2026-11-18): the WhatsApp infrastructure tasks (T-045–T-049, T-100) and the recommendation tasks (T-073–T-074, T-115) are scheduled for the **Pilot** stage, not the MVP. They stay in their waves and keep their IDs and priorities; they are delivered after the POS-core demo, because they depend on the Meta account, business verification, and per-outlet WhatsApp numbers. The MVP release gates below still describe the full scope and need a decision before they are changed.
 - RabbitMQ is used in every environment, including the demo. Fixed-delay retries use TTL + dead-letter queues; business timers (unpaid timeout, reminders, no-show, anonymization) use the database-backed `scheduled_jobs` table. The full topology is in Appendix A.
 
 ## Wave 0 — Product and technical foundation
@@ -231,9 +232,9 @@ The following work can proceed in parallel once the foundation is ready:
 - Menu and inventory: T-016–T-024
 - Purchase orders and supplier debt: T-125–T-131 (after the ledger, T-041; not on the order critical path)
 - Admin shell and screens: T-066–T-072
-- WhatsApp infrastructure: T-045–T-049, T-100
+- WhatsApp infrastructure: T-045–T-049, T-100 (**Pilot**, not MVP)
 - Reservations: T-057–T-065 (not on the order critical path; needs T-055 and T-104 only for reminders and no-show release)
-- Recommendations: T-073–T-074, T-115
+- Recommendations: T-073–T-074, T-115 (**Pilot**, not MVP)
 - Legal and content: T-106, T-107
 
 ## Suggested issue labels
