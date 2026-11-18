@@ -158,7 +158,7 @@ The sidebar item **Pengeluaran** opens tabs **Pengeluaran** (direct expenses: th
 | Detail | `GET /owner/purchase-orders/{id}` | Lines `[{item, stock_item_id?, quantity, unit, unit_price, received_quantity, subtotal}]`, `events:[{at, kind: opened\|received\|closed\|paid\|cancelled, actor:{name, role}, data}]`, `amount_owed`. |
 | Catat pembayaran | `POST /owner/purchase-orders/{id}/payments` (`Idempotency-Key`) | `paid_on, amount (≤ amount_owed), method: cash\|transfer, drawer_id?` (cash from an open shift). Posts one `expense` ledger entry. |
 | Batalkan PO | `POST /owner/purchase-orders/{id}/cancel` | `reason*`; refused once paid or received. |
-| Tutup dengan selisih | `POST /owner/purchase-orders/{id}/close` | `reason*` when a line is short (owner only). |
+| Tutup dengan catatan | `POST /owner/purchase-orders/{id}/close` | `note*`; only the owner, only for a PO with a difference. |
 | Daftar supplier | `GET/POST /owner/suppliers`, `PATCH /owner/suppliers/{id}` | `name, phone?, note?`. |
 
 ### O16 · Buka PO (owner & staf) — planned
@@ -173,6 +173,7 @@ The sidebar item **Pengeluaran** opens tabs **Pengeluaran** (direct expenses: th
 | Card | Endpoint | Fields |
 |---|---|---|
 | Ringkasan PO | `GET /owner/dashboard` ↳ `po_summary` (query `outlet_id`, `period`) | `{total:{count, amount}, status:{open, closed}, goods:{not_arrived, partly_arrived, arrived}, payment:{unpaid, partly_paid, paid}, by_term:{pay_later, pay_in_advance}}`, each `{count, amount}`; by PO open date. |
+| PO ada selisih | ↳ `po_differences` | `[{po_id, number, supplier, outlet, short_lines:[{item, ordered, received, unit}], last_received_at}]`; action: O15 close-with-note. |
 | Pembayaran supplier | ↳ `supplier_payments` | `debt_total, overdue_count, due_7d_amount, prepaid_not_received, items:[{po_id, number, supplier, outlet, payment_term, reason: overdue\|due\|pay_in_advance, due_date?, amount_owed}]` (overdue first, then due date). |
 
 ## Staff operational screens (owner can use them too)
@@ -272,7 +273,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 |---|---|---|
 | Form | `GET /ops/purchase-orders/{id}` | Lines with `quantity, received_quantity, unit`. |
 | Simpan penerimaan | `POST /ops/purchase-orders/{id}/receipts` (`Idempotency-Key`) | `received_on, note?, lines:[{line_id, quantity}]` (never above the remaining quantity). Creates restock movements for ingredient lines; returns per-line `match\|short` and PO `status`. |
-| Tutup PO | `POST /ops/purchase-orders/{id}/close` | Allowed for staff only when every line matches; pay-in-advance POs must be paid first. |
+| Tutup PO | `POST /ops/purchase-orders/{id}/close` | Staff, only when every line matches (`difference_found` → refused; the owner closes it with a note from O17/O15); pay-in-advance POs must be paid first. |
 
 ## Attendance tablet (K0–K4)
 

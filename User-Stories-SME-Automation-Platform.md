@@ -472,10 +472,10 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Saat barang datang, staf (atau owner) melakukan cross-check: mengisi qty yang datang di samping qty PO untuk setiap baris, beserta tanggal terima dan catatan opsional; aplikasi menandai baris yang sesuai dan yang kurang.
   - Baris yang terhubung ke bahan menambah stok lewat movement restock yang merujuk PO, dikonversi ke satuan dasar bahan; baris teks bebas tidak mengubah stok.
   - Barang boleh datang dalam beberapa kali pengiriman; qty yang diterima tidak boleh melebihi qty PO.
-  - Jika semua baris sesuai, owner atau staf dapat **menutup PO**.
-  - Jika ada selisih, PO tetap terbuka dengan status **ada selisih** dan kekurangan per baris, sampai sisanya datang atau owner menutupnya dengan alasan wajib; untuk PO tempo, hutang menjadi qty diterima × harga satuan (default usulan).
+  - Jika semua baris sesuai, staf **menutup PO**.
+  - Jika ada selisih, staf tidak dapat menutup PO: PO tetap terbuka dengan status **ada selisih** dan kekurangan per baris, serta muncul di daftar **PO ada selisih** pada dashboard owner. Setelah sisanya datang dan sesuai, staf dapat menutupnya; jika tidak, **hanya owner** yang dapat menutup PO itu dengan **catatan wajib**. Untuk PO tempo, hutang menjadi qty diterima × harga satuan (default usulan).
   - Setiap pengecekan dan penutupan mencatat siapa dan kapan, dan PO yang ditutup tidak dapat dibuka lagi.
-- **Traceability:** FR1.5, FR4.2, FR4.10, FR4.11, AC4.9, AC4.10
+- **Traceability:** FR1.5, FR3.11, FR4.2, FR4.10, FR4.11, AC4.9, AC4.10
 
 ### US-061 — Tab Purchase Order dan pengingat pembayaran di dashboard
 
@@ -486,6 +486,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Layar Pengeluaran owner memiliki tab **Pengeluaran** (pengeluaran langsung) dan **Purchase Order**; staf mendapat layar Purchase Order untuk outletnya (daftar PO, buka PO, cross-check barang) tanpa pembayaran dan hutang.
   - Tab Purchase Order memiliki filter terbuka (menunggu barang), ada selisih, menunggu pembayaran, overdue, dan ditutup, serta detail PO berisi baris item, riwayat pengecekan barang, dan riwayat pembayaran beserta pencatatnya.
   - Dashboard owner memiliki kartu **Pembayaran supplier**: PO tempo yang sudah ditutup dan belum lunas (overdue dulu, lalu jatuh tempo terdekat) dan PO bayar di muka yang terbuka dan belum dibayar, masing-masing dengan tombol catat pembayaran.
+  - Dashboard owner memiliki daftar **PO ada selisih** (supplier, outlet, baris yang kurang, sejak kapan) dengan tombol **Tutup dengan catatan** yang hanya tersedia untuk owner.
   - Kartu itu dan laporan cashflow menampilkan total hutang supplier (jumlah overdue dan jatuh tempo 7 hari) serta barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
   - Dashboard owner memiliki laporan **Ringkasan PO** per outlet dan periode: jumlah dan nilai PO yang dibuka vs ditutup, barang belum datang / sebagian / sudah datang, dan pembayaran belum dibayar / sebagian / lunas, dipisah bayar mundur dan bayar di muka; setiap angka membuka daftar PO yang sesuai.
   - Staf tidak melihat kartu dan laporan ini, termasuk lewat API langsung.

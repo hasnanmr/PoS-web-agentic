@@ -95,7 +95,7 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `stock_movement_type` | `sale`, `sale_reversal`, `restock`, `waste`, `adjustment` | Signed quantity. `adjustment` can be + or −. |
 | `ledger_entry_type` | `revenue`, `pb1`, `delivery_fee`, `refund`, `expense`, `cash_shortage`, `cash_surplus`, `reversal` | Signed amount (+ cash in, − cash out). |
 | `po_payment_term` (proposed, T-125) | `pay_later`, `pay_in_advance` | Fixed when the PO is created. |
-| `po_status` (proposed) | `open`, `difference_found`, `closed`, `cancelled` | `open` until goods are checked; `difference_found` while a line is short; `closed` when every line matches, or by the owner with a reason; `cancelled` only with no payment and no goods. |
+| `po_status` (proposed) | `open`, `difference_found`, `closed`, `cancelled` | `open` until goods are checked; `difference_found` while a line is short; `closed` by staff when every line matches, or only by the owner with a note; `cancelled` only with no payment and no goods. |
 | `po_payment_status` (proposed) | `unpaid`, `partially_paid`, `paid` | From payments; never above the PO total. Overdue = pay later, not paid, past the due date (outlet time zone). |
 | `addon_selection` | `single`, `multiple` | Plus `is_required` flag. |
 | `reservation_status` | `booked`, `seated`, `completed`, `cancelled`, `no_show` | |
@@ -148,11 +148,11 @@ Rules:
 
 - Scheme 1, pay later: open → goods arrive and are checked against PO quantities → PO closed → payment reminder on the owner dashboard until paid.
 - Scheme 2, pay in advance: open → payment request on the owner dashboard → paid → goods arrive and are checked → PO closed (not allowed while unpaid).
-- Who: owner, or staff for an assigned outlet, open POs (no approval; creator recorded) and cross-check goods; staff may close only a matching PO. Suppliers, payments, cancellation, close-with-difference, debt, and dashboard reminders are owner-only.
+- Who: owner, or staff for an assigned outlet, open POs (no approval; creator recorded) and cross-check goods; staff close a matching PO. Suppliers, payments, cancellation, close-with-difference (note required), debt, and dashboard reminders are owner-only.
 - Cash basis: opening, checking, or closing a PO never posts to the ledger; each supplier payment posts one `expense` entry (negative amount) on the payment date with method, PO number, and supplier.
 - Pay later: payments may be split; the sum never exceeds the PO total. Pay in advance: the full payment is recorded before goods arrive; the PO then waits for goods.
 - A cash supplier payment may be taken from an open shift's drawer; it is then cash paid out in that shift's expected cash (§7).
-- Goods check: owner or assigned staff enter received vs ordered per line; quantity never above the ordered quantity; a short line keeps the PO in `difference_found` until the rest arrives or the owner closes it with a reason (pay later: amount owed = received × unit price, proposed); ingredient lines create `restock` movements (base units) referencing the PO; free-text lines add no stock.
+- Goods check: owner or assigned staff enter received vs ordered per line; quantity never above the ordered quantity; a short line keeps the PO in `difference_found` (staff can't close; listed on the owner dashboard) until the rest arrives or the owner closes it with a note (pay later: amount owed = received × unit price, proposed); ingredient lines create `restock` movements (base units) referencing the PO; free-text lines add no stock.
 - Cancel: only with no payment and no receipt, reason required. Payments and receipts are append-only.
 - Open (PRD §13): short deliveries and supplier returns, separate PPN, approvals and WhatsApp reminders.
 

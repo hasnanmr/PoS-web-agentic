@@ -41,7 +41,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O14 Kehadiran Staf, Selfie & Koreksi | US-053, US-054 | T-118, T-119, T-122 |
 | O15 Pengeluaran — tab Purchase Order (KPI hutang/jatuh tempo/dibayar belum diterima, daftar PO dengan filter status, detail PO dengan alur, riwayat, sisa hutang) | US-031, US-057, US-058, US-059, US-060, US-061 | T-125, T-126, T-127, T-128, T-130 |
 | O16 Buka PO (owner & staf; skema bayar mundur / bayar di muka, item bahan atau teks bebas) | US-057 | T-126, T-130 |
-| O17 Dashboard owner — Ringkasan PO & Pembayaran supplier (+ dialog Catat pembayaran); kartu tambahan untuk O2 | US-058, US-059, US-061 | T-128, T-130 |
+| O17 Dashboard owner — Ringkasan PO, Pembayaran supplier, PO ada selisih (tutup dengan catatan, owner saja) + dialog Catat pembayaran; kartu tambahan untuk O2 | US-058, US-059, US-061 | T-128, T-130 |
 
 ### Staff (web admin)
 
