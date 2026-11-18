@@ -92,8 +92,8 @@ uv run python -m app.worker.main                                     # or: make 
 Configuration comes from environment variables or `backend/.env` (template:
 [`backend/.env.example`](backend/.env.example)). `APP_ENV` is one of `local`, `demo`,
 `staging`, `production`. Outside `local`, `DATABASE_URL`, `SUPABASE_URL`,
-`SUPABASE_JWKS_URL`, `SUPABASE_JWT_ISSUER` and `RABBITMQ_URL` are required; the process
-exits with a list of problems if the configuration is invalid. Default time zone is
+`SUPABASE_JWKS_URL` and `SUPABASE_JWT_ISSUER` are required (`RABBITMQ_URL` is optional until
+the WhatsApp worker exists); the process exits with a list of problems if the configuration is invalid. Default time zone is
 `Asia/Jakarta` (WIB). Logs are JSON lines on stdout.
 
 ### Admin web app
