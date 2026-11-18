@@ -20,7 +20,7 @@ supabase/migrations/ plain SQL schema migrations (no Alembic)
 design/             wireframes (source of truth for every frontend screen)
 docs/               project documentation
 docker-compose.yml  local Postgres 16 + RabbitMQ 3 (management UI)
-railway.toml        Railway config for the backend API service
+backend/railway.toml, admin/railway.toml  Railway config per service
 Makefile            dev / test / lint shortcuts (`make help`)
 ```
 
@@ -120,9 +120,30 @@ make lint      # ruff (check + format) + eslint + tsc
 make check     # lint, test and admin build
 ```
 
-## Deployment (not set up yet)
+## Deployment (Railway)
 
-Supabase (Postgres + Auth) and Railway are not provisioned; the repo only contains config.
-The backend API deploys to Railway from `backend/Dockerfile` (see `railway.toml`). The
-WhatsApp worker will be a separate Railway service using the same image with start command
-`python -m app.worker.main`.
+Two Railway services in one project, both deployed by GitHub Actions (`.github/workflows/ci.yml`):
+
+| Service name | Source | Config |
+|---|---|---|
+| `backend` | `backend/` | `backend/Dockerfile`, `backend/railway.toml` |
+| `admin` | `admin/` | `admin/Dockerfile`, `admin/railway.toml` |
+
+On every push to `main`, CI runs first; if it is green, only the service whose files changed
+is redeployed (`backend/**` or `supabase/**` -> backend, `admin/**` -> admin). Pull requests
+and other branches run CI only.
+
+One-time setup:
+
+1. Railway: create the project (region Singapore), add services named exactly `backend` and
+   `admin` (RabbitMQ is added later, together with the WhatsApp worker). Set the variables listed in `backend/railway.toml` and
+   `admin/railway.toml` (admin `VITE_*` are build-time, so redeploy after changing them).
+2. Railway: Project Settings -> Tokens -> create a project token for the production
+   environment.
+3. GitHub: Settings -> Secrets and variables -> Actions -> new secret `RAILWAY_TOKEN`.
+4. Do **not** also connect the services to the GitHub repo in Railway, or each push deploys twice.
+
+Database migrations (`supabase/migrations/`) are not applied by this pipeline; apply them to
+the hosted Supabase project before merging a backend change that depends on them.
+The WhatsApp worker will be a separate Railway service using the backend image with start
+command `python -m app.worker.main`.

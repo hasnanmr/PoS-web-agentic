@@ -1,0 +1,13 @@
+# Railway config for the admin web app service. The deploy workflow uploads admin/ as the
+# service root. Variables (build time): VITE_API_BASE_URL, VITE_SUPABASE_URL,
+# VITE_SUPABASE_ANON_KEY. Railway injects PORT.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
