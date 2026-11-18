@@ -44,6 +44,30 @@ describe('O3 Bisnis & Outlet', () => {
   })
 })
 
+describe('O3 QRIS statis outlet (PoC)', () => {
+  it('uploads a PNG and refuses other files', async () => {
+    const api = fakeApi({
+      'GET /owner/outlets/o-dago': DAGO,
+      'GET /owner/outlets/o-dago/drawers': [],
+      'GET /owner/outlets/o-dago/qris': { image: null },
+      'UPLOAD /owner/outlets/o-dago/qris?filename=qris-dago.png': {
+        image: { filename: 'qris-dago.png', content_type: 'image/png', size: 10, uploaded_at: '2026-11-02T03:00:00Z' } },
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><BusinessPage /></WithSession>)
+    expect(await screen.findByText('QRIS statis outlet')).toBeInTheDocument()
+    expect(await screen.findByText('Belum ada gambar QRIS.')).toBeInTheDocument()
+    expect(screen.getByText('Hanya PNG/JPG, maks 2 MB.')).toBeInTheDocument()
+
+    const input = screen.getByLabelText(/Unggah gambar/)
+    await userEvent.upload(input, new File(['gif'], 'qris.gif', { type: 'image/gif' }), { applyAccept: false })
+    expect(await screen.findByText('Hanya PNG/JPG, maks 2 MB.', { selector: '[role=alert] *, [role=alert]' })).toBeInTheDocument()
+    expect(api.calls.some(([m]) => m === 'UPLOAD')).toBe(false)
+
+    await userEvent.upload(input, new File(['png'], 'qris-dago.png', { type: 'image/png' }))
+    await waitFor(() => expect(api.calls.map(([m, p]) => `${m} ${p}`)).toContain('UPLOAD /owner/outlets/o-dago/qris?filename=qris-dago.png'))
+  })
+})
+
 describe('O4 Staf & Akses', () => {
   const RINA: StaffMember = {
     id: 's1', display_name: 'Rina', email: 'rina@kopisenja.id',

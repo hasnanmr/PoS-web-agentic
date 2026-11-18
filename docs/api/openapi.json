@@ -2083,6 +2083,18 @@
             "title": "Order No",
             "type": "string"
           },
+          "payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Id"
+          },
           "payment_method": {
             "anyOf": [
               {
@@ -2101,6 +2113,18 @@
           "payment_status": {
             "title": "Payment Status",
             "type": "string"
+          },
+          "qris_checked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "QRIS payments only: found in the receiving account (S2 Cek →); else null",
+            "title": "Qris Checked"
           },
           "status": {
             "title": "Status",
@@ -2135,6 +2159,8 @@
           "status",
           "payment_status",
           "payment_method",
+          "payment_id",
+          "qris_checked",
           "table",
           "customer_name",
           "item_summary",
@@ -2343,6 +2369,18 @@
             "title": "Order No",
             "type": "string"
           },
+          "payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Id"
+          },
           "payment_method": {
             "anyOf": [
               {
@@ -2376,6 +2414,18 @@
               }
             ],
             "title": "Pb1 Rate Bps"
+          },
+          "qris_checked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "QRIS payments only: found in the receiving account (S2 Cek →); else null",
+            "title": "Qris Checked"
           },
           "refund": {
             "anyOf": [
@@ -2430,6 +2480,8 @@
           "status",
           "payment_status",
           "payment_method",
+          "payment_id",
+          "qris_checked",
           "table",
           "customer_name",
           "item_summary",
@@ -3665,6 +3717,67 @@
           "timezone"
         ],
         "title": "ProofQueueItem",
+        "type": "object"
+      },
+      "QrisCheckIn": {
+        "properties": {
+          "merchant_account_checked": {
+            "title": "Merchant Account Checked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "merchant_account_checked"
+        ],
+        "title": "QrisCheckIn",
+        "type": "object"
+      },
+      "QrisImage": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "uploaded_at": {
+            "format": "date-time",
+            "title": "Uploaded At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "content_type",
+          "size",
+          "uploaded_at"
+        ],
+        "title": "QrisImage",
+        "type": "object"
+      },
+      "QrisStatus": {
+        "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QrisImage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "image"
+        ],
+        "title": "QrisStatus",
         "type": "object"
       },
       "QuoteLine": {
@@ -4955,6 +5068,60 @@
         ]
       }
     },
+    "/api/v1/ops/orders/{order_id}/qris-check": {
+      "post": {
+        "description": "S2 \"Cek →\": the QRIS payment was found in the receiving account.",
+        "operationId": "qris_check_api_v1_ops_orders__order_id__qris_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QrisCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Qris Check",
+        "tags": [
+          "ops: qris"
+        ]
+      }
+    },
     "/api/v1/ops/orders/{order_id}/reversal": {
       "post": {
         "operationId": "order_reversal_api_v1_ops_orders__order_id__reversal_post",
@@ -5519,6 +5686,50 @@
         "summary": "Proof Queue",
         "tags": [
           "ops: payment proofs"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/qris/image": {
+      "get": {
+        "description": "The outlet's static QRIS, shown to the customer at the counter and at bill close.",
+        "operationId": "qris_image_api_v1_ops_outlets__outlet_id__qris_image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {},
+              "image/png": {}
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Qris Image",
+        "tags": [
+          "ops: qris"
         ]
       }
     },
@@ -6952,6 +7163,120 @@
           }
         },
         "summary": "Set Opening Hours",
+        "tags": [
+          "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/qris": {
+      "get": {
+        "description": "O3 \"qris-dago.png · diunggah 2 Nov 2026\" (null until one is uploaded). The image itself:\n`GET /ops/outlets/{id}/qris/image`.",
+        "operationId": "get_qris_api_v1_owner_outlets__outlet_id__qris_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QrisStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Qris",
+        "tags": [
+          "owner: outlets"
+        ]
+      },
+      "put": {
+        "description": "O3 \"⇪ Ganti gambar\": the raw PNG/JPG as the request body (max 2 MB).",
+        "operationId": "put_qris_api_v1_owner_outlets__outlet_id__qris_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "default": "qris",
+              "maxLength": 200,
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QrisStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Qris",
         "tags": [
           "owner: outlets"
         ]

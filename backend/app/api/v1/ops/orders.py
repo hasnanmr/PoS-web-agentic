@@ -133,6 +133,10 @@ class OrderCard(BaseModel):
     status: str
     payment_status: str
     payment_method: str | None
+    payment_id: UUID | None
+    qris_checked: bool | None = Field(
+        description="QRIS payments only: found in the receiving account (S2 Cek →); else null"
+    )
     table: str | None
     customer_name: str | None
     item_summary: str

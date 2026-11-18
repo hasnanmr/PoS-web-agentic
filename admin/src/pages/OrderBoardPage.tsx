@@ -2,6 +2,9 @@
 // (Detail Order & Reversal, T-032). Endpoints: GET /ops/outlets/{id}/orders/board (polled
 // for "↻ live"), GET /ops/orders/{id}, POST /ops/orders/{id}/transitions | cancel | reversal.
 // "Cek →" on a proof_submitted card opens S4 Review Pembayaran for that order.
+// PoC demo: a paid QRIS order the server marks with `qris_check` shows "QRIS belum dicek" and a
+// "Cek →" that opens the cross-check (POST /ops/orders/{id}/qris-check): staff confirm the
+// transaction is in the receiving account, with the S4 merchant-account step.
 // Behavior notes: order status and payment status are separate badges; buttons come only
 // from the server's allowed_actions; unpaid pay-first orders have no "Mulai siapkan".
 import { useState } from 'react'
@@ -46,7 +49,7 @@ function where(o: OrderCard): string {
 
 function paymentText(o: OrderCard): string {
   if (o.bill_id && o.payment_status !== 'paid' && o.payment_status !== 'refunded') return 'di bill'
-  if (o.payment_status === 'paid') return `paid (${o.payment_method === 'qris' ? 'QRIS' : 'cash'})`
+  if (o.payment_status === 'paid') return `paid (${o.payment_method === 'qris' ? `QRIS${o.qris_checked ? ' ✓ dicek' : ''}` : 'cash'})`
   return o.payment_status
 }
 
@@ -57,6 +60,7 @@ export default function OrderBoardPage() {
   const [type, setType] = useState('')
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<string>()
+  const [checking, setChecking] = useState<OrderCard>()
   const [error, setError] = useState<string>()
   const params = new URLSearchParams()
   if (channel) params.set('channel', channel)
@@ -124,6 +128,11 @@ export default function OrderBoardPage() {
                         <button type="button" className="w-full text-left hover:underline" onClick={() => setOpenId(o.id)}>
                           {o.order_no}  {o.payment_status === 'refunded' ? 'reversed' : o.status}  {o.status === 'completed' ? formatRupiah(o.total) : ''}
                         </button>
+                        {o.allowed_actions.includes('qris_check') && (
+                          <button type="button" className="text-warning hover:underline" onClick={() => setChecking(o)}>
+                            QRIS belum dicek · Cek →
+                          </button>
+                        )}
                       </li>
                     ))}
                     {cards.length === 0 && <li className="text-text-muted">Belum ada.</li>}
@@ -143,6 +152,12 @@ export default function OrderBoardPage() {
                           </button>
                           {o.payment_status !== 'paid' && !o.bill_id && (
                             <span className="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">{o.payment_status}</span>
+                          )}
+                          {o.allowed_actions.includes('qris_check') && (
+                            <>
+                              <span className="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">QRIS belum dicek</span>
+                              <Button variant="ghost" className="mt-2 h-8 w-full" onClick={() => setChecking(o)}>Cek →</Button>
+                            </>
                           )}
                           {o.payment_status === 'proof_submitted' && (
                             <Link to={`/payment-review?order=${o.id}`}
@@ -170,6 +185,8 @@ export default function OrderBoardPage() {
         Klik kartu untuk detail, riwayat status, dan aksi Batalkan / Reversal.
       </div>
       {openId && <OrderDrawer orderId={openId} onClose={() => setOpenId(undefined)} onChanged={() => void reload()} />}
+      {checking && <QrisCheckDialog order={checking} onClose={() => setChecking(undefined)}
+        onChecked={async () => { setChecking(undefined); await reload() }} />}
     </>
   )
 }
@@ -296,6 +313,53 @@ function ReversalForm({ order, onCancel, onConfirm }: {
       <div className="mt-3 flex gap-3">
         <LinkButton onClick={onCancel}>Batal</LinkButton>
         <Button variant="action" disabled={!reason.trim()} onClick={() => onConfirm(reason.trim(), ingredients)}>Konfirmasi reversal</Button>
+      </div>
+    </div>
+  )
+}
+
+// PoC demo cross-check of a QRIS payment against the receiving account. Same step and copy as
+// S4: "✓" stays disabled until the merchant-account checkbox is ticked.
+function QrisCheckDialog({ order, onClose, onChecked }: {
+  order: OrderCard
+  onClose: () => void
+  onChecked: () => Promise<void>
+}) {
+  const { api, outlet } = useSession()
+  const [checked, setChecked] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 sm:items-center" role="dialog" aria-modal="true"
+      aria-label={`Cek QRIS ${order.order_no}`}>
+      <div className="w-full max-w-md rounded-lg bg-surface p-4 text-[13px]">
+        <h2 className="text-[16px] font-bold">Cek pembayaran QRIS · {order.order_no}</h2>
+        <p className="mb-3 text-[12px] text-text-muted">
+          {where(order)} · {formatTime(order.created_at, outlet?.timezone ?? 'Asia/Jakarta')}{order.bill_id ? ' · dibayar lewat bill' : ''}
+        </p>
+        <p className="text-[20px] font-bold">{formatRupiah(order.total)}</p>
+        <div className="my-3 rounded-md bg-warning-soft p-2 text-[12px] text-warning">
+          ⚠ Jangan konfirmasi hanya dari screenshot. Cek mutasi di akun merchant QRIS untuk nominal {formatRupiah(order.total)}.
+        </div>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+          <span>Saya sudah menemukan transaksi ini di akun merchant QRIS</span>
+        </label>
+        {error && <div className="mt-2"><Alert>{error}</Alert></div>}
+        <div className="mt-4 flex gap-2">
+          <Button variant="ghost" className="flex-1" onClick={onClose}>Batal</Button>
+          <Button className="flex-1 bg-success" disabled={!checked || busy} onClick={async () => {
+            setBusy(true)
+            setError(undefined)
+            try {
+              await api.post(`/ops/orders/${order.id}/qris-check`, { merchant_account_checked: true })
+              await onChecked()
+            } catch (e) {
+              setError(errorMessage(e))
+              setBusy(false)
+            }
+          }}>✓ Sudah masuk rekening</Button>
+        </div>
       </div>
     </div>
   )

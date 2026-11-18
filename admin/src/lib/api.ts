@@ -24,8 +24,10 @@ export interface Api {
   put<T>(path: string, body: unknown): Promise<T>
   patch<T>(path: string, body: unknown): Promise<T>
   del<T = void>(path: string): Promise<T>
-  /** Raw file download (e.g. O10 "Ekspor CSV"). */
-  blob(path: string): Promise<Blob>
+  /** Raw file download (e.g. O10 "Ekspor CSV", the outlet's QRIS image). */
+  blob(path: string, accept?: string): Promise<Blob>
+  /** Raw file upload as the request body (O3 QRIS image). */
+  upload<T>(path: string, file: Blob, contentType: string): Promise<T>
 }
 
 export function createApi(baseUrl: string, token: TokenSource): Api {
@@ -36,13 +38,14 @@ export function createApi(baseUrl: string, token: TokenSource): Api {
     const headers: Record<string, string> = { Accept: 'application/json', ...extra }
     const access = await token()
     if (access) headers.Authorization = `Bearer ${access}`
-    if (body !== undefined) headers['Content-Type'] = 'application/json'
+    const raw = body instanceof Blob
+    if (body !== undefined && !raw) headers['Content-Type'] = 'application/json'
     let res: Response
     try {
       res = await fetch(root + path, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
       })
     } catch {
       throw new ApiError(0, 'network_error', 'Tidak bisa terhubung ke server')
@@ -64,7 +67,8 @@ export function createApi(baseUrl: string, token: TokenSource): Api {
     put: (path, body) => request('PUT', path, body),
     patch: (path, body) => request('PATCH', path, body),
     del: (path) => request('DELETE', path),
-    blob: (path) => request<Blob>('GET', path, undefined, { Accept: 'text/csv' }, true),
+    blob: (path, accept = 'text/csv') => request<Blob>('GET', path, undefined, { Accept: accept }, true),
+    upload: (path, file, contentType) => request('PUT', path, file, { 'Content-Type': contentType }),
   }
 }
 

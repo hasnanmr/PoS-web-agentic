@@ -232,7 +232,8 @@ def test_status_machine_board_and_events(client, ctx) -> None:
         f"/api/v1/ops/outlets/{ctx['outlet']}/orders/board", headers=ctx["staff"]
     ).json()
     card = next(c for c in board["confirmed"] if c["id"] == order["id"])
-    assert card["allowed_actions"] == ["preparing", "reversal"]
+    assert card["allowed_actions"] == ["preparing", "reversal", "qris_check"]
+    assert card["qris_checked"] is False  # PoC: QRIS waits for the S2 cross-check
     assert card["item_summary"] == "1× Americano" and card["payment_method"] == "qris"  # noqa: RUF001
 
     url = f"/api/v1/ops/orders/{order['id']}/transitions"
@@ -242,7 +243,8 @@ def test_status_machine_board_and_events(client, ctx) -> None:
         res = client.post(url, headers=ctx["staff"], json={"to_status": to})
         assert res.status_code == 200, res.text
     detail = res.json()
-    assert detail["status"] == "completed" and detail["allowed_actions"] == ["reversal"]
+    assert detail["status"] == "completed"
+    assert detail["allowed_actions"] == ["reversal", "qris_check"]  # still checkable when done
     assert [(e["kind"], e["to"], e["actor"]["name"]) for e in detail["events"]][-3:] == [
         ("status_changed", "preparing", "Rina"),
         ("status_changed", "ready", "Rina"),

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { usePolling } from '../lib/usePolling'
+import { ApiError } from '../lib/api'
 import type { Quote } from '../lib/types'
 import { fakeApi, fakeSession, OUTLETS } from '../test/fakes'
 import { WithSession } from '../test/session'
@@ -61,6 +62,30 @@ describe('S1 Counter', () => {
       items: [{ product_id: 'p-kopi', quantity: 1, addon_option_ids: ['o-reg'] }],
       payment: { method: 'cash', cash_received: 50000, drawer_id: 'd1' } }]))
     expect(await screen.findByText('Order #A-1001 dibuat · Rp 27.500 · Kembalian Rp 22.500')).toBeInTheDocument()
+  })
+
+  it('lets an optional single-choice add-on be unselected; a required one stays chosen', async () => {
+    const chicken: MenuItem = { ...KOPI, product_id: 'p-chk', name: 'Italian chicken', addon_groups: [
+      KOPI.addon_groups[0],
+      { id: 'g-jamur', name: 'Jamur', selection: 'single', is_required: false, options: [
+        { id: 'o-jamur', name: 'Jamur H', price: 6000, available: true }] }] }
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/menu': [chicken],
+      'GET /ops/outlets/o-dago/tables': [],
+      'GET /ops/outlets/o-dago/shifts/current': [],
+    })
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api, outlet: PAY_FIRST })}><CounterPage /></WithSession></MemoryRouter>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Italian chicken' }))
+    const modal = screen.getByRole('dialog', { name: 'Add-on Italian chicken' })
+    const jamur = within(modal).getByLabelText(/Jamur H/)
+    await userEvent.click(jamur)
+    expect(jamur).toBeChecked()
+    await userEvent.click(jamur)
+    expect(jamur).not.toBeChecked()
+    const regular = within(modal).getByLabelText(/Regular/)
+    await userEvent.click(regular)
+    await userEvent.click(regular)
+    expect(regular).toBeChecked()
   })
 
   it('disables cash without a shift and sends dine-in to the open bill', async () => {
@@ -210,7 +235,7 @@ describe('usePolling', () => {
 
 const CARD: OrderCard = {
   id: 'o1', order_no: '#A-1039', channel: 'counter', type: 'takeaway', payment_mode: 'pay_first', status: 'confirmed',
-  payment_status: 'paid', payment_method: 'cash', table: null, customer_name: null,
+  payment_status: 'paid', payment_method: 'cash', payment_id: null, qris_checked: null, table: null, customer_name: null,
   item_summary: '1× Americano, 1× Roti Bakar', total: 46200, bill_id: null, created_at: '2026-11-18T03:00:00Z',
   auto_cancel_at: null, allowed_actions: ['preparing', 'reversal'],
 }
@@ -245,6 +270,50 @@ describe('S2 Order Board + S3', () => {
     await userEvent.type(within(drawer).getByLabelText('Alasan reversal'), 'salah input')
     await userEvent.click(within(drawer).getByRole('button', { name: 'Konfirmasi reversal' }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/orders/o1/reversal', { reason: 'salah input', ingredients: 'waste' }]))
+  })
+})
+
+describe('S2 QRIS cross-check (PoC)', () => {
+  it('shows "QRIS belum dicek" and confirms only after the merchant-account checkbox', async () => {
+    const qris: OrderCard = { ...CARD, payment_method: 'qris', payment_id: 'pay1', qris_checked: false,
+      allowed_actions: ['preparing', 'reversal', 'qris_check'] }
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/orders/board': { ...EMPTY, confirmed: [qris], done_today: [{ ...qris, id: 'o2', order_no: '#A-1040', status: 'completed' }] },
+      'POST /ops/orders/o1/qris-check': { ...qris, qris_checked: true, allowed_actions: ['preparing', 'reversal'] },
+    })
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api })}><OrderBoardPage /></WithSession></MemoryRouter>)
+    const column = await screen.findByRole('region', { name: 'CONFIRMED' })
+    expect(within(column).getByText('QRIS belum dicek')).toBeInTheDocument()
+    const done = screen.getByRole('region', { name: 'SELESAI / BATAL HARI INI' })
+    expect(within(done).getByRole('button', { name: 'QRIS belum dicek · Cek →' })).toBeInTheDocument()
+
+    await userEvent.click(within(column).getByRole('button', { name: 'Cek →' }))
+    const dialog = screen.getByRole('dialog', { name: 'Cek QRIS #A-1039' })
+    expect(within(dialog).getByText(/Cek mutasi di akun merchant QRIS untuk nominal Rp 46.200/)).toBeInTheDocument()
+    const confirm = within(dialog).getByRole('button', { name: '✓ Sudah masuk rekening' })
+    expect(confirm).toBeDisabled()
+    await userEvent.click(within(dialog).getByLabelText('Saya sudah menemukan transaksi ini di akun merchant QRIS'))
+    await userEvent.click(confirm)
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/orders/o1/qris-check', { merchant_account_checked: true }]))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Cek QRIS #A-1039' })).not.toBeInTheDocument())
+  })
+})
+
+describe('S1 Counter QRIS (PoC)', () => {
+  it('shows the outlet QRIS with the amount, or tells the owner to upload it', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/menu': [{ ...KOPI, addon_groups: [] }],
+      'GET /ops/outlets/o-dago/tables': [],
+      'GET /ops/outlets/o-dago/shifts/current': [],
+      'POST /ops/outlets/o-dago/quotes': { lines: [{ product_id: 'p-kopi', name: 'Es Kopi Susu Senja', unit_price: 25000,
+        quantity: 1, line_total: 25000, addons: [] }], subtotal: 25000, pb1_rate_bps: null, pb1_amount: 0, total: 25000 },
+      'BLOB /ops/outlets/o-dago/qris/image': new ApiError(404, 'not_found', 'qris_image not found'),
+    })
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api, outlet: PAY_FIRST })}><CounterPage /></WithSession></MemoryRouter>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    await userEvent.click(await screen.findByRole('button', { name: '▦ QRIS' }))
+    expect(await screen.findByText('Scan QRIS · bayar tepat Rp 25.000')).toBeInTheDocument()
+    expect(await screen.findByText('Belum ada QRIS. Owner mengunggahnya di Bisnis & Outlet.')).toBeInTheDocument()
   })
 })
 

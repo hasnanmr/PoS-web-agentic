@@ -239,6 +239,9 @@ export interface OrderCard {
   status: OrderStatus
   payment_status: PaymentStatus
   payment_method: 'cash' | 'qris' | null
+  payment_id: string | null
+  /** QRIS only: found in the receiving account (S2 "Cek →"); null otherwise. */
+  qris_checked: boolean | null
   table: string | null
   customer_name: string | null
   item_summary: string
@@ -444,4 +447,9 @@ export interface CashCount {
   to: string
   summary: { shifts: number; shifts_with_difference: number; total_shortage: number; total_surplus: number }
   rows: CashCountRow[]
+}
+
+/** O3 "QRIS statis outlet" (PoC demo). */
+export interface QrisStatus {
+  image: { filename: string; content_type: string; size: number; uploaded_at: string } | null
 }
