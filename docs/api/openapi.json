@@ -1,18 +1,231 @@
 {
   "components": {
     "schemas": {
-      "Created": {
+      "AddonGroupInput": {
+        "properties": {
+          "is_required": {
+            "default": false,
+            "title": "Is Required",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/AddonOptionInput"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Options",
+            "type": "array"
+          },
+          "selection": {
+            "default": "single",
+            "enum": [
+              "single",
+              "multiple"
+            ],
+            "title": "Selection",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "options"
+        ],
+        "title": "AddonGroupInput",
+        "type": "object"
+      },
+      "AddonGroupRow": {
         "properties": {
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "is_required": {
+            "title": "Is Required",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/AddonOptionRow"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "selection": {
+            "enum": [
+              "single",
+              "multiple"
+            ],
+            "title": "Selection",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
           }
         },
         "required": [
-          "id"
+          "id",
+          "name",
+          "selection",
+          "is_required",
+          "sort_order",
+          "options"
         ],
-        "title": "Created",
+        "title": "AddonGroupRow",
+        "type": "object"
+      },
+      "AddonOptionInput": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/OutletPriceItem"
+            },
+            "title": "Prices",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AddonOptionInput",
+        "type": "object"
+      },
+      "AddonOptionRow": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/OptionPrice"
+            },
+            "title": "Prices",
+            "type": "array"
+          },
+          "recipe": {
+            "items": {
+              "$ref": "#/components/schemas/RecipeLineRow"
+            },
+            "title": "Recipe",
+            "type": "array"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sort_order",
+          "prices",
+          "recipe"
+        ],
+        "title": "AddonOptionRow",
+        "type": "object"
+      },
+      "AffectedProduct": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "product",
+              "addon"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sold_out": {
+            "title": "Sold Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "sold_out"
+        ],
+        "title": "AffectedProduct",
+        "type": "object"
+      },
+      "Availability": {
+        "properties": {
+          "limiting_stock_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limiting Stock Item"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
+          },
+          "portions_available": {
+            "title": "Portions Available",
+            "type": "integer"
+          },
+          "sold_out": {
+            "title": "Sold Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "outlet_name",
+          "portions_available",
+          "sold_out",
+          "limiting_stock_item"
+        ],
+        "title": "Availability",
         "type": "object"
       },
       "Drawer": {
@@ -249,6 +462,180 @@
         "title": "MeUser",
         "type": "object"
       },
+      "MovementCreate": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Base unit; signed for adjustment",
+            "title": "Quantity"
+          },
+          "stock_item_id": {
+            "format": "uuid",
+            "title": "Stock Item Id",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "restock",
+              "waste",
+              "adjustment"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "stock_item_id",
+          "quantity"
+        ],
+        "title": "MovementCreate",
+        "type": "object"
+      },
+      "MovementPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MovementRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "MovementPage",
+        "type": "object"
+      },
+      "MovementRow": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "actor_type": {
+            "title": "Actor Type",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "display_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Unit"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "order_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order No"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "stock_item": {
+            "title": "Stock Item",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "sale",
+              "sale_reversal",
+              "restock",
+              "waste",
+              "adjustment"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "g",
+              "ml",
+              "pcs"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "type",
+          "quantity",
+          "unit",
+          "display_unit",
+          "stock_item",
+          "order_no",
+          "note",
+          "actor_type",
+          "actor"
+        ],
+        "title": "MovementRow",
+        "type": "object"
+      },
       "OnboardingBusiness": {
         "properties": {
           "name": {
@@ -385,6 +772,25 @@
           "closes_at"
         ],
         "title": "OpeningHoursItem",
+        "type": "object"
+      },
+      "OptionPrice": {
+        "properties": {
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "price": {
+            "title": "Price",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "price"
+        ],
+        "title": "OptionPrice",
         "type": "object"
       },
       "OutletCreate": {
@@ -723,6 +1129,64 @@
         "title": "OutletPatch",
         "type": "object"
       },
+      "OutletPriceItem": {
+        "properties": {
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "maximum": 100000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          }
+        },
+        "required": [
+          "outlet_id"
+        ],
+        "title": "OutletPriceItem",
+        "type": "object"
+      },
+      "OutletPriceRow": {
+        "properties": {
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "outlet_name",
+          "price"
+        ],
+        "title": "OutletPriceRow",
+        "type": "object"
+      },
       "OutletSummary": {
         "properties": {
           "id": {
@@ -755,6 +1219,373 @@
           "is_active"
         ],
         "title": "OutletSummary",
+        "type": "object"
+      },
+      "ProductCreate": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_owner_pick": {
+            "default": false,
+            "title": "Is Owner Pick",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProductCreate",
+        "type": "object"
+      },
+      "ProductDetail": {
+        "properties": {
+          "addon_groups": {
+            "items": {
+              "$ref": "#/components/schemas/AddonGroupRow"
+            },
+            "title": "Addon Groups",
+            "type": "array"
+          },
+          "catalog_sync": {
+            "default": "not_configured",
+            "title": "Catalog Sync",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "has_photo": {
+            "title": "Has Photo",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_owner_pick": {
+            "title": "Is Owner Pick",
+            "type": "boolean"
+          },
+          "is_sample": {
+            "title": "Is Sample",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/OutletPriceRow"
+            },
+            "title": "Prices",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "category",
+          "description",
+          "is_owner_pick",
+          "is_active",
+          "is_sample",
+          "has_photo",
+          "tags",
+          "prices",
+          "addon_groups"
+        ],
+        "title": "ProductDetail",
+        "type": "object"
+      },
+      "ProductPatch": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "is_owner_pick": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Owner Pick"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "title": "ProductPatch",
+        "type": "object"
+      },
+      "ProductRow": {
+        "properties": {
+          "addon_group_count": {
+            "title": "Addon Group Count",
+            "type": "integer"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "has_photo": {
+            "title": "Has Photo",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingredient_count": {
+            "title": "Ingredient Count",
+            "type": "integer"
+          },
+          "is_owner_pick": {
+            "title": "Is Owner Pick",
+            "type": "boolean"
+          },
+          "is_sample": {
+            "title": "Is Sample",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "sold_out",
+              "inactive"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "category",
+          "is_owner_pick",
+          "is_sample",
+          "has_photo",
+          "addon_group_count",
+          "ingredient_count",
+          "price",
+          "status"
+        ],
+        "title": "ProductRow",
+        "type": "object"
+      },
+      "RecipeLine": {
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "stock_item_id": {
+            "format": "uuid",
+            "title": "Stock Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_item_id",
+          "quantity"
+        ],
+        "title": "RecipeLine",
+        "type": "object"
+      },
+      "RecipeLineRow": {
+        "properties": {
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "stock_item": {
+            "title": "Stock Item",
+            "type": "string"
+          },
+          "stock_item_id": {
+            "format": "uuid",
+            "title": "Stock Item Id",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "g",
+              "ml",
+              "pcs"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_item_id",
+          "quantity",
+          "stock_item",
+          "unit"
+        ],
+        "title": "RecipeLineRow",
         "type": "object"
       },
       "StaffMember": {
@@ -818,6 +1649,287 @@
         "title": "StaffOutlet",
         "type": "object"
       },
+      "StockCounts": {
+        "properties": {
+          "low": {
+            "title": "Low",
+            "type": "integer"
+          },
+          "out": {
+            "title": "Out",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "low",
+          "out"
+        ],
+        "title": "StockCounts",
+        "type": "object"
+      },
+      "StockItemCreate": {
+        "properties": {
+          "display_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "g",
+                  "kg",
+                  "ml",
+                  "L",
+                  "pcs"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Unit"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "g",
+              "ml",
+              "pcs"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "unit"
+        ],
+        "title": "StockItemCreate",
+        "type": "object"
+      },
+      "StockItemPatch": {
+        "properties": {
+          "display_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "g",
+                  "kg",
+                  "ml",
+                  "L",
+                  "pcs"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Unit"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "StockItemPatch",
+        "type": "object"
+      },
+      "StockItemRow": {
+        "properties": {
+          "display_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "g",
+                  "kg",
+                  "ml",
+                  "L",
+                  "pcs"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Unit"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "thresholds": {
+            "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "title": "Thresholds",
+            "type": "array"
+          },
+          "unit": {
+            "enum": [
+              "g",
+              "ml",
+              "pcs"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "unit",
+          "display_unit",
+          "thresholds"
+        ],
+        "title": "StockItemRow",
+        "type": "object"
+      },
+      "StockResponse": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/StockCounts"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StockRow"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "counts",
+          "items"
+        ],
+        "title": "StockResponse",
+        "type": "object"
+      },
+      "StockRow": {
+        "properties": {
+          "affected_products": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedProduct"
+            },
+            "title": "Affected Products",
+            "type": "array"
+          },
+          "display_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Unit"
+          },
+          "low_threshold": {
+            "title": "Low Threshold",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "on_hand": {
+            "title": "On Hand",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "low",
+              "out"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_item_id": {
+            "format": "uuid",
+            "title": "Stock Item Id",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "g",
+              "ml",
+              "pcs"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_item_id",
+          "name",
+          "unit",
+          "display_unit",
+          "on_hand",
+          "low_threshold",
+          "status",
+          "affected_products"
+        ],
+        "title": "StockRow",
+        "type": "object"
+      },
+      "ThresholdItem": {
+        "properties": {
+          "low_threshold": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Low Threshold"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "low_threshold"
+        ],
+        "title": "ThresholdItem",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -857,6 +1969,39 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "app__api__v1__owner__catalog__Created": {
+        "properties": {
+          "catalog_sync": {
+            "default": "not_configured",
+            "title": "Catalog Sync",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Created",
+        "type": "object"
+      },
+      "app__api__v1__owner__outlets__Created": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Created",
+        "type": "object"
       }
     }
   },
@@ -884,6 +2029,413 @@
         "summary": "Me",
         "tags": [
           "session"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/stock": {
+      "get": {
+        "operationId": "get_stock_api_v1_ops_outlets__outlet_id__stock_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "low",
+                "out"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 60,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Stock",
+        "tags": [
+          "ops: stock"
+        ]
+      }
+    },
+    "/api/v1/ops/outlets/{outlet_id}/stock-movements": {
+      "get": {
+        "operationId": "list_movements_api_v1_ops_outlets__outlet_id__stock_movements_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stock_item_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stock Item Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovementPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Movements",
+        "tags": [
+          "ops: stock"
+        ]
+      },
+      "post": {
+        "operationId": "create_movement_api_v1_ops_outlets__outlet_id__stock_movements_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MovementCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Movement",
+        "tags": [
+          "ops: stock"
+        ]
+      }
+    },
+    "/api/v1/owner/addon-groups/{group_id}": {
+      "delete": {
+        "operationId": "delete_addon_group_api_v1_owner_addon_groups__group_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Addon Group",
+        "tags": [
+          "owner: catalog"
+        ]
+      },
+      "patch": {
+        "operationId": "update_addon_group_api_v1_owner_addon_groups__group_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddonGroupInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Addon Group",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/addon-options/{option_id}/recipe": {
+      "get": {
+        "operationId": "get_option_recipe_api_v1_owner_addon_options__option_id__recipe_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "option_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Option Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecipeLineRow"
+                  },
+                  "title": "Response Get Option Recipe Api V1 Owner Addon Options  Option Id  Recipe Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Option Recipe",
+        "tags": [
+          "owner: catalog"
+        ]
+      },
+      "put": {
+        "operationId": "set_option_recipe_api_v1_owner_addon_options__option_id__recipe_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "option_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Option Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/RecipeLine"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecipeLineRow"
+                  },
+                  "title": "Response Set Option Recipe Api V1 Owner Addon Options  Option Id  Recipe Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Option Recipe",
+        "tags": [
+          "owner: catalog"
         ]
       }
     },
@@ -1241,7 +2793,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Created"
+                  "$ref": "#/components/schemas/app__api__v1__owner__outlets__Created"
                 }
               }
             },
@@ -1322,6 +2874,605 @@
         "summary": "Set Opening Hours",
         "tags": [
           "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/products": {
+      "get": {
+        "operationId": "list_products_api_v1_owner_products_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "price_outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Price Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 60,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "active",
+                "sold_out",
+                "inactive"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProductRow"
+                  },
+                  "title": "Response List Products Api V1 Owner Products Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Products",
+        "tags": [
+          "owner: catalog"
+        ]
+      },
+      "post": {
+        "operationId": "create_product_api_v1_owner_products_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Product",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/products/{product_id}": {
+      "delete": {
+        "operationId": "delete_product_api_v1_owner_products__product_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Product Api V1 Owner Products  Product Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Product",
+        "tags": [
+          "owner: catalog"
+        ]
+      },
+      "get": {
+        "operationId": "get_product_api_v1_owner_products__product_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Product",
+        "tags": [
+          "owner: catalog"
+        ]
+      },
+      "patch": {
+        "operationId": "update_product_api_v1_owner_products__product_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Product",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/products/{product_id}/addon-groups": {
+      "post": {
+        "operationId": "create_addon_group_api_v1_owner_products__product_id__addon_groups_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddonGroupInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Addon Group",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/products/{product_id}/addon-groups/order": {
+      "put": {
+        "operationId": "reorder_addon_groups_api_v1_owner_products__product_id__addon_groups_order_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Addon Groups",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/products/{product_id}/availability": {
+      "get": {
+        "operationId": "product_availability_api_v1_owner_products__product_id__availability_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Availability"
+                  },
+                  "title": "Response Product Availability Api V1 Owner Products  Product Id  Availability Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Product Availability",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/products/{product_id}/prices": {
+      "put": {
+        "operationId": "set_prices_api_v1_owner_products__product_id__prices_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/OutletPriceItem"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OutletPriceRow"
+                  },
+                  "title": "Response Set Prices Api V1 Owner Products  Product Id  Prices Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Prices",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/products/{product_id}/recipe": {
+      "get": {
+        "operationId": "get_product_recipe_api_v1_owner_products__product_id__recipe_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecipeLineRow"
+                  },
+                  "title": "Response Get Product Recipe Api V1 Owner Products  Product Id  Recipe Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Product Recipe",
+        "tags": [
+          "owner: catalog"
+        ]
+      },
+      "put": {
+        "operationId": "set_product_recipe_api_v1_owner_products__product_id__recipe_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/RecipeLine"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecipeLineRow"
+                  },
+                  "title": "Response Set Product Recipe Api V1 Owner Products  Product Id  Recipe Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Product Recipe",
+        "tags": [
+          "owner: catalog"
         ]
       }
     },
@@ -1513,6 +3664,166 @@
         "summary": "Set Staff Outlets",
         "tags": [
           "owner: staff"
+        ]
+      }
+    },
+    "/api/v1/owner/stock-items": {
+      "get": {
+        "operationId": "list_stock_items_api_v1_owner_stock_items_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockItemRow"
+                  },
+                  "title": "Response List Stock Items Api V1 Owner Stock Items Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Stock Items",
+        "tags": [
+          "owner: catalog"
+        ]
+      },
+      "post": {
+        "operationId": "create_stock_item_api_v1_owner_stock_items_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__v1__owner__catalog__Created"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Stock Item",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/stock-items/{item_id}": {
+      "patch": {
+        "operationId": "update_stock_item_api_v1_owner_stock_items__item_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockItemPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Stock Item",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/stock-items/{item_id}/thresholds": {
+      "put": {
+        "operationId": "set_thresholds_api_v1_owner_stock_items__item_id__thresholds_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/ThresholdItem"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Thresholds",
+        "tags": [
+          "owner: catalog"
         ]
       }
     },

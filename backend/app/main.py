@@ -16,7 +16,8 @@ from app import db
 from app.api import health
 from app.api.errors import install_error_handlers
 from app.api.v1 import me
-from app.api.v1.owner import onboarding, outlets, staff
+from app.api.v1.ops import stock as ops_stock
+from app.api.v1.owner import catalog, onboarding, outlets, staff
 from app.auth.principal import PgUserDirectory, UserDirectory
 from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
@@ -105,6 +106,8 @@ def create_app(
     app.include_router(onboarding.router)
     app.include_router(outlets.router)
     app.include_router(staff.router)
+    app.include_router(catalog.router)
+    app.include_router(ops_stock.router)
 
     logger.info(
         "api configured",

@@ -130,6 +130,16 @@ async def create_outlet(
         " select %s, %s, d, '08:00', '22:00' from generate_series(1, 7) d",
         (outlet_id, ctx.tenant_id),
     )
+    # New outlets sell the same menu at the first outlet's prices until the owner edits them.
+    await conn.execute(
+        """
+        insert into app.outlet_prices (tenant_id, outlet_id, product_id, addon_option_id, price)
+        select tenant_id, %s, product_id, addon_option_id, price from app.outlet_prices
+        where outlet_id = (select id from app.outlets where id <> %s
+                           order by created_at limit 1)
+        """,
+        (outlet_id, outlet_id),
+    )
     await record_audit(
         conn,
         ctx,
@@ -320,3 +330,17 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, UUID):
         return str(value)
     return value
+
+
+async def require_outlet(conn: AsyncConnection, outlet_id: UUID) -> dict[str, Any]:
+    """404 unless the caller may access this outlet (RLS: owner, assigned staff, workers)."""
+    cur = conn.cursor(row_factory=dict_row)
+    await cur.execute(
+        "select id, name, timezone, order_prefix, payment_mode::text as payment_mode,"
+        " pb1_enabled, pb1_rate_bps, delivery_fee from app.outlets where id = %s and is_active",
+        (outlet_id,),
+    )
+    row = await cur.fetchone()
+    if row is None:
+        raise NotFoundError("outlet")
+    return row

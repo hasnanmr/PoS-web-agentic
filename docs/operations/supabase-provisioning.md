@@ -1,6 +1,10 @@
 # Supabase provisioning checklist (T-079)
 
-Status: **config only** — accounts are not created yet (2026-11-17). Run this list when the Supabase account exists. One project per environment: `demo`, `staging`, `production`.
+Status (2026-11-18): the first cloud project is [PoS-web-agentic](https://supabase.com/dashboard/project/igesdngvyyhmbvjclwgi) in Singapore. Its environment designation still needs to be recorded; use separate projects for `demo`, `staging`, and `production` when those environments exist.
+
+Completed on this project: all 11 repository migrations (with matching migration versions), invite-only Auth, the `app.custom_access_token_hook`, 900-second access tokens, `http://localhost:5170` as the Auth Site URL and Redirect URL, and four private Storage buckets. The current JWT signing key is ECC P-256. The admin app's local publishable key and project URL are in the ignored `admin/.env.local` file.
+
+The `app_backend` role password and transaction-pooler URL are in the ignored local `backend/.env`, together with the Supabase URL/JWKS/issuer. A read-only connection as `app_backend` succeeded. Still required before end-to-end owner invitations: set `SUPABASE_SERVICE_ROLE_KEY` in the backend's local/deployment secrets, copy the backend variables to deployment secrets when deployed, and replace the local Auth URL with the hosted admin URL. The legacy HS256 signing key is still listed as a previous key; revoke it after confirming no clients depend on it. Do not run `supabase/seed.sql` on this project.
 
 | Step | Setting | Source of truth |
 |---|---|---|

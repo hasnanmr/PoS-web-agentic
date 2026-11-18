@@ -28,7 +28,7 @@ sql_paths = ["./seed.sql"]
 [auth]
 enabled = true
 site_url = "http://localhost:5170"
-additional_redirect_urls = ["http://localhost:5170/auth/callback"]
+additional_redirect_urls = ["http://localhost:5170", "http://localhost:5170/auth/callback"]
 # Short access-token expiry (NFR5). Outlet access and active status are checked live.
 jwt_expiry = 900
 enable_refresh_token_rotation = true
