@@ -128,6 +128,19 @@ describe('O5 add-on group editor', () => {
 })
 
 describe('O6 Resep & Bahan', () => {
+  it('keeps the recipe editable when only availability fails', async () => {
+    const api = fakeApi({
+      'GET /owner/stock-items': [{ id: 'kopi', name: 'Biji kopi house blend', unit: 'g', display_unit: 'kg', thresholds: [] }],
+      'GET /owner/products': ROWS,
+      'GET /owner/products/p1': DETAIL,
+      'GET /owner/products/p1/recipe': [{ stock_item_id: 'kopi', stock_item: 'Biji kopi house blend', unit: 'g', quantity: '18.000' }],
+      'GET /owner/products/p1/availability': new Error('boom'),
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><RecipesPage /></WithSession>)
+    expect(await screen.findByRole('button', { name: 'Simpan resep' })).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
   it('shows the recipe, availability, and saves', async () => {
     const api = fakeApi({
       'GET /owner/stock-items': [

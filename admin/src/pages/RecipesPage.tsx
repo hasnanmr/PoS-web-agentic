@@ -127,7 +127,7 @@ function RecipeEditor({ productId, stockItems, onSaved }: { productId: string; s
     setShown(recipe.data)
     setLines(recipe.data ? toDrafts(recipe.data) : undefined)
   }
-  const loadError = product.error ?? recipe.error ?? availability.error
+  const loadError = product.error ?? recipe.error
   if (loadError) return <Alert>{errorMessage(loadError)}</Alert>
   if (!product.data || !lines) return <Loading />
 
@@ -173,6 +173,7 @@ function RecipeEditor({ productId, stockItems, onSaved }: { productId: string; s
 
       <div className="mt-5 rounded-md bg-page p-3 text-[12px]">
         <p className="font-semibold">Simulasi ketersediaan per outlet (1 porsi Regular)</p>
+        {availability.error ? <div className="mt-1"><Alert>{errorMessage(availability.error)}</Alert></div> : null}
         <p className="mt-1">
           {(availability.data ?? []).map((a) => (
             <span key={a.outlet_id} className={a.sold_out ? 'text-danger' : ''}>
