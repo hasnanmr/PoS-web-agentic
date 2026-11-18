@@ -200,6 +200,83 @@ def test_addon_group_limits_and_replace(client, ctx) -> None:
     )
 
 
+def test_addon_group_slot_freed_by_removing_an_option(client, ctx) -> None:
+    """Regression: removed options are deactivated, and only active ones count toward 10."""
+    kopi = _product(client, ctx, "Americano")
+    res = client.post(
+        f"/api/v1/owner/products/{kopi['id']}/addon-groups",
+        headers=ctx["owner"],
+        json={"name": "Topping", "options": [{"name": f"T{i}"} for i in range(10)]},
+    )
+    assert res.status_code == 201, res.text
+    group = next(g for g in res.json()["addon_groups"] if g["name"] == "Topping")
+    options = group["options"]
+    assert len(options) == 10
+    # Remove one and add one in the same save (what the editor does).
+    body = {
+        "name": "Topping",
+        "selection": "single",
+        "is_required": False,
+        "options": [{"id": o["id"], "name": o["name"]} for o in options[1:]] + [{"name": "Baru"}],
+    }
+    res = client.patch(f"/api/v1/owner/addon-groups/{group['id']}", headers=ctx["owner"], json=body)
+    assert res.status_code == 200, res.text
+    group = next(g for g in res.json()["addon_groups"] if g["name"] == "Topping")
+    assert [o["name"] for o in group["options"]][-1] == "Baru"
+    assert len(group["options"]) == 10
+    # An 11th active option is still rejected.
+    body["options"].append({"name": "Terlalu banyak"})
+    res = client.patch(f"/api/v1/owner/addon-groups/{group['id']}", headers=ctx["owner"], json=body)
+    assert res.status_code == 422
+    client.delete(f"/api/v1/owner/addon-groups/{group['id']}", headers=ctx["owner"])
+
+
+def test_unknown_outlet_in_option_prices_is_422_not_500(client, ctx) -> None:
+    kopi = _product(client, ctx, "Americano")
+    res = client.post(
+        f"/api/v1/owner/products/{kopi['id']}/addon-groups",
+        headers=ctx["owner"],
+        json={
+            "name": "Salah outlet",
+            "options": [
+                {
+                    "name": "X",
+                    "prices": [
+                        {"outlet_id": "00000000-0000-0000-0000-0000000000ff", "price": 1000}
+                    ],
+                }
+            ],
+        },
+    )
+    assert res.status_code == 422, res.text
+
+
+def test_blank_names_are_validation_errors(client, ctx) -> None:
+    owner = ctx["owner"]
+    assert (
+        client.post("/api/v1/owner/products", headers=owner, json={"name": "  "}).status_code == 422
+    )
+    kopi = _product(client, ctx, "Americano")
+    res = client.patch(f"/api/v1/owner/products/{kopi['id']}", headers=owner, json={"name": " "})
+    assert res.status_code == 422
+    res = client.post("/api/v1/owner/stock-items", headers=owner, json={"name": " ", "unit": "g"})
+    assert res.status_code == 422
+    # Trimmed on the way in.
+    res = client.post(
+        "/api/v1/owner/stock-items", headers=owner, json={"name": "  Es batu  ", "unit": "g"}
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_reorder_requires_every_group_once(client, ctx) -> None:
+    kopi = _product(client, ctx, "Es Kopi Susu Senja")
+    detail = client.get(f"/api/v1/owner/products/{kopi['id']}", headers=ctx["owner"]).json()
+    ids = [g["id"] for g in detail["addon_groups"]]
+    url = f"/api/v1/owner/products/{kopi['id']}/addon-groups/order"
+    assert client.put(url, headers=ctx["owner"], json=ids[:-1]).status_code == 422
+    assert client.put(url, headers=ctx["owner"], json=list(reversed(ids))).status_code == 204
+
+
 def test_recipe_rules_and_availability(client, ctx) -> None:
     croissant = _product(client, ctx, "Croissant Butter")
     url = f"/api/v1/owner/products/{croissant['id']}/recipe"

@@ -87,6 +87,16 @@ select pg_temp.expect_error(
   $$insert into app.addon_options (tenant_id, group_id, name)
     values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000e2', 'Opsi 11')$$,
   '11th add-on option (AC4.6)');
+-- Deactivated options free a slot; reactivating into a full group is rejected.
+update app.addon_options set is_active = false
+where id = (select id from app.addon_options
+            where group_id = '00000000-0000-0000-0000-0000000000e2' and name = 'Opsi 1');
+insert into app.addon_options (tenant_id, group_id, name)
+values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000e2', 'Opsi 11');
+select pg_temp.expect_error(
+  $$update app.addon_options set is_active = true
+    where group_id = '00000000-0000-0000-0000-0000000000e2' and name = 'Opsi 1'$$,
+  'reactivating an option in a group with 10 active options');
 
 -- Orders ------------------------------------------------------------------
 insert into app.orders (id, tenant_id, outlet_id, order_no, channel, type, payment_mode, status,

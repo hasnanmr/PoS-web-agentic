@@ -8,7 +8,7 @@ import { displayFactor, formatDelta, formatQty, formatTime } from '../lib/format
 import type { Movement, StockResponse, StockRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
-import { Alert, Button, Card, Field, Loading, Select, TextInput } from '../ui/kit'
+import { Alert, Button, Card, Field, LinkButton, Loading, Select, TextInput } from '../ui/kit'
 
 type Filter = 'all' | 'low' | 'out'
 type MoveType = 'restock' | 'waste' | 'adjustment'
@@ -34,6 +34,8 @@ function affectedText(row: StockRow): string {
     .join(', ')
 }
 
+interface MovementPage { items: Movement[]; next_cursor: number | null }
+
 export default function StockPage() {
   const { api, outlet } = useSession()
   const outletId = outlet?.id ?? ''
@@ -41,9 +43,13 @@ export default function StockPage() {
   const [q, setQ] = useState('')
   const stock = useLoad(() => api.get<StockResponse>(`/ops/outlets/${outletId}/stock`), outletId)
   const history = useLoad(
-    () => api.get<{ items: Movement[] }>(`/ops/outlets/${outletId}/stock-movements?limit=20`),
+    () => api.get<MovementPage>(`/ops/outlets/${outletId}/stock-movements?limit=20`),
     outletId,
   )
+  // Older pages appended after the first 20 ("Muat lagi"); reset when the outlet or the newest page changes.
+  const [older, setOlder] = useState<{ outletId: string; items: Movement[]; cursor: number | null }>()
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreError, setMoreError] = useState<string>()
   const formRef = useRef<HTMLDivElement>(null)
   const [preselect, setPreselect] = useState<string>()
 
@@ -52,6 +58,22 @@ export default function StockPage() {
     (i) => (filter === 'all' || i.status === filter) && i.name.toLowerCase().includes(q.trim().toLowerCase()),
   )
   const counts = stock.data?.counts ?? { low: 0, out: 0 }
+  const extra = older?.outletId === outletId ? older : undefined
+  const movements = [...(history.data?.items ?? []), ...(extra?.items ?? [])]
+  const nextCursor = extra ? extra.cursor : (history.data?.next_cursor ?? null)
+  async function loadMore() {
+    if (nextCursor == null) return
+    setLoadingMore(true)
+    setMoreError(undefined)
+    try {
+      const page = await api.get<MovementPage>(`/ops/outlets/${outletId}/stock-movements?limit=20&cursor=${nextCursor}`)
+      setOlder({ outletId, items: [...(extra?.items ?? []), ...page.items], cursor: page.next_cursor })
+    } catch (e) {
+      setMoreError(errorMessage(e))
+    } finally {
+      setLoadingMore(false)
+    }
+  }
   const chip = (value: Filter, label: string) => (
     <button type="button" onClick={() => setFilter(value)} aria-pressed={filter === value}
       className={`rounded-full px-2.5 py-1 text-[12px] ${filter === value ? 'bg-primary-soft font-semibold text-primary' : 'text-text-muted hover:text-text'}`}>
@@ -113,10 +135,11 @@ export default function StockPage() {
 
         <div className="space-y-4" ref={formRef}>
           <MovementForm key={preselect ?? 'none'} items={stock.data?.items ?? []} preselect={preselect}
-            onSaved={async () => { await Promise.all([stock.reload(), history.reload()]) }} />
+            onSaved={async () => { setOlder(undefined); await Promise.all([stock.reload(), history.reload()]) }} />
           <Card title="Riwayat movement (append-only)">
+            {history.error ? <Alert>{errorMessage(history.error)}</Alert> : null}
             <ul className="space-y-1.5 text-[12px]">
-              {(history.data?.items ?? []).map((m) => (
+              {movements.map((m) => (
                 <li key={m.id} className="flex gap-2">
                   <span className="w-10 shrink-0 text-text-muted">{formatTime(m.at, outlet.timezone)}</span>
                   <span className="w-14 shrink-0">{MOVE_LABEL[m.type]}</span>
@@ -126,8 +149,15 @@ export default function StockPage() {
                   </span>
                 </li>
               ))}
-              {history.data?.items.length === 0 && <li className="text-text-muted">Belum ada movement.</li>}
+              {history.data && movements.length === 0 && <li className="text-text-muted">Belum ada movement.</li>}
+              {history.loading && !history.data && !history.error && <li className="text-text-muted">Memuat…</li>}
             </ul>
+            {moreError ? <Alert>{moreError}</Alert> : null}
+            {nextCursor != null && (
+              <LinkButton className="mt-2 text-[12px]" disabled={loadingMore} onClick={() => void loadMore()}>
+                {loadingMore ? 'Memuat…' : 'Muat lagi'}
+              </LinkButton>
+            )}
             <p className="mt-3 text-[11px] text-text-muted">
               Stok tidak bisa diedit langsung — hanya lewat movement. Movement tidak bisa diubah/dihapus.
             </p>

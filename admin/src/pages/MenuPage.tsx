@@ -17,14 +17,16 @@ const STATUS_LABEL: Record<ProductRow['status'], string> = { active: 'Aktif', so
 
 export default function MenuPage() {
   const { api, me, outlet } = useSession()
-  const [priceOutlet, setPriceOutlet] = useState(outlet?.id ?? '')
+  // Prices follow the sidebar outlet; the page selector overrides it until the sidebar outlet changes.
+  const [override, setOverride] = useState<{ base: string; id: string }>()
+  const priceOutlet = override && override.base === (outlet?.id ?? '') ? override.id : (outlet?.id ?? '')
   const [q, setQ] = useState('')
   const [category, setCategory] = useState('')
   const [status, setStatus] = useState('all')
   const [selected, setSelected] = useState<string | 'new'>()
   const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
   const products = useLoad(
-    () => api.get<ProductRow[]>(`/owner/products?price_outlet_id=${priceOutlet}`),
+    () => api.get<ProductRow[]>(priceOutlet ? `/owner/products?price_outlet_id=${priceOutlet}` : '/owner/products'),
     priceOutlet,
   )
   const all = products.data ?? []
@@ -43,7 +45,7 @@ export default function MenuPage() {
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2 text-[13px] md:px-6">
         <span className="text-primary">Harga ditampilkan untuk:</span>
         <Select aria-label="Harga ditampilkan untuk outlet" className="h-8 w-auto" value={priceOutlet}
-          onChange={(e) => setPriceOutlet(e.target.value)}>
+          onChange={(e) => setOverride({ base: outlet?.id ?? '', id: e.target.value })}>
           {me.outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
         </Select>
       </div>
@@ -172,6 +174,7 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
   const [shown, setShown] = useState<ProductDetail>()
   const [busy, setBusy] = useState(false)
   const [editingGroup, setEditingGroup] = useState<AddonGroup | 'new'>()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   if (detail.data !== shown) {
     setShown(detail.data)
     setDraft(detail.data ? toDraft(detail.data) : undefined)
@@ -301,14 +304,23 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-        <LinkButton className="text-danger" onClick={async () => {
-          try {
-            const res = await api.del<{ result: string }>(`/owner/products/${productId}`)
-            await onDeleted(res.result === 'deleted' ? `${p.name} dihapus.` : `${p.name} sudah pernah dipesan, jadi dinonaktifkan.`)
-          } catch (e) {
-            onError(errorMessage(e))
-          }
-        }}>✕ Hapus item</LinkButton>
+        {confirmDelete ? (
+          <span className="flex items-center gap-3 text-[12px]">
+            <span>Hapus &quot;{p.name}&quot;?</span>
+            <LinkButton className="text-danger" onClick={async () => {
+              try {
+                const res = await api.del<{ result: string }>(`/owner/products/${productId}`)
+                await onDeleted(res.result === 'deleted' ? `${p.name} dihapus.` : `${p.name} sudah pernah dipesan, jadi dinonaktifkan.`)
+              } catch (e) {
+                setConfirmDelete(false)
+                onError(errorMessage(e))
+              }
+            }}>Ya, hapus</LinkButton>
+            <LinkButton onClick={() => setConfirmDelete(false)}>Batal</LinkButton>
+          </span>
+        ) : (
+          <LinkButton className="text-danger" onClick={() => setConfirmDelete(true)}>✕ Hapus item</LinkButton>
+        )}
         <Button variant="action" onClick={save} disabled={busy || !draft.name.trim()}>
           {busy ? 'Menyimpan…' : 'Simpan & sync katalog'}
         </Button>
@@ -327,11 +339,12 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
   onError: (text: string) => void
 }) {
   const { api } = useSession()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [name, setName] = useState(group?.name ?? '')
   const [selection, setSelection] = useState<'single' | 'multiple'>(group?.selection ?? 'single')
   const [required, setRequired] = useState(group?.is_required ?? false)
   const [options, setOptions] = useState<OptionDraft[]>(
-    group?.options.map((o) => ({ id: o.id, name: o.name, price: String(o.prices.find((x) => x.outlet_id === priceOutlet)?.price ?? 0) }))
+    group?.options.map((o) => ({ id: o.id, name: o.name, price: String(o.prices.find((x) => x.outlet_id === priceOutlet)?.price ?? '') }))
       ?? [{ id: null, name: '', price: '0' }],
   )
   const update = (i: number, patch: Partial<OptionDraft>) => setOptions(options.map((o, j) => (j === i ? { ...o, ...patch } : o)))
@@ -344,7 +357,8 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
       options: options.filter((o) => o.name.trim()).map((o) => ({
         id: o.id,
         name: o.name.trim(),
-        prices: [{ outlet_id: priceOutlet, price: Number(o.price || 0) }],
+        // An empty price stays unpriced at this outlet (null), it is not Rp 0.
+        prices: priceOutlet ? [{ outlet_id: priceOutlet, price: o.price === '' ? null : Number(o.price) }] : [],
       })),
     }
     try {
@@ -371,7 +385,7 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
           <TextInput aria-label={`Opsi ${i + 1}`} placeholder="Regular" className="h-8 flex-1" value={o.name}
             onChange={(e) => update(i, { name: e.target.value })} />
           <span className="text-text-muted">+Rp</span>
-          <TextInput aria-label={`Harga opsi ${i + 1}`} inputMode="numeric" className="h-8 w-20" value={o.price}
+          <TextInput aria-label={`Harga opsi ${i + 1}`} inputMode="numeric" placeholder="—" className="h-8 w-20" value={o.price}
             onChange={(e) => update(i, { price: e.target.value.replace(/\D/g, '') })} />
           <button type="button" aria-label={`Hapus opsi ${i + 1}`} className="text-text-muted hover:text-danger"
             onClick={() => setOptions(options.filter((_, j) => j !== i))}>✕</button>
@@ -384,16 +398,23 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
       <div className="flex flex-wrap items-center gap-3">
         <Button className="h-8" disabled={!name.trim() || !options.some((o) => o.name.trim())} onClick={save}>Simpan grup</Button>
         <LinkButton onClick={() => void onDone()}>Batal</LinkButton>
-        {group && (
-          <LinkButton className="ml-auto text-danger" onClick={async () => {
-            try {
-              await api.del(`/owner/addon-groups/${group.id}`)
-              await onDone(`Grup add-on "${group.name}" dihapus.`)
-            } catch (e) {
-              onError(errorMessage(e))
-            }
-          }}>Hapus grup</LinkButton>
-        )}
+        {group && (confirmDelete ? (
+          <span className="ml-auto flex items-center gap-3">
+            <span>Hapus grup ini?</span>
+            <LinkButton className="text-danger" onClick={async () => {
+              try {
+                await api.del(`/owner/addon-groups/${group.id}`)
+                await onDone(`Grup add-on "${group.name}" dihapus.`)
+              } catch (e) {
+                setConfirmDelete(false)
+                onError(errorMessage(e))
+              }
+            }}>Ya, hapus</LinkButton>
+            <LinkButton onClick={() => setConfirmDelete(false)}>Batal</LinkButton>
+          </span>
+        ) : (
+          <LinkButton className="ml-auto text-danger" onClick={() => setConfirmDelete(true)}>Hapus grup</LinkButton>
+        ))}
       </div>
     </div>
   )

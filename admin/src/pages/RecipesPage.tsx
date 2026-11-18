@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
-import { displayFactor, formatDelta } from '../lib/format'
+import { displayFactor, formatDelta, plainQuantity } from '../lib/format'
 import type { AddonOption, Availability, DisplayUnit, ProductDetail, ProductRow, RecipeLine, StockItem, Unit } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
@@ -45,7 +45,7 @@ export default function RecipesPage() {
 interface LineDraft { stock_item_id: string; amount: string }
 
 function toDrafts(lines: RecipeLine[]): LineDraft[] {
-  return lines.map((l) => ({ stock_item_id: l.stock_item_id, amount: String(Number(l.quantity)) }))
+  return lines.map((l) => ({ stock_item_id: l.stock_item_id, amount: plainQuantity(l.quantity) }))
 }
 
 function toBody(lines: LineDraft[]) {
@@ -127,6 +127,8 @@ function RecipeEditor({ productId, stockItems, onSaved }: { productId: string; s
     setShown(recipe.data)
     setLines(recipe.data ? toDrafts(recipe.data) : undefined)
   }
+  const loadError = product.error ?? recipe.error
+  if (loadError) return <Alert>{errorMessage(loadError)}</Alert>
   if (!product.data || !lines) return <Loading />
 
   async function save() {
@@ -279,7 +281,7 @@ function ThresholdTab({ items, reload }: { items?: StockItem[]; reload: () => Pr
   if (!items) return <Loading />
   const current = (i: StockItem) => {
     const t = i.thresholds.find((x) => x.outlet_id === outletId)?.low_threshold ?? '0'
-    return String(Number(t) / displayFactor(i.display_unit))
+    return plainQuantity(String(Number(t) / displayFactor(i.display_unit)))
   }
   async function save() {
     try {

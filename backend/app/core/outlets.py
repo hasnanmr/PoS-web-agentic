@@ -130,12 +130,15 @@ async def create_outlet(
         " select %s, %s, d, '08:00', '22:00' from generate_series(1, 7) d",
         (outlet_id, ctx.tenant_id),
     )
-    # New outlets sell the same menu at the first outlet's prices until the owner edits them.
+    # New outlets sell the same menu at the oldest active outlet's prices (and availability)
+    # until the owner edits them.
     await conn.execute(
         """
-        insert into app.outlet_prices (tenant_id, outlet_id, product_id, addon_option_id, price)
-        select tenant_id, %s, product_id, addon_option_id, price from app.outlet_prices
-        where outlet_id = (select id from app.outlets where id <> %s
+        insert into app.outlet_prices
+          (tenant_id, outlet_id, product_id, addon_option_id, price, is_available)
+        select tenant_id, %s, product_id, addon_option_id, price, is_available
+        from app.outlet_prices
+        where outlet_id = (select id from app.outlets where id <> %s and is_active
                            order by created_at limit 1)
         """,
         (outlet_id, outlet_id),

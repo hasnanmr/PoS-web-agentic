@@ -217,6 +217,8 @@ async def update_product(
         )
     if tags is not None:
         await _set_tags(conn, ctx, product_id, tags)
+    if not fields and tags is None:
+        return
     await record_audit(
         conn,
         ctx,
@@ -272,22 +274,24 @@ async def _upsert_price(
         (price.price, price.outlet_id, target),
     )
     if cur.rowcount == 0:
-        await conn.execute(
-            f"insert into app.outlet_prices (tenant_id, outlet_id, {column}, price)"  # noqa: S608
-            " values (%s, %s, %s, %s)",
-            (ctx.tenant_id, price.outlet_id, target, price.price),
-        )
+        try:
+            async with conn.transaction():
+                await conn.execute(
+                    f"insert into app.outlet_prices (tenant_id, outlet_id, {column}, price)"  # noqa: S608
+                    " values (%s, %s, %s, %s)",
+                    (ctx.tenant_id, price.outlet_id, target, price.price),
+                )
+        except (errors.ForeignKeyViolation, errors.InsufficientPrivilege):
+            # An outlet of another tenant fails the RLS check before the foreign key.
+            raise ValidationFailedError("unknown outlet", {"field": "outlet_id"}) from None
 
 
 async def set_product_prices(
     conn: AsyncConnection, ctx: ActorContext, product_id: UUID, prices: list[OutletPrice]
 ) -> None:
     await get_product(conn, product_id)
-    try:
-        for p in prices:
-            await _upsert_price(conn, ctx, p, product_id=product_id)
-    except errors.ForeignKeyViolation:
-        raise ValidationFailedError("unknown outlet", {"field": "outlet_id"}) from None
+    for p in prices:
+        await _upsert_price(conn, ctx, p, product_id=product_id)
     await record_audit(
         conn,
         ctx,
@@ -352,7 +356,12 @@ async def save_addon_group(
             raise NotFoundError("add-on group")
         product_id = row[0]
 
-    keep: list[UUID] = []
+    # Free slots first: the 10-option limit counts active options only.
+    keep: list[UUID] = [o.id for o in options if o.id is not None]
+    await conn.execute(
+        "update app.addon_options set is_active = false where group_id = %s and not (id = any(%s))",
+        (group_id, keep),
+    )
     for index, opt in enumerate(options, start=1):
         if opt.id is None:
             option_id = uuid4()
@@ -376,13 +385,8 @@ async def save_addon_group(
             )
             if cur.rowcount == 0:
                 raise NotFoundError("add-on option")
-        keep.append(option_id)
         for p in opt.prices:
             await _upsert_price(conn, ctx, p, option_id=option_id)
-    await conn.execute(
-        "update app.addon_options set is_active = false where group_id = %s and not (id = any(%s))",
-        (group_id, keep),
-    )
     await record_audit(
         conn,
         ctx,
@@ -411,13 +415,27 @@ async def delete_addon_group(conn: AsyncConnection, ctx: ActorContext, group_id:
 
 
 async def reorder_addon_groups(
-    conn: AsyncConnection, product_id: UUID, group_ids: list[UUID]
+    conn: AsyncConnection, ctx: ActorContext, product_id: UUID, group_ids: list[UUID]
 ) -> None:
+    await get_product(conn, product_id)
+    cur = await conn.execute("select id from app.addon_groups where product_id = %s", (product_id,))
+    existing = {row[0] for row in await cur.fetchall()}
+    if len(set(group_ids)) != len(group_ids) or set(group_ids) != existing:
+        raise ValidationFailedError(
+            "order must list every group of the product exactly once", {"field": "group_ids"}
+        )
     for index, gid in enumerate(group_ids, start=1):
         await conn.execute(
-            "update app.addon_groups set sort_order = %s where id = %s and product_id = %s",
-            (index, gid, product_id),
+            "update app.addon_groups set sort_order = %s where id = %s", (index, gid)
         )
+    await record_audit(
+        conn,
+        ctx,
+        action="addon_group.reordered",
+        entity_type="product",
+        entity_id=product_id,
+        data={"groups": len(group_ids)},
+    )
 
 
 # Stock items & thresholds --------------------------------------------------------------------

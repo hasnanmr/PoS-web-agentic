@@ -7,11 +7,11 @@ Photo upload (Supabase Storage) and WhatsApp catalog sync (T-051) come later.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app import db
 from app.auth.deps import OwnerOnly
@@ -20,6 +20,9 @@ from app.core import catalog as core
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: catalog"])
 
 Quantity = Decimal
+# Names are trimmed before validation: the DB requires 1-120 chars after trim.
+Name120 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+Name60 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
 Unit = Literal["g", "ml", "pcs"]
 DisplayUnit = Literal["g", "kg", "ml", "L", "pcs"]
 CATALOG_SYNC = "not_configured"  # WhatsApp catalog sync (T-051) is not part of the POS demo
@@ -97,7 +100,7 @@ class ProductDetail(BaseModel):
 
 
 class ProductCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: Name120
     category: str | None = Field(default=None, max_length=60)
     description: str | None = Field(default=None, max_length=500)
     is_owner_pick: bool = False
@@ -106,7 +109,7 @@ class ProductCreate(BaseModel):
 
 
 class ProductPatch(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=120)
+    name: Name120 | None = None
     category: str | None = Field(default=None, max_length=60)
     description: str | None = Field(default=None, max_length=500)
     is_owner_pick: bool | None = None
@@ -116,12 +119,12 @@ class ProductPatch(BaseModel):
 
 class AddonOptionInput(BaseModel):
     id: UUID | None = None
-    name: str = Field(min_length=1, max_length=60)
+    name: Name60
     prices: list[OutletPriceItem] = Field(default_factory=list)
 
 
 class AddonGroupInput(BaseModel):
-    name: str = Field(min_length=1, max_length=60)
+    name: Name60
     selection: Literal["single", "multiple"] = "single"
     is_required: bool = False
     options: list[AddonOptionInput] = Field(min_length=1, max_length=10)
@@ -136,13 +139,13 @@ class StockItemRow(BaseModel):
 
 
 class StockItemCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: Name120
     unit: Unit
     display_unit: DisplayUnit | None = None
 
 
 class StockItemPatch(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=120)
+    name: Name120 | None = None
     display_unit: DisplayUnit | None = None
 
 
@@ -297,8 +300,9 @@ async def delete_addon_group(group_id: UUID, request: Request, owner: OwnerOnly)
 async def reorder_addon_groups(
     product_id: UUID, body: list[UUID], request: Request, owner: OwnerOnly
 ) -> Response:
-    async with db.transaction(_pool(request), owner.actor()) as conn:
-        await core.reorder_addon_groups(conn, product_id, body)
+    ctx = owner.actor()
+    async with db.transaction(_pool(request), ctx) as conn:
+        await core.reorder_addon_groups(conn, ctx, product_id, body)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

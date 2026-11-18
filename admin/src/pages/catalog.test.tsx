@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { fakeApi, fakeSession } from '../test/fakes'
 import { WithSession } from '../test/session'
 import type { ProductDetail, ProductRow, StockResponse } from '../lib/types'
-import { formatQty } from '../lib/format'
+import { formatQty, plainQuantity } from '../lib/format'
 import MenuPage from './MenuPage'
 import RecipesPage from './RecipesPage'
 import StockPage from './StockPage'
@@ -29,9 +29,31 @@ describe('format', () => {
     expect(formatQty('180', 'g', 'g')).toBe('180 g')
     expect(formatQty('140', 'pcs', 'pcs')).toBe('140 pcs')
   })
+
+  it('shows decimal strings from the API as editable id-ID text without rounding', () => {
+    expect(plainQuantity('125.000')).toBe('125')
+    expect(plainQuantity('0.125')).toBe('0,125')
+    expect(plainQuantity('10.050')).toBe('10,05')
+    expect(plainQuantity('999999999.123')).toBe('999999999,123')
+  })
 })
 
 describe('S7 Stok', () => {
+  it('loads older movements with "Muat lagi"', async () => {
+    const move = (id: number) => ({ id, at: '2026-11-18T03:00:00Z', type: 'restock', quantity: '100', unit: 'g',
+      display_unit: 'g', stock_item: `Bahan ${id}`, order_no: null, note: null, actor_type: 'user', actor: 'Rina' })
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/stock': STOCK,
+      'GET /ops/outlets/o-dago/stock-movements?limit=20': { items: [move(2)], next_cursor: 2 },
+      'GET /ops/outlets/o-dago/stock-movements?limit=20&cursor=2': { items: [move(1)], next_cursor: null },
+    })
+    render(<WithSession session={fakeSession('staff', { api })}><StockPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Muat lagi' }))
+    expect(await screen.findByText(/bahan 1/)).toBeInTheDocument()
+    expect(screen.getByText(/bahan 2/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Muat lagi' })).not.toBeInTheDocument()
+  })
+
   it('shows levels, filters, and records a restock in the display unit', async () => {
     const api = fakeApi({
       'GET /ops/outlets/o-dago/stock': STOCK,
@@ -80,6 +102,28 @@ describe('O5 Menu & Add-on', () => {
       { outlet_id: 'o-dago', price: 25000 }, { outlet_id: 'o-riau', price: 27000 }]]))
     expect(api.calls.find(([m, p]) => m === 'PATCH' && p === '/owner/products/p1')?.[2]).toMatchObject({
       tags: ['coffee', 'sweet'], is_owner_pick: true })
+  })
+})
+
+describe('O5 add-on group editor', () => {
+  it('keeps an unpriced option unpriced (null), not Rp 0', async () => {
+    const detail: ProductDetail = { ...DETAIL, addon_groups: [{ ...DETAIL.addon_groups[0], options: [
+      { id: 'large', name: 'Large', sort_order: 1, prices: [], recipe: [] }] }] }
+    const api = fakeApi({ 'GET /owner/products?price_outlet_id=o-dago': ROWS, 'GET /owner/products/p1': detail })
+    render(<MemoryRouter><WithSession session={fakeSession('owner', { api })}><MenuPage /></WithSession></MemoryRouter>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Ubah grup Ukuran' }))
+    expect(screen.getByLabelText('Harga opsi 1')).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan grup' }))
+    await waitFor(() => expect(api.calls.find(([m, p]) => m === 'PATCH' && p === '/owner/addon-groups/g1')?.[2])
+      .toMatchObject({ options: [{ id: 'large', name: 'Large', prices: [{ outlet_id: 'o-dago', price: null }] }] }))
+  })
+
+  it('asks before deleting an item', async () => {
+    const api = fakeApi({ 'GET /owner/products?price_outlet_id=o-dago': ROWS, 'GET /owner/products/p1': DETAIL })
+    render(<MemoryRouter><WithSession session={fakeSession('owner', { api })}><MenuPage /></WithSession></MemoryRouter>)
+    await userEvent.click(await screen.findByText('✕ Hapus item'))
+    expect(api.calls.some(([m]) => m === 'DELETE')).toBe(false)
+    expect(screen.getByText(/Hapus "Es Kopi Susu Senja"\?/)).toBeInTheDocument()
   })
 })
 

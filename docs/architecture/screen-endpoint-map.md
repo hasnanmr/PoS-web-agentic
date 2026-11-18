@@ -66,7 +66,7 @@ Staff calling it → `403` (AC7.7).
 | List with price for one outlet | `GET /owner/products?price_outlet_id=&q=&category=&status=` ✅ | `[{id, name, category, is_owner_pick, is_sample, addon_group_count, price, status: active\|sold_out\|inactive}]`. |
 | + Item menu / Edit | `POST /owner/products`, `GET/PATCH /owner/products/{id}` ✅ (photo upload pending) | `name*, category, is_owner_pick, tags[], description, is_active, photo` (upload URL via `POST /owner/products/{id}/photo`). |
 | Harga per outlet | `PUT /owner/products/{id}/prices` ✅ | `[{outlet_id, price}]`. |
-| Grup add-on | `POST /owner/products/{id}/addon-groups`, `PATCH/DELETE /owner/addon-groups/{id}`, `PUT /owner/products/{id}/addon-groups/order` ✅ | `name, selection: single\|multiple, is_required`, options `[{name, prices:[{outlet_id, price}]}]`, max 10 options. Option availability per outlet returned (`unavailable` when ingredients run out). |
+| Grup add-on | `POST /owner/products/{id}/addon-groups`, `PATCH/DELETE /owner/addon-groups/{id}`, `PUT /owner/products/{id}/addon-groups/order` ✅ | `name, selection: single\|multiple, is_required`, options `[{name, prices:[{outlet_id, price}]}]`, max 10 options. Removed options are deactivated, not deleted (orders may reference them); only active options count toward the 10-option limit. Per-option availability is not returned yet (O5 shows none); product availability is `GET /owner/products/{id}/availability`. |
 | Simpan & sync katalog | the save calls above enqueue catalog sync automatically | Response includes `catalog_sync: queued` once T-051 exists; until then `not_configured`. |
 | ✕ Hapus item | `DELETE /owner/products/{id}` ✅ | Soft delete if referenced by orders. |
 

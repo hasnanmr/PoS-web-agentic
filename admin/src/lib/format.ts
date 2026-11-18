@@ -71,3 +71,10 @@ export function formatTime(iso: string, timeZone: string): string {
     .format(new Date(iso))
     .replace('.', ':')
 }
+
+/** A decimal string from the API (e.g. "125.000", "0.500") as editable id-ID text ("125", "0,5"), without rounding through Number. */
+export function plainQuantity(value: string | number): string {
+  const text = String(value)
+  if (!text.includes('.')) return text
+  return text.replace(/\.?0+$/, '').replace('.', ',')
+}
