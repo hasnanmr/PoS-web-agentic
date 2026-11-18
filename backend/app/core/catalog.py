@@ -458,6 +458,13 @@ async def list_stock_items(conn: AsyncConnection) -> list[dict[str, Any]]:
     return await cur.fetchall()
 
 
+def _stock_item_check_error(exc: errors.CheckViolation) -> ValidationFailedError:
+    constraint = getattr(exc.diag, "constraint_name", None) or ""
+    if "name" in constraint:
+        return ValidationFailedError("name must be 1-120 characters", {"field": "name"})
+    return ValidationFailedError("display unit does not fit the unit", {"field": "display_unit"})
+
+
 async def create_stock_item(
     conn: AsyncConnection, ctx: ActorContext, *, name: str, unit: str, display_unit: str | None
 ) -> UUID:
@@ -473,10 +480,8 @@ async def create_stock_item(
         raise ConflictError(
             "stock_item_name_taken", "an ingredient with this name exists"
         ) from None
-    except errors.CheckViolation:
-        raise ValidationFailedError(
-            "display unit does not fit the unit", {"field": "display_unit"}
-        ) from None
+    except errors.CheckViolation as exc:
+        raise _stock_item_check_error(exc) from None
     await record_audit(
         conn,
         ctx,
@@ -504,10 +509,8 @@ async def update_stock_item(
         raise ConflictError(
             "stock_item_name_taken", "an ingredient with this name exists"
         ) from None
-    except errors.CheckViolation:
-        raise ValidationFailedError(
-            "display unit does not fit the unit", {"field": "display_unit"}
-        ) from None
+    except errors.CheckViolation as exc:
+        raise _stock_item_check_error(exc) from None
     if cur.rowcount == 0:
         raise NotFoundError("stock item")
     await record_audit(

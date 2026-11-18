@@ -1,9 +1,8 @@
 version: 2
 
-# Template files and local-dev compose hold placeholders and throwaway
-# docker passwords only; real secrets live in untracked .env files.
+# Allowlist one known value instead of whole paths, so a real secret committed to an
+# env template or compose file is still caught.
 secret:
-  ignored_paths:
-    - "**/.env.example"
-    - "docker-compose*.yml"
-    - "docker-compose*.yaml"
+  ignored_matches:
+    - name: Local docker database password (backend/.env.example)
+      match: app_backend_local

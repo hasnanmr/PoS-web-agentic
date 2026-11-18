@@ -195,10 +195,17 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
         is_active: draft.is_active,
         tags: draft.tags.split(',').map((t) => t.trim()).filter(Boolean),
       })
-      await api.put(`/owner/products/${productId}/prices`, p.prices.map((x) => ({
-        outlet_id: x.outlet_id,
-        price: draft.prices[x.outlet_id] === '' ? null : Number(draft.prices[x.outlet_id].replace(/\D/g, '')),
-      })))
+      try {
+        await api.put(`/owner/products/${productId}/prices`, p.prices.map((x) => ({
+          outlet_id: x.outlet_id,
+          price: draft.prices[x.outlet_id] === '' ? null : Number(draft.prices[x.outlet_id].replace(/\D/g, '')),
+        })))
+      } catch (e) {
+        // The PATCH above already succeeded: say so, so the owner knows what was saved.
+        await detail.reload()
+        onError(`Data item tersimpan, tetapi harga belum tersimpan: ${errorMessage(e)}`)
+        return
+      }
       await detail.reload()
       await onChanged('Perubahan menu disimpan. Sync katalog WhatsApp belum aktif untuk demo.')
     } catch (e) {

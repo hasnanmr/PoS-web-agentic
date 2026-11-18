@@ -139,7 +139,7 @@ async def create_outlet(
         select tenant_id, %s, product_id, addon_option_id, price, is_available
         from app.outlet_prices
         where outlet_id = (select id from app.outlets where id <> %s and is_active
-                           order by created_at limit 1)
+                           order by created_at, id limit 1)
         """,
         (outlet_id, outlet_id),
     )
