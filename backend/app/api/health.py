@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, Response, status
 
 from app import db
 from app.config import Settings
+from app.version import BUILD_SHA
 
 router = APIRouter(tags=["health"])
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 async def healthz(request: Request) -> dict[str, Any]:
     """Liveness: the process is up and serving requests. Never touches dependencies."""
     settings: Settings = request.app.state.settings
-    return {"status": "ok", "env": settings.app_env}
+    return {"status": "ok", "env": settings.app_env, "version": BUILD_SHA}
 
 
 @router.get("/readyz")
@@ -40,4 +41,4 @@ async def readyz(request: Request, response: Response) -> dict[str, Any]:
     ready = all(value in {"ok", "not_configured"} for value in checks.values())
     if not ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return {"status": "ok" if ready else "unavailable", "checks": checks}
+    return {"status": "ok" if ready else "unavailable", "checks": checks, "version": BUILD_SHA}

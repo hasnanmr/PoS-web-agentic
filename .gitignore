@@ -28,3 +28,7 @@ coverage/
 *.tsbuildinfo
 npm-debug.log*
 pnpm-debug.log*
+
+# NOTE: backend/app/BUILD_SHA and admin/public/version.txt (commit stamps written by CI right
+# before `railway up`) must NOT be listed here: `railway up` skips gitignored files, and the
+# post-deploy smoke test needs them in the build. They only ever exist on the CI runner.

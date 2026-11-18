@@ -17,9 +17,21 @@ on:
 permissions:
   contents: read
 
+# Branches and PRs: a newer push cancels the older run. main: runs queue and never cancel each
+# other, so a migration, deploy, or rollback is never interrupted halfway.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Railway ids and public URLs (not secrets). The smoke test and rollback use them.
+env:
+  RAILWAY_PROJECT_ID: 9fbd5725-da6b-49af-8f4b-39f046eadc8d
+  RAILWAY_ENVIRONMENT_ID: 3df553f3-5cdc-49c6-b891-f8041605b3a4
+  BACKEND_SERVICE_ID: e5e6e66b-b917-4f93-9948-6f9313aa027b
+  ADMIN_SERVICE_ID: 9904ffd3-926b-4134-9684-ee98245a37a6
+  BACKEND_URL: https://backend-production-d87fbd6a.up.railway.app
+  ADMIN_URL: https://admin-production-f63d699c.up.railway.app
+  RAILWAY_CLI: "@railway/cli@5.75.0"
 
 jobs:
   backend:
@@ -115,16 +127,46 @@ jobs:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
 
-  # CD on every push to main (a merged PR), once CI is green: migrate, then redeploy every
-  # service. Deploys wait for the migration, so new code never runs against an old schema.
-  migrate:
-    name: Migrate database (Alembic)
+  # CD on every push to main (a merged PR), once CI is green:
+  #   snapshot -> migrate -> deploy backend + admin -> smoke test
+  # If a deploy or the smoke test fails after the migration succeeded, both services are
+  # rolled back to the snapshot (the database stays migrated: migrations are additive).
+  snapshot:
+    name: Snapshot running deployments
     needs: [backend, admin]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    concurrency:
-      group: migrate-database
-      cancel-in-progress: false
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    outputs:
+      backend_id: ${{ steps.snap.outputs.backend_id }}
+      backend_sha: ${{ steps.snap.outputs.backend_sha }}
+      admin_id: ${{ steps.snap.outputs.admin_id }}
+      admin_sha: ${{ steps.snap.outputs.admin_sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g "$RAILWAY_CLI"
+      # Fails the run before anything changes if the Railway API is not usable, so we never
+      # migrate and deploy without a way back.
+      - id: snap
+        name: Record what serves now
+        run: |
+          # An API error fails this step (bash -e); an empty answer means "no deployment yet".
+          backend="$(scripts/ci/active-deployment.sh "$BACKEND_SERVICE_ID")"
+          admin="$(scripts/ci/active-deployment.sh "$ADMIN_SERVICE_ID")"
+          read -r backend_id backend_sha <<<"$backend" || true
+          read -r admin_id admin_sha <<<"$admin" || true
+          {
+            echo "backend_id=${backend_id:-}"; echo "backend_sha=${backend_sha:-}"
+            echo "admin_id=${admin_id:-}"; echo "admin_sha=${admin_sha:-}"
+          } >> "$GITHUB_OUTPUT"
+          echo "backend: ${backend_id:-none} (${backend_sha:-?}) · admin: ${admin_id:-none} (${admin_sha:-?})"
+
+  migrate:
+    name: Migrate database (Alembic)
+    needs: [snapshot]
+    runs-on: ubuntu-latest
     env:
       MIGRATION_DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
@@ -149,15 +191,14 @@ jobs:
     name: Deploy backend to Railway
     needs: [migrate]
     runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-backend
-      cancel-in-progress: false
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Railway CLI
-        run: npm install -g @railway/cli@5.75.0
+        run: npm install -g "$RAILWAY_CLI"
+      - name: Stamp the commit (served by /healthz and /readyz)
+        run: echo "$GITHUB_SHA" > backend/app/BUILD_SHA
       - name: Deploy
         run: railway up backend --path-as-root --service backend --ci --message "$GITHUB_SHA"
 
@@ -165,14 +206,72 @@ jobs:
     name: Deploy admin to Railway
     needs: [migrate]
     runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-admin
-      cancel-in-progress: false
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Railway CLI
-        run: npm install -g @railway/cli@5.75.0
+        run: npm install -g "$RAILWAY_CLI"
+      - name: Stamp the commit (served as /version.txt)
+        run: echo "$GITHUB_SHA" > admin/public/version.txt
       - name: Deploy
         run: railway up admin --path-as-root --service admin --ci --message "$GITHUB_SHA"
+
+  smoke:
+    name: Smoke test production
+    needs: [deploy-backend, deploy-admin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Both services healthy and serving this commit
+        env:
+          BACKEND_EXPECTED: ${{ github.sha }}
+          ADMIN_EXPECTED: ${{ github.sha }}
+        run: scripts/ci/smoke.sh
+
+  rollback:
+    name: Roll back deployments
+    needs: [snapshot, migrate, deploy-backend, deploy-admin, smoke]
+    # Only after a successful migration (before it, nothing changed) and only when a deploy
+    # or the smoke test failed or was cancelled.
+    if: >-
+      always() && needs.migrate.result == 'success' && (
+        needs.deploy-backend.result != 'success' ||
+        needs.deploy-admin.result != 'success' ||
+        needs.smoke.result != 'success')
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      BACKEND_PREV_ID: ${{ needs.snapshot.outputs.backend_id }}
+      BACKEND_PREV_SHA: ${{ needs.snapshot.outputs.backend_sha }}
+      ADMIN_PREV_ID: ${{ needs.snapshot.outputs.admin_id }}
+      ADMIN_PREV_SHA: ${{ needs.snapshot.outputs.admin_sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g "$RAILWAY_CLI"
+      - name: Roll back both services and verify
+        id: rollback
+        run: scripts/ci/rollback.sh
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Deployment rolled back"
+            echo "Deploy or smoke test failed for \`$GITHUB_SHA\` after the migration succeeded."
+            echo ""
+            echo "| Service | Rolled back to deployment | Commit |"
+            echo "|---|---|---|"
+            echo "| backend | ${BACKEND_PREV_ID:-none} | ${BACKEND_PREV_SHA:-?} |"
+            echo "| admin | ${ADMIN_PREV_ID:-none} | ${ADMIN_PREV_SHA:-?} |"
+            echo ""
+            if [ "${{ steps.rollback.outcome }}" = "success" ]; then
+              echo "Rollback verified by the smoke test. The database stays migrated (additive migrations)."
+            else
+              echo "**Rollback could not be verified: check Railway now.**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      # The run stays red: the merged commit is not live.
+      - name: Fail the run
+        run: |
+          echo "::error::$GITHUB_SHA was rolled back; fix and merge again"; exit 1

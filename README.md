@@ -132,13 +132,24 @@ Two Railway services in one project, both deployed by GitHub Actions (`.github/w
 
 On every push to `main` (each merged PR), CI runs first. If it is green:
 
-1. **Migrate database (Alembic)**: `python -m app.tools.migrate` applies pending revisions
+1. **Snapshot running deployments**: records the backend and admin deployments serving now
+   (Railway API). If the API is not usable, the run stops here and nothing changes.
+2. **Migrate database (Alembic)**: `python -m app.tools.migrate` applies pending revisions
    from `backend/migrations` to the hosted Supabase database. It prints the current revision
    and the head, and does nothing when the database is already at head.
-2. **Deploy backend** and **Deploy admin**: both services are always redeployed, after the
-   migration succeeds.
+3. **Deploy backend** and **Deploy admin**: both services are always redeployed. CI stamps
+   the commit into each build (`backend/app/BUILD_SHA`, returned as `version` by `/healthz`
+   and `/readyz`; `admin/public/version.txt`).
+4. **Smoke test production** (`scripts/ci/smoke.sh`), retried for up to 5 minutes:
+   - backend `/readyz` is healthy and reports this commit;
+   - `/api/v1/me` returns 401 without a token;
+   - admin `/` serves the app and `/version.txt` is this commit.
+5. **Roll back deployments** (`scripts/ci/rollback.sh`): runs only when the migration
+   succeeded and a deploy or the smoke test failed. It rolls **both** services back to the
+   snapshot and verifies them with the smoke test. The database is not rolled back
+   (migrations are additive and forward-only), and the run stays red.
 
-Pull requests and other branches run CI only.
+Runs on `main` queue and never cancel each other. Pull requests and other branches run CI only.
 
 One-time setup:
 
