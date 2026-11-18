@@ -473,7 +473,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Baris yang terhubung ke bahan menambah stok lewat movement restock yang merujuk PO, dikonversi ke satuan dasar bahan; baris teks bebas tidak mengubah stok.
   - Barang boleh datang dalam beberapa kali pengiriman; qty yang diterima tidak boleh melebihi qty PO.
   - Jika semua baris sesuai, staf **menutup PO**.
-  - Jika ada selisih, staf tidak dapat menutup PO: PO tetap terbuka dengan status **ada selisih** dan kekurangan per baris, serta muncul di daftar **PO ada selisih** pada dashboard owner. Setelah sisanya datang dan sesuai, staf dapat menutupnya; jika tidak, **hanya owner** yang dapat menutup PO itu dengan **catatan wajib**. Untuk PO tempo, hutang menjadi qty diterima × harga satuan (default usulan).
+  - Jika ada selisih, staf tidak dapat menutup PO: PO tetap terbuka dengan status **ada selisih** dan kekurangan per baris, serta muncul di daftar **PO ada selisih** pada dashboard owner. Setelah sisanya datang dan sesuai, staf dapat menutupnya; jika tidak, **hanya owner** yang dapat menutup PO itu dengan **catatan wajib**. Untuk PO tempo, hutang menjadi qty diterima × harga satuan (diputuskan). Refund supplier untuk PO bayar di muka yang kurang belum termasuk MVP.
   - Setiap pengecekan dan penutupan mencatat siapa dan kapan, dan PO yang ditutup tidak dapat dibuka lagi.
 - **Traceability:** FR1.5, FR3.11, FR4.2, FR4.10, FR4.11, AC4.9, AC4.10
 

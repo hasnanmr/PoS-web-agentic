@@ -152,7 +152,7 @@ Rules:
 - Cash basis: opening, checking, or closing a PO never posts to the ledger; each supplier payment posts one `expense` entry (negative amount) on the payment date with method, PO number, and supplier.
 - Pay later: payments may be split; the sum never exceeds the PO total. Pay in advance: the full payment is recorded before goods arrive; the PO then waits for goods.
 - A cash supplier payment may be taken from an open shift's drawer; it is then cash paid out in that shift's expected cash (§7).
-- Goods check: owner or assigned staff enter received vs ordered per line; quantity never above the ordered quantity; a short line keeps the PO in `difference_found` (staff can't close; listed on the owner dashboard) until the rest arrives or the owner closes it with a note (pay later: amount owed = received × unit price, proposed); ingredient lines create `restock` movements (base units) referencing the PO; free-text lines add no stock.
+- Goods check: owner or assigned staff enter received vs ordered per line; quantity never above the ordered quantity; a short line keeps the PO in `difference_found` (staff can't close; listed on the owner dashboard) until the rest arrives or the owner closes it with a note (pay later: amount owed = received × unit price, decided; refunds for short pay-in-advance POs are out of the MVP); ingredient lines create `restock` movements (base units) referencing the PO; free-text lines add no stock.
 - Cancel: only with no payment and no receipt, reason required. Payments and receipts are append-only.
 - Open (PRD §13): short deliveries and supplier returns, separate PPN, approvals and WhatsApp reminders.
 
