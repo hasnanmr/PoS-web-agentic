@@ -58,6 +58,8 @@ export default function StockPage() {
     (i) => (filter === 'all' || i.status === filter) && i.name.toLowerCase().includes(q.trim().toLowerCase()),
   )
   const counts = stock.data?.counts ?? { low: 0, out: 0 }
+  // Pages loaded for another outlet are dropped, so A → B → A starts again from the newest page.
+  if (older && older.outletId !== outletId) setOlder(undefined)
   const extra = older?.outletId === outletId ? older : undefined
   const movements = [...(history.data?.items ?? []), ...(extra?.items ?? [])]
   const nextCursor = extra ? extra.cursor : (history.data?.next_cursor ?? null)

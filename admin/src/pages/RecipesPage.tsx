@@ -127,7 +127,7 @@ function RecipeEditor({ productId, stockItems, onSaved }: { productId: string; s
     setShown(recipe.data)
     setLines(recipe.data ? toDrafts(recipe.data) : undefined)
   }
-  const loadError = product.error ?? recipe.error
+  const loadError = product.error ?? recipe.error ?? availability.error
   if (loadError) return <Alert>{errorMessage(loadError)}</Alert>
   if (!product.data || !lines) return <Loading />
 

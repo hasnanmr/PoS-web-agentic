@@ -5,7 +5,7 @@
 --    10 options could never take another. Count active options, and enforce the limit
 --    when an option is reactivated too.
 create or replace function app.enforce_addon_option_limit() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = '' as $$
 begin
   if not new.is_active then
     return new;

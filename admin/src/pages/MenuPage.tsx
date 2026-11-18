@@ -352,7 +352,7 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
   const [required, setRequired] = useState(group?.is_required ?? false)
   const [options, setOptions] = useState<OptionDraft[]>(
     group?.options.map((o) => ({ id: o.id, name: o.name, price: String(o.prices.find((x) => x.outlet_id === priceOutlet)?.price ?? '') }))
-      ?? [{ id: null, name: '', price: '0' }],
+      ?? [{ id: null, name: '', price: '' }],
   )
   const update = (i: number, patch: Partial<OptionDraft>) => setOptions(options.map((o, j) => (j === i ? { ...o, ...patch } : o)))
 
@@ -399,7 +399,7 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
         </div>
       ))}
       <div className="flex flex-wrap items-center gap-3">
-        <LinkButton disabled={options.length >= 10} onClick={() => setOptions([...options, { id: null, name: '', price: '0' }])}>+ Opsi</LinkButton>
+        <LinkButton disabled={options.length >= 10} onClick={() => setOptions([...options, { id: null, name: '', price: '' }])}>+ Opsi</LinkButton>
         <span className="text-text-muted">Harga untuk outlet yang dipilih di atas.</span>
       </div>
       <div className="flex flex-wrap items-center gap-3">
