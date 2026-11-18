@@ -20,7 +20,7 @@ def test_reads_environment_and_normalises(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("APP_ENV", "LOCAL")
     monkeypatch.setenv("LOG_LEVEL", "debug")
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173, https://admin.example.com ,")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://pos:pos@localhost:5432/pos")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://pos@localhost:5432/pos")
     monkeypatch.setenv("SUPABASE_URL", "")  # empty means unset
     settings = load_settings()
     assert settings.app_env == "local"

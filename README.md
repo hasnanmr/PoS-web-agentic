@@ -30,10 +30,41 @@ Makefile            dev / test / lint shortcuts (`make help`)
 - [User stories](User-Stories-SME-Automation-Platform.md)
 - [Task breakdown](Task-Breakdown-SME-Automation-Platform.md)
 - [Wireframe traceability](design/WIREFRAME-TRACEABILITY.md) and previews in `design/previews/`
-- [CLAUDE.md](CLAUDE.md): frontend rules and design tokens
+- [CLAUDE.md](CLAUDE.md): frontend and backend rules, design tokens
+- [Domain glossary, rules, and enums](docs/domain/domain-glossary-and-rules.md) (T-001)
+- [API boundaries](docs/architecture/api-boundaries.md) (T-002)
+- [Screen → endpoint map](docs/architecture/screen-endpoint-map.md): backend contract per wireframe screen
+- [Database](supabase/README.md) (T-004)
 
-Frontend screens must match the wireframes; note the screen code (e.g. `O2`, `S1`, `M1`) in
-the route/component file.
+Frontend screens and the backend endpoints they use must match the wireframes; note the screen
+code (e.g. `O2`, `S1`, `M1`) in the route/component file and in the endpoint's router.
+
+## Accounts and roles
+
+- **Platform admin** invites every new owner from the command line (no screen):
+
+  ```bash
+  cd backend
+  uv run python -m app.cli invite-owner --email owner@cafe.id --invited-by you@platform
+  ```
+
+  The owner gets a Supabase invite email, sets a password, signs in with app role
+  `owner_pending`, and creates the business on O1. Needs `SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, and `DATABASE_URL`.
+- **Owner** invites staff from O4 (Staf & Akses). There is no public sign-up.
+
+## Database and tests
+
+```bash
+make up          # docker compose Postgres + RabbitMQ
+make db-reset    # schema (shim + migrations), dummy seed, app_backend password
+make check       # migration hygiene, lint, API contract, tests, build
+make db-test TEST_DB_URL=postgresql://<user>:<password>@localhost:5432/empty_db
+```
+
+The API connects as `app_backend` so row-level security always applies. CI
+(`.github/workflows/ci.yml`) runs all of the above against a Postgres 16 service,
+including backend integration tests (`TEST_DATABASE_URL`, `TEST_APP_DATABASE_URL`).
 
 ## Prerequisites
 
