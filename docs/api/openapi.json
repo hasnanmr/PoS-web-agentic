@@ -4642,6 +4642,56 @@
         "title": "Tile",
         "type": "object"
       },
+      "TopItem": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity_sold": {
+            "title": "Quantity Sold",
+            "type": "integer"
+          },
+          "revenue": {
+            "description": "Sum of item line totals incl. add-ons, excl. PB1 and delivery fee",
+            "title": "Revenue",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "quantity_sold",
+          "revenue"
+        ],
+        "title": "TopItem",
+        "type": "object"
+      },
+      "TopItems": {
+        "properties": {
+          "period": {
+            "enum": [
+              "day",
+              "month",
+              "year"
+            ],
+            "title": "Period",
+            "type": "string"
+          },
+          "top_items": {
+            "items": {
+              "$ref": "#/components/schemas/TopItem"
+            },
+            "title": "Top Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "period",
+          "top_items"
+        ],
+        "title": "TopItems",
+        "type": "object"
+      },
       "TransitionIn": {
         "properties": {
           "to_status": {
@@ -6503,6 +6553,72 @@
         "summary": "Set Option Recipe",
         "tags": [
           "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/dashboard/top-items": {
+      "get": {
+        "description": "O2 \"Item terlaris\": top 5 by quantity sold for today, this month, or this year.",
+        "operationId": "top_items_api_v1_owner_dashboard_top_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "day",
+              "enum": [
+                "day",
+                "month",
+                "year"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopItems"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Top Items",
+        "tags": [
+          "owner: dashboard"
         ]
       }
     },

@@ -26,7 +26,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | O1 Login (invite-only) & Buat Bisnis | US-001, US-002, US-003, US-008 | T-006, T-010, T-011, T-024, T-066 |
-| O2 Dashboard + keramaian (busy/quiet hours, busyness map, current crowd) | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
+| O2 Dashboard + keramaian (busy/quiet hours, busyness map, current crowd, item terlaris) | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
 | O3 Bisnis & Outlet (PB1, payment mode, QRIS, cash drawers, attendance tablets, grace period) | US-002, US-017, US-018, US-019, US-020, US-053, US-055 | T-011, T-014, T-039, T-066, T-118, T-121 |
 | O4 Staf & Akses (staff invitation, access matrix) | US-003, US-033 | T-006, T-012, T-013, T-066 |
 | O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
