@@ -119,7 +119,15 @@ of the sidebar toggles Owner/Staf; in any build you can also use `?role=owner` o
 make test      # backend pytest + admin vitest
 make lint      # ruff (check + format) + eslint + tsc
 make check     # lint, test and admin build
+make audit     # known vulnerabilities in backend/uv.lock and admin/pnpm-lock.yaml
 ```
+
+`make audit` asks OSV about every locked package, so it works with any npm registry. Plain
+`pnpm audit` does not: it needs an audit endpoint on the configured registry, and a mirror such
+as `registry.npmmirror.com` has none, so it errors out instead of auditing. `make audit` runs
+`pnpm audit` against `registry.npmjs.org` explicitly for that reason. Advisories that are known
+and accepted go in `.github/osv-ignore.txt` with a reason; CI (job `security`) fails on anything
+else, so bump the dependency instead.
 
 ## Deployment (Railway)
 

@@ -12,7 +12,10 @@ ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 RUN pnpm build
 
-FROM nginx:1.27-alpine
+# Serve the SPA with nginx. 1.30.7 is the stable release that fixes the November 2026 batch
+# (CVE-2026-123007 / CVE-2026-123633 and friends). Those need HTTP/2, which nginx.conf.template
+# does not enable, but a fixed, supported branch keeps the bundled OpenSSL/Alpine current too.
+FROM nginx:1.30.7-alpine
 # The nginx image renders /etc/nginx/templates/*.template with env vars at start (PORT).
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
