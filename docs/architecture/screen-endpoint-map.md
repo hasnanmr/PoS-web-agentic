@@ -276,10 +276,12 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Daftar PO outlet | `GET /ops/outlets/{id}/purchase-orders?status=&cursor=&limit=` ✅ | Same rows and filters as O15; payment status read-only; `amount_paid`/`amount_owed` null (no debt, also for the owner on this endpoint). |
+| Daftar PO outlet | `GET /ops/outlets/{id}/purchase-orders?status=active\|waiting_goods\|closed&cursor=&limit=` ✅ | `{items:[PO row], next_cursor, counts:{active, waiting_goods}}`. Rows as O15, payment status read-only, `amount_paid`/`amount_owed` null (no debt, also for the owner on this endpoint). Chips from the wireframe header: Terbuka (`active`: not closed, except Menunggu barang — a PO with a difference stays here), Menunggu barang (`waiting_goods`: pay in advance, paid in full, still open with no difference, AC3.9), Ditutup (`closed`); no `status` = all (Semua). `counts` are for the outlet whatever the filter. O15's owner filters are not accepted here (422). |
 | + Buka PO | opens S12 (O16 endpoint) | |
 
-### S11 · Cross-check barang datang (staf & owner) — backend ✅
+### S11 · Cross-check barang datang (staf di outlet) — backend ✅
+
+Recorded by staff at the outlet where the goods arrive. The owner does not record receipts from the admin app (product owner, 2026-11-19): there is no owner entry to S11, and O15 never renders `receive`/`close`.
 
 | Part | Endpoint | Fields |
 |---|---|---|

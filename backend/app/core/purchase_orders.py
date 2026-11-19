@@ -36,6 +36,8 @@ from app.core.units import to_quantity
 
 PaymentTerm = Literal["pay_later", "pay_in_advance"]
 ListFilter = Literal["open", "difference_found", "awaiting_payment", "overdue", "closed"]
+# S10 header (staff): Terbuka / Menunggu barang / Ditutup.
+OutletFilter = Literal["active", "waiting_goods", "closed"]
 # O17 Ringkasan PO drill-down (FR3.12): each figure lists exactly its POs.
 StateFilter = Literal["open", "closed"]
 GoodsFilter = Literal["not_arrived", "partly_arrived", "arrived"]
@@ -182,12 +184,20 @@ _OVERDUE = """
   p.status = 'closed' and p.payment_term = 'pay_later' and p.payment_status <> 'paid'
   and p.due_date < (timezone(ou.timezone, now()))::date
 """
+# "Menunggu barang" (S10 chip, AC3.9): a pay-in-advance PO paid in full, still open with no
+# difference — the outlet is only waiting for the goods. S10 "Terbuka" is every other PO that is
+# not closed (a PO with a difference stays there: it needs attention).
+_WAITING_GOODS = """
+  p.payment_term = 'pay_in_advance' and p.payment_status = 'paid' and p.status = 'open'
+"""
 _FILTERS: dict[str, str] = {
     "open": "p.status = 'open'",
     "difference_found": "p.status = 'difference_found'",
     "awaiting_payment": _AWAITING_PAYMENT,
     "overdue": _OVERDUE,
     "closed": "p.status = 'closed'",
+    "waiting_goods": _WAITING_GOODS,
+    "active": f"p.status in ('open', 'difference_found') and not ({_WAITING_GOODS})",
 }
 # Ringkasan PO buckets (cancelled POs are never counted). "Dibuka" = not closed yet, with or
 # without a difference (AC3.14).
@@ -294,7 +304,7 @@ async def list_pos(
     viewer: Viewer,
     *,
     outlet_id: UUID | None,
-    status: ListFilter | None,
+    status: ListFilter | OutletFilter | None,
     cursor: str | None,
     limit: int,
     month: str | None = None,
@@ -352,6 +362,20 @@ async def list_pos(
         "items": [_row_out(r, viewer) for r in rows],
         "next_cursor": _encode_cursor(rows[-1]) if more and rows else None,
     }
+
+
+async def outlet_counts(conn: AsyncConnection, outlet_id: UUID) -> dict[str, int]:
+    """S10 header counts: Terbuka (`active`) and Menunggu barang (`waiting_goods`)."""
+    cur = await conn.execute(
+        "select count(*) filter (where "  # noqa: S608 (constants)
+        + _FILTERS["active"]
+        + ")::int, count(*) filter (where "
+        + _WAITING_GOODS
+        + ")::int from app.purchase_orders p where p.outlet_id = %s",
+        (outlet_id,),
+    )
+    active, waiting = await cur.fetchone()  # type: ignore[misc]
+    return {"active": active, "waiting_goods": waiting}
 
 
 async def _load(conn: AsyncConnection, po_id: UUID, *, lock: bool = False) -> dict[str, Any]:

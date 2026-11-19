@@ -2720,6 +2720,26 @@
         "title": "OrderItemOut",
         "type": "object"
       },
+      "OutletCounts": {
+        "properties": {
+          "active": {
+            "description": "Terbuka: not closed, except Menunggu barang",
+            "title": "Active",
+            "type": "integer"
+          },
+          "waiting_goods": {
+            "description": "Menunggu barang: pay in advance, paid, open",
+            "title": "Waiting Goods",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active",
+          "waiting_goods"
+        ],
+        "title": "OutletCounts",
+        "type": "object"
+      },
       "OutletCreate": {
         "properties": {
           "address": {
@@ -3083,6 +3103,39 @@
           }
         },
         "title": "OutletPatch",
+        "type": "object"
+      },
+      "OutletPoPage": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/OutletCounts",
+            "description": "S10 header counts (whatever the status filter)"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PoRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "counts"
+        ],
+        "title": "OutletPoPage",
         "type": "object"
       },
       "OutletPriceItem": {
@@ -7212,7 +7265,7 @@
     },
     "/api/v1/ops/outlets/{outlet_id}/purchase-orders": {
       "get": {
-        "description": "S10 Daftar PO outlet: payment status read-only, no debt totals (also for the owner).",
+        "description": "S10 Daftar PO outlet: payment status read-only, no debt totals (also for the owner).\nChips Terbuka (`active`) / Menunggu barang (`waiting_goods`) / Ditutup (`closed`), with the\ncounts for the first two.",
         "operationId": "outlet_pos_api_v1_ops_outlets__outlet_id__purchase_orders_get",
         "parameters": [
           {
@@ -7233,10 +7286,8 @@
               "anyOf": [
                 {
                   "enum": [
-                    "open",
-                    "difference_found",
-                    "awaiting_payment",
-                    "overdue",
+                    "active",
+                    "waiting_goods",
                     "closed"
                   ],
                   "type": "string"
@@ -7283,7 +7334,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PoPage"
+                  "$ref": "#/components/schemas/OutletPoPage"
                 }
               }
             },

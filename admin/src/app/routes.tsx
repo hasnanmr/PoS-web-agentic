@@ -13,6 +13,7 @@ import MyAttendancePage from '../pages/MyAttendancePage'
 import OpenBillsPage from '../pages/OpenBillsPage'
 import OrderBoardPage from '../pages/OrderBoardPage'
 import PaymentReviewPage from '../pages/PaymentReviewPage'
+import PurchaseOrdersPage from '../pages/PurchaseOrdersPage'
 import RecipesPage from '../pages/RecipesPage'
 import RecommendationsPage from '../pages/RecommendationsPage'
 import ReservationsPage from '../pages/ReservationsPage'
@@ -33,6 +34,7 @@ const PAGES: Record<keyof typeof ROUTES, ComponentType> = {
   paymentReview: PaymentReviewPage,
   reservations: ReservationsPage,
   stock: StockPage,
+  purchaseOrders: PurchaseOrdersPage,
   shifts: ShiftsPage,
   myAttendance: MyAttendancePage,
   menu: MenuPage,

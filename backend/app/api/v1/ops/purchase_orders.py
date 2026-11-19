@@ -61,6 +61,15 @@ class PoPage(BaseModel):
     next_cursor: str | None
 
 
+class OutletCounts(BaseModel):
+    active: int = Field(description="Terbuka: not closed, except Menunggu barang")
+    waiting_goods: int = Field(description="Menunggu barang: pay in advance, paid, open")
+
+
+class OutletPoPage(PoPage):
+    counts: OutletCounts = Field(description="S10 header counts (whatever the status filter)")
+
+
 class PoLine(BaseModel):
     id: UUID
     item: str
@@ -193,17 +202,20 @@ async def outlet_pos(
     outlet_id: UUID,
     request: Request,
     user: TenantUser,
-    status_filter: Annotated[po.ListFilter | None, Query(alias="status")] = None,
+    status_filter: Annotated[po.OutletFilter | None, Query(alias="status")] = None,
     cursor: str | None = Query(default=None, max_length=200),
     limit: int = Query(default=20, ge=1, le=100),
-) -> PoPage:
-    """S10 Daftar PO outlet: payment status read-only, no debt totals (also for the owner)."""
+) -> OutletPoPage:
+    """S10 Daftar PO outlet: payment status read-only, no debt totals (also for the owner).
+    Chips Terbuka (`active`) / Menunggu barang (`waiting_goods`) / Ditutup (`closed`), with the
+    counts for the first two."""
     async with db.transaction(_pool(request), user.actor()) as conn:
         await outlets.require_outlet(conn, outlet_id)
         page = await po.list_pos(
             conn, "staff", outlet_id=outlet_id, status=status_filter, cursor=cursor, limit=limit
         )
-    return PoPage(**page)
+        counts = await po.outlet_counts(conn, outlet_id)
+    return OutletPoPage(**page, counts=OutletCounts(**counts))
 
 
 @router.post("/outlets/{outlet_id}/purchase-orders", status_code=status.HTTP_201_CREATED)

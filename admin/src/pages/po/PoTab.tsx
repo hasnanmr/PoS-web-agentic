@@ -18,7 +18,7 @@ import { useLoad } from '../../lib/useLoad'
 import { Alert, Button, LinkButton, Loading } from '../../ui/kit'
 import { NoteDialog, PaymentDialog, type PayTarget } from './dialogs'
 import { Badge } from './ui'
-import { CHIPS, TERM_LABEL, monthLabel, rowBadge, termDetail } from './util'
+import { CHIPS, TERM_LABEL, eventText, flow, monthLabel, rowBadge, termDetail } from './util'
 
 /** Ringkasan PO drill-down (FR3.12): one figure's POs. */
 export interface Drill {
@@ -395,37 +395,6 @@ function PoList({ outletId, month, filter, selected, onFilter, onSelect }: {
 }
 
 // O15 · Detail PO ---------------------------------------------------------------------------
-
-const ROLE: Record<string, string> = { owner: 'Owner', staff: 'staf' }
-
-function eventText(e: PoDetail['events'][number], po: PoDetail): string {
-  const who = e.actor.name ? (e.actor.role === 'owner' ? 'Owner' : `${e.actor.name} (${ROLE[e.actor.role ?? ''] ?? e.actor.role})`) : 'Sistem'
-  const data = e.data
-  switch (e.kind) {
-    case 'opened':
-      return `PO dibuka · ${who}`
-    case 'received': {
-      const lines = (data.lines as { item: string; quantity: string; unit: string }[] | undefined) ?? []
-      const text = lines.map((l) => `${l.item} ${plainQuantity(l.quantity)} ${l.unit}`).join(', ')
-      return `Barang dicek: ${text} · ${who}`
-    }
-    case 'paid':
-      return `Bayar ${formatRupiah(Number(data.amount))} · ${data.method === 'transfer' ? 'transfer' : data.from_drawer ? 'cash dari laci' : 'cash'} · ${who}`
-    case 'closed':
-      return data.note ? `PO ditutup dengan catatan “${String(data.note)}” · ${who}` : `PO ditutup · ${who}`
-    case 'cancelled':
-      return `PO dibatalkan: ${String(data.reason ?? po.cancel_reason ?? '')} · ${who}`
-  }
-}
-
-function flow(po: PoDetail): { label: string; done: boolean }[] {
-  const checked = po.goods_status !== 'not_arrived'
-  const closed = po.status === 'closed'
-  const paid = po.payment_status === 'paid'
-  return po.payment_term === 'pay_later'
-    ? [{ label: 'Dibuka', done: true }, { label: 'Barang dicek', done: checked }, { label: 'PO ditutup', done: closed }, { label: 'Dibayar', done: paid }]
-    : [{ label: 'Dibuka', done: true }, { label: 'Dibayar', done: paid }, { label: 'Barang dicek', done: checked }, { label: 'PO ditutup', done: closed }]
-}
 
 function DetailPanel({ id, onPay, onNote }: {
   id: string

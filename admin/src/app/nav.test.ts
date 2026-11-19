@@ -40,6 +40,7 @@ describe('navigation per role (wireframe Sidebar/Owner, Sidebar/Staff)', () => {
           'Review Pembayaran',
           'Reservasi & Meja',
           'Stok',
+          'Purchase Order',
           'Shift Kasir',
           'Absensi Saya',
         ],

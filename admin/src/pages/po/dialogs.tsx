@@ -41,7 +41,7 @@ export function PaymentDialog({ target, onClose, onDone }: {
   const [amount, setAmount] = useState(String(target.owed))
   const [method, setMethod] = useState<Method>('transfer')
   const [drawerId, setDrawerId] = useState('')
-  const keyFor = useIdempotencyKey()
+  const { keyFor, settled } = useIdempotencyKey()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const shifts = useLoad(() => api.get<ShiftRow[]>(`/ops/outlets/${target.outletId}/shifts/current`), target.outletId)
@@ -63,6 +63,7 @@ export function PaymentDialog({ target, onClose, onDone }: {
         drawer_id: method === 'cash_drawer' ? drawerId : null,
       }
       await api.post(`/owner/purchase-orders/${target.id}/payments`, body, { 'Idempotency-Key': keyFor(body) })
+      settled()
       onDone()
     } catch (err) {
       setError(errorMessage(err))

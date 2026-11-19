@@ -372,3 +372,40 @@ def test_outlet_filter_validation_and_staff_refused(client, ctx) -> None:
         assert listed.status_code == 422, bad
     for path in ("/api/v1/owner/dashboard/purchase-orders", "/api/v1/owner/purchase-orders"):
         assert client.get(path, headers=ctx["staff"]).status_code == 403
+
+
+def test_s10_chips_and_counts_for_staff(client, ctx) -> None:
+    """S10 header: Terbuka / Menunggu barang / Ditutup, with counts (AC3.9 "waiting for
+    goods" = pay in advance, paid, still open with no difference)."""
+    pos = {k: v["id"] for k, v in ctx["pos"].items()}
+    url = f"/api/v1/ops/outlets/{ctx['outlet']}/purchase-orders"
+
+    def ids(status: str | None = None) -> tuple[set[str], dict[str, int]]:
+        res = client.get(
+            url,
+            headers=ctx["staff"],
+            params={"limit": "100", **({"status": status} if status else {})},
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert all(r["amount_owed"] is None for r in body["items"])  # staff see no debt
+        return {r["id"] for r in body["items"]}, body["counts"]
+
+    active, counts = ids("active")
+    assert active == {
+        pos["open1"],
+        pos["open2"],
+        pos["short"],
+        pos["advance_unpaid"],
+        pos["open_late"],
+    }
+    waiting, same = ids("waiting_goods")
+    assert waiting == {pos["advance_waiting"]}
+    assert counts == same == {"active": 5, "waiting_goods": 1}  # counts ignore the filter
+    closed, _ = ids("closed")
+    assert closed == {pos["advance_closed"], pos["later_paid"], pos["later_part"], pos["overdue"]}
+    everything, _ = ids()
+    assert pos["cancelled"] in everything and len(everything) == 11
+    # O15's filters are not S10's.
+    res = client.get(url, headers=ctx["staff"], params={"status": "awaiting_payment"})
+    assert res.status_code == 422
