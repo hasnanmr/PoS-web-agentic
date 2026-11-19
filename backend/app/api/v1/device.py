@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from app import db
 from app.api.errors import ApiError
 from app.core import attendance as core
+from app.core import attendance_reports
 from app.core.actor import ActorContext
 from app.core.errors import ValidationFailedError
 
@@ -154,6 +155,7 @@ class StaffList(BaseModel):
 @router.get("/staff")
 async def staff(request: Request, device: CurrentDevice) -> StaffList:
     """K1 "Tap nama kamu untuk clock in / clock out": only staff assigned to this outlet."""
+    await attendance_reports.run_due_checks(_pool(request), device.tenant_id)
     async with db.transaction(_pool(request), device.actor()) as conn:
         rows = await core.outlet_staff(conn)
     return StaffList(
@@ -229,6 +231,8 @@ class AttendanceOut(BaseModel):
 @router.post("/attendance", status_code=status.HTTP_201_CREATED)
 async def record(body: AttendanceIn, request: Request, device: CurrentDevice) -> AttendanceOut:
     """K3 "Simpan clock in" / "Simpan clock out". The server decides which (working → out)."""
+    # A record left open past closing + grace is flagged first, so this tap starts a new day.
+    await attendance_reports.run_due_checks(_pool(request), device.tenant_id)
     ctx: ActorContext = device.actor()
     async with db.transaction(_pool(request), ctx) as conn:
         row = await core.record_attendance(

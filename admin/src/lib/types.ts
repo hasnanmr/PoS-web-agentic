@@ -760,3 +760,55 @@ export interface ReservationDetail extends ReservationRow {
     created_at: string
   }[]
 }
+
+// O14 · Kehadiran Staf / S9 · Absensi Saya (T-118, T-119, T-122) -----------------------------
+export type AttendanceStatus = 'open' | 'closed' | 'needs_correction' | 'corrected'
+
+export interface AttendanceRecord {
+  id: string
+  date: string
+  user: { id: string; name: string }
+  outlet: { id: string; name: string }
+  timezone: string
+  clock_in_at: string
+  clock_out_at: string | null
+  duration_minutes: number | null
+  has_selfie_in: boolean
+  has_selfie_out: boolean
+  status: AttendanceStatus
+}
+
+export interface AttendanceReport {
+  from: string
+  to: string
+  summary: { user: { id: string; name: string }; outlets: string[]; worked_minutes: number; days: number }[]
+  needs_correction_count: number
+  records: AttendanceRecord[]
+}
+
+export interface AttendanceTimes {
+  clock_in_at: string | null
+  clock_out_at: string | null
+}
+
+export interface AttendanceDetail extends AttendanceRecord {
+  devices: { clock_in: string | null; clock_out: string | null }
+  original: AttendanceTimes
+  flag: { at: string; closes_at: string | null; grace_minutes: number | null } | null
+  corrections: { at: string; by: string; from: AttendanceTimes; to: AttendanceTimes; reason: string | null }[]
+}
+
+export interface MyAttendanceToday {
+  status: 'working' | 'not_clocked_in'
+  clock_in_at: string | null
+  device_name: string | null
+  outlet: { name: string; timezone: string | null } | null
+  flagged_records: { id: string; date: string; outlet: { name: string } }[]
+}
+
+export interface MyAttendanceHistory {
+  from: string
+  to: string
+  records: AttendanceRecord[]
+  total_minutes: number
+}

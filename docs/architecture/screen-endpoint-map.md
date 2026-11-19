@@ -142,15 +142,17 @@ The sidebar item **Pengeluaran** opens this screen with the full expense list un
 | ↻ Putar ulang | `POST /owner/dead-letters/{id}/replay` | Audited. |
 | ✕ Buang | `POST /owner/dead-letters/{id}/discard` | `reason*`. Audited. |
 
-### O14 · Kehadiran Staf, Selfie & Koreksi (T-118, T-119, T-122)
+### O14 · Kehadiran Staf, Selfie & Koreksi (T-118, T-119, T-122) — backend ✅ (Wave 7c-2)
+
+Owner only (staff get 403, also by direct API call). Before every attendance read or write (O14, S9, K1, K3) the server runs the due checks for the tenant: a record still open at the outlet's closing time of its clock-in day (outlet-local; after midnight when `closes_at <= opens_at`; local midnight when the day has no hours; the clock-in itself when it was after closing) plus `attendance_grace_minutes` becomes `needs_correction` with `flagged_at` = that instant, without a clock-out time; selfies older than 30 days are deleted (records stay). This runs lazily until the T-104 scheduler exists.
 
 | Action | Endpoint | Fields |
 |---|---|---|
-| Summary + table | `GET /owner/attendance?outlet_id=&user_id=&from=&to=` | `summary:[{user, outlets, worked_minutes, days}]`, `needs_correction_count`, `records:[{id, date, user, outlet, timezone, clock_in_at, clock_out_at, duration_minutes, has_selfie_in, has_selfie_out, status: open\|closed\|needs_correction\|corrected}]`. Flagged records excluded from totals. |
-| Selfie | `GET /owner/attendance/{id}/selfies` | Short-lived signed URLs (in/out) + device name. |
-| Koreksi catatan | `POST /owner/attendance/{id}/corrections` | `clock_in_at?, clock_out_at?, reason*`. Returns updated record + history. |
-| Riwayat koreksi | `GET /owner/attendance/{id}` | `original`, `flagged_at`, `corrections:[{at, by, from, to, reason}]`. |
-| ⭳ Ekspor CSV | `GET /owner/attendance?format=csv` | |
+| Summary + table | `GET /owner/attendance?outlet_id=&user_id=&from=&to=` ✅ | Default range: the last 7 days up to today. Days are outlet-local (`clock_in_at` in the outlet zone). `{from, to, summary:[{user:{id,name}, outlets:[name], worked_minutes, days}], needs_correction_count, records:[{id, date, user:{id,name}, outlet:{id,name}, timezone, clock_in_at, clock_out_at, duration_minutes, has_selfie_in, has_selfie_out, status: open\|closed\|needs_correction\|corrected}]}`, newest first. Flagged and open records are left out of the totals (`duration_minutes` null). |
+| Selfie | `GET /owner/attendance/{id}/selfies/in\|out` ✅ | **PoC:** the photo bytes (`Cache-Control: private, no-store`), loaded as a blob like the QRIS image; signed bucket URLs come with the Storage move. Device names are in the detail below. 404 once purged. |
+| Koreksi catatan | `POST /owner/attendance/{id}/corrections` ✅ | `clock_in_at?, clock_out_at?, reason*` → the detail below. `reason_required` for a blank reason; `record_open` (409) while the person is still working; clock-out required, after clock-in, not in the future. Status becomes `corrected`; the change is an append-only `correction` event. |
+| Riwayat koreksi | `GET /owner/attendance/{id}` ✅ | Record fields + `devices:{clock_in, clock_out}` (tablet names), `original:{clock_in_at, clock_out_at}` (from the clock events), `flag:{at, closes_at "22:00", grace_minutes}\|null`, `corrections:[{at, by, from:{clock_in_at, clock_out_at}, to:{…}, reason}]`. |
+| ⭳ Ekspor CSV | `GET /owner/attendance?format=csv` ✅ | Columns `tanggal, staf, outlet, zona, masuk, pulang, durasi_menit, status`, outlet-local times. |
 
 ### O15 · Dashboard — tab PO & Supplier: Daftar PO, detail, supplier (T-125–T-128) — backend ✅ (T-125–T-128)
 
@@ -267,13 +269,15 @@ Before every read or write of an outlet's reservations the server releases expir
 | Buka shift | `POST /ops/drawers/{id}/shifts` ✅ | `starting_cash`. `conflict` if one is open. |
 | Submit hitungan & tutup shift | `POST /ops/shifts/{id}/close` ✅ (`Idempotency-Key`) | `count_breakdown:{"100000":12, "50000":6, "20000":9, "10000":5, "5000":4, "2000":3, "coins":4400}` (note counts; `coins` = "Rp 1.000 & koin" as an amount) → server sums `counted_cash`; the response then reveals `drawer:{id, name}, starting_cash, cash_in, cash_refunds, cash_paid_out, expected_cash (= starting + cash in − cash refunds − cash paid to suppliers from this drawer), counted_cash, difference, kind: shortage\|surplus\|none, counted_by, closed_at, timezone`. A non-zero difference posts `cash_shortage`/`cash_surplus` to the ledger. `shift_closed` (409) when already closed; cash payments wait for or refuse a shift being closed. |
 
-### S9 / M6 · Absensi Saya (T-116, T-117, T-122)
+### S9 / M6 · Absensi Saya (T-116, T-117, T-122) — backend ✅ (Wave 7c-2)
+
+Read-only. There is no clock-in endpoint for staff tokens; RLS limits rows and selfies to the signed-in person.
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Status hari ini + banner | `GET /ops/me/attendance/today` | `status: working\|not_clocked_in`, `clock_in_at, device_name, outlet`, `flagged_records:[{date, outlet}]`. |
-| Riwayat minggu ini | `GET /ops/me/attendance?from=&to=` | Own records only + `total_minutes` (flagged excluded). |
-| Lihat selfie sendiri | `GET /ops/me/attendance/{id}/selfies` | Signed URLs. No clock-in endpoint exists for staff tokens. |
+| Status hari ini + banner | `GET /ops/me/attendance/today` ✅ | `status: working\|not_clocked_in`, `clock_in_at, device_name, outlet:{name, timezone}` (when working), `flagged_records:[{id, date, outlet:{name}}]` ("Kamu lupa clock out 16 Nov"). The tablet name comes from definer function `app.attendance_device_names` (staff cannot read the device list; migration `20261119171439`). |
+| Riwayat minggu ini | `GET /ops/me/attendance?from=&to=` ✅ | Default: Monday of this week to today (WIB); at most 3 months. `{from, to, records:[same shape as O14], total_minutes}` (flagged and open excluded). |
+| Lihat selfie sendiri | `GET /ops/me/attendance/{id}/selfies/in\|out` ✅ | Photo bytes as in O14; 404 for anyone else's record. |
 
 ### S10 · Purchase Order outlet (staf) — backend ✅
 
