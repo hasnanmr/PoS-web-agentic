@@ -1,5 +1,5 @@
 // Wireframe O1 · "Masuk" card (invite-only login, Supabase Auth email + password).
-// The password field has a Lihat / Sembunyikan toggle (same as the Atur password card).
+// The password field has an eye-icon show/hide toggle (same as the Atur password card).
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useState, type FormEvent } from 'react'
 import { Alert, Button, Card, Field, PasswordInput, TextInput } from '../ui/kit'
