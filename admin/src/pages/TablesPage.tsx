@@ -152,8 +152,9 @@ function TableForm({ table, onDone, onCancel }: { table?: OwnerTable; onDone: ()
   )
 }
 
+/** Minutes shown as hours ("2", "0,75"); display only, see `minutesFrom`. */
 function hours(minutes: number): string {
-  return String(Math.round((minutes / 60) * 10) / 10)
+  return String(Math.round((minutes / 60) * 100) / 100).replace('.', ',')
 }
 
 function RulesForm({ initial, zone, onSaved }: { initial: ReservationSettings; zone: string; onSaved: () => void }) {
@@ -169,6 +170,10 @@ function RulesForm({ initial, zone, onSaved }: { initial: ReservationSettings; z
   const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
   const [busy, setBusy] = useState(false)
   const num = (v: string) => Number(v.replace(',', '.'))
+  // An untouched field sends the stored minutes, so a value that is not a whole fraction of an
+  // hour (e.g. 45 or 20 minutes) is not changed by rounding when another field is saved.
+  const minutesFrom = (value: string, stored: number) =>
+    value === hours(stored) ? stored : Math.round(num(value) * 60)
   const valid = [duration, windowDays, maxParty].every((v) => v !== '' && Number.isInteger(Number(v))) &&
     [reminder, cutoff].every((v) => v !== '' && !Number.isNaN(num(v))) && from !== '' && until !== ''
 
@@ -208,8 +213,8 @@ function RulesForm({ initial, zone, onSaved }: { initial: ReservationSettings; z
             default_duration_minutes: Number(duration),
             booking_window_days: Number(windowDays),
             max_party_size: Number(maxParty),
-            reminder_offset_minutes: Math.round(num(reminder) * 60),
-            cancellation_cutoff_minutes: Math.round(num(cutoff) * 60),
+            reminder_offset_minutes: minutesFrom(reminder, initial.reminder_offset_minutes),
+            cancellation_cutoff_minutes: minutesFrom(cutoff, initial.cancellation_cutoff_minutes),
           })
           setNotice({ tone: 'success', text: 'Aturan reservasi disimpan.' })
           onSaved()

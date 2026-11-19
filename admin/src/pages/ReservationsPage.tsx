@@ -6,18 +6,15 @@
 import { useEffect, useState } from 'react'
 import { useSession } from '../app/session'
 import { ApiError, errorMessage } from '../lib/api'
-import { formatTime, hhmm } from '../lib/format'
+import { formatTime, hhmm, offsetAt } from '../lib/format'
 import type { ReservationAction, ReservationBoard, ReservationDetail, ReservationRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, LinkButton, Loading, Select, TextInput } from '../ui/kit'
 
-const ZONE: Record<string, { label: string; offset: string }> = {
-  'Asia/Jakarta': { label: 'WIB', offset: '+07:00' },
-  'Asia/Makassar': { label: 'WITA', offset: '+08:00' },
-  'Asia/Jayapura': { label: 'WIT', offset: '+09:00' },
-}
+const ZONE_LABEL: Record<string, string> = { 'Asia/Jakarta': 'WIB', 'Asia/Makassar': 'WITA', 'Asia/Jayapura': 'WIT' }
+
 
 const SOURCE: Record<ReservationRow['source'], string> = {
   whatsapp: 'WhatsApp',
@@ -130,7 +127,8 @@ export default function ReservationsPage() {
 
   if (!outlet) return <PageHeader title="Reservasi & Meja" />
   const data = board.data
-  const zone = ZONE[data?.timezone ?? outlet.timezone] ?? { label: outlet.timezone, offset: '+07:00' }
+  const timezone = data?.timezone ?? outlet.timezone
+  const zoneLabel = ZONE_LABEL[timezone] ?? timezone
   const shown = data?.date ?? day
   const refresh = async (text?: string) => {
     setNotice(text)
@@ -156,7 +154,7 @@ export default function ReservationsPage() {
             <button type="button" aria-label="Hari sebelumnya" className="h-8 w-8 rounded-md hover:bg-surface"
               disabled={!shown} onClick={() => shown && setDay(addDays(shown, -1))}>‹</button>
             <span className="font-semibold">
-              {shown ? <><span className="hidden md:inline">{dayLabel(shown, 'long')}</span><span className="md:hidden">{dayLabel(shown, 'short')}</span></> : '…'} ({zone.label})
+              {shown ? <><span className="hidden md:inline">{dayLabel(shown, 'long')}</span><span className="md:hidden">{dayLabel(shown, 'short')}</span></> : '…'} ({zoneLabel})
             </span>
             <button type="button" aria-label="Hari berikutnya" className="h-8 w-8 rounded-md hover:bg-surface"
               disabled={!shown} onClick={() => shown && setDay(addDays(shown, 1))}>›</button>
@@ -165,7 +163,7 @@ export default function ReservationsPage() {
         </div>
         {notice && <Alert tone="success">{notice}</Alert>}
         {form === 'booking' && data && (
-          <BookingForm board={data} defaultDay={shown!} offset={zone.offset} onCancel={() => setForm(undefined)}
+          <BookingForm board={data} defaultDay={shown!} onCancel={() => setForm(undefined)}
             onDone={async (r, bookedDay) => {
               setForm(undefined)
               setDay(bookedDay)
@@ -400,8 +398,8 @@ function DetailCard({ id, board, now, onChanged }: {
   )
 }
 
-function BookingForm({ board, defaultDay, offset, onDone, onCancel }: {
-  board: ReservationBoard; defaultDay: string; offset: string
+function BookingForm({ board, defaultDay, onDone, onCancel }: {
+  board: ReservationBoard; defaultDay: string
   onDone: (r: ReservationDetail, day: string) => Promise<void>; onCancel: () => void
 }) {
   const { api, outlet } = useSession()
@@ -417,6 +415,8 @@ function BookingForm({ board, defaultDay, offset, onDone, onCancel }: {
   const size = Number(party)
   const valid = name.trim() !== '' && size >= 1 && date !== '' && time !== ''
   const fits = board.tables.filter((t) => t.is_bookable && t.capacity >= size)
+  // A table that no longer fits the party drops out of the list: fall back to automatic.
+  const chosen = fits.some((t) => t.id === tableId) ? tableId : ''
 
   return (
     <Card title="+ Booking telepon / langsung">
@@ -427,7 +427,7 @@ function BookingForm({ board, defaultDay, offset, onDone, onCancel }: {
           <TextInput aria-label="Jumlah orang" inputMode="numeric" value={party} onChange={(e) => setParty(e.target.value.replace(/\D/g, ''))} />
         </label>
         <label>Meja
-          <Select aria-label="Meja booking" value={tableId} onChange={(e) => setTableId(e.target.value)}>
+          <Select aria-label="Meja booking" value={chosen} onChange={(e) => setTableId(e.target.value)}>
             <option value="">Otomatis (meja terkecil yang cukup)</option>
             {fits.map((t) => <option key={t.id} value={t.id}>{tableLabel(t)}</option>)}
           </Select>
@@ -455,8 +455,8 @@ function BookingForm({ board, defaultDay, offset, onDone, onCancel }: {
               guest_name: name.trim(),
               guest_phone: phone.trim() || null,
               party_size: size,
-              starts_at: `${date}T${time}:00${offset}`,
-              table_id: tableId || null,
+              starts_at: `${date}T${time}:00${offsetAt(board.timezone, date, time)}`,
+              table_id: chosen || null,
               source,
             })
             await onDone(res, date)
@@ -480,13 +480,15 @@ function WalkInForm({ board, onDone, onCancel }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const size = Number(party)
+  const fits = board.tables.filter((t) => t.capacity >= size)
+  const chosen = fits.some((t) => t.id === tableId) ? tableId : ''
   return (
     <Card title="Tandai meja terisi (tanpa reservasi)">
       <div className="grid gap-3 text-[12px] sm:grid-cols-2">
         <label>Meja
-          <Select aria-label="Meja terisi" value={tableId} onChange={(e) => setTableId(e.target.value)}>
+          <Select aria-label="Meja terisi" value={chosen} onChange={(e) => setTableId(e.target.value)}>
             <option value="">Pilih meja</option>
-            {board.tables.filter((t) => t.capacity >= size).map((t) => <option key={t.id} value={t.id}>{tableLabel(t)}</option>)}
+            {fits.map((t) => <option key={t.id} value={t.id}>{tableLabel(t)}</option>)}
           </Select>
         </label>
         <label>Jumlah orang
@@ -498,11 +500,11 @@ function WalkInForm({ board, onDone, onCancel }: {
       </p>
       {error && <div className="mt-2"><Alert>{error}</Alert></div>}
       <div className="mt-3 flex gap-3">
-        <Button variant="action" disabled={!tableId || size < 1 || busy} onClick={async () => {
+        <Button variant="action" disabled={!chosen || size < 1 || busy} onClick={async () => {
           setBusy(true)
           setError(undefined)
           try {
-            await onDone(await api.post<ReservationDetail>(`/ops/outlets/${outlet!.id}/walk-ins`, { table_id: tableId, party_size: size }))
+            await onDone(await api.post<ReservationDetail>(`/ops/outlets/${outlet!.id}/walk-ins`, { table_id: chosen, party_size: size }))
           } catch (e) {
             setError(reservationError(e))
             setBusy(false)

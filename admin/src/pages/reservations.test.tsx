@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
+import { offsetAt } from '../lib/format'
 import type { OwnerTable, ReservationBoard, ReservationDetail, ReservationSettings } from '../lib/types'
 import { fakeApi, fakeSession } from '../test/fakes'
 import { WithSession } from '../test/session'
@@ -39,6 +40,21 @@ describe('O8 Meja & Aturan Reservasi', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Simpan' })[0]) // the table form's
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/owner/outlets/o-dago/tables',
       { name: 'VIP', capacity: 10, area: 'Lantai 2', is_bookable: true }]))
+  })
+
+  it('keeps stored minutes that are not whole tenths of an hour when another field is saved', async () => {
+    const api = fakeApi({
+      'GET /owner/outlets/o-dago/tables': TABLES,
+      'GET /owner/outlets/o-dago/reservation-settings': { ...SETTINGS, reminder_offset_minutes: 45, cancellation_cutoff_minutes: 20 },
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><TablesPage /></WithSession>)
+    expect(await screen.findByLabelText('Reminder dikirim')).toHaveValue('0,75')
+    await userEvent.clear(screen.getByLabelText('Maks. jumlah orang'))
+    await userEvent.type(screen.getByLabelText('Maks. jumlah orang'), '12')
+    const saves = screen.getAllByRole('button', { name: 'Simpan' })
+    await userEvent.click(saves[saves.length - 1])
+    await waitFor(() => expect(api.calls).toContainEqual(['PUT', '/owner/outlets/o-dago/reservation-settings',
+      expect.objectContaining({ max_party_size: 12, reminder_offset_minutes: 45, cancellation_cutoff_minutes: 20 })]))
   })
 
   it('saves reservation rules with hours converted to minutes', async () => {
@@ -146,6 +162,33 @@ describe('S6 / M4 Reservasi & Meja', () => {
     expect(await screen.findByText('Meja sudah dibooking atau terisi di jam itu (bentrok).')).toBeInTheDocument()
   })
 
+  it('falls back to automatic when the chosen table no longer fits the party', async () => {
+    const api = fakeApi({ 'GET /ops/outlets/o-dago/reservations': BOARD })
+    render(<WithSession session={fakeSession('staff', { api })}><ReservationsPage /></WithSession>)
+    await screen.findByRole('region', { name: 'Timeline meja' })
+    await userEvent.click(screen.getAllByRole('button', { name: /\+ Booking/ })[0])
+    await userEvent.type(screen.getByLabelText('Nama tamu'), 'Dewi')
+    await userEvent.selectOptions(screen.getByLabelText('Meja booking'), 't1')
+    await userEvent.clear(screen.getByLabelText('Jumlah orang'))
+    await userEvent.type(screen.getByLabelText('Jumlah orang'), '4')
+    expect(screen.getByLabelText('Meja booking')).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan booking' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/outlets/o-dago/reservations',
+      expect.objectContaining({ party_size: 4, table_id: null })]))
+  })
+
+  it('disables the walk-in button when the chosen table no longer fits', async () => {
+    const api = fakeApi({ 'GET /ops/outlets/o-dago/reservations': BOARD })
+    render(<WithSession session={fakeSession('staff', { api })}><ReservationsPage /></WithSession>)
+    await screen.findByRole('region', { name: 'Timeline meja' })
+    await userEvent.click(screen.getAllByRole('button', { name: /Tandai meja terisi/ })[0])
+    await userEvent.selectOptions(screen.getByLabelText('Meja terisi'), 't1')
+    await userEvent.clear(screen.getByLabelText('Jumlah orang terisi'))
+    await userEvent.type(screen.getByLabelText('Jumlah orang terisi'), '3')
+    expect(screen.getByLabelText('Meja terisi')).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Tandai terisi' })).toBeDisabled()
+  })
+
   it('marks a table occupied without a reservation', async () => {
     const api = fakeApi({
       'GET /ops/outlets/o-dago/reservations': BOARD,
@@ -158,5 +201,13 @@ describe('S6 / M4 Reservasi & Meja', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Tandai terisi' }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/outlets/o-dago/walk-ins', { table_id: 't9', party_size: 2 }]))
     expect(await screen.findByText('M09 ditandai terisi (tanpa reservasi).')).toBeInTheDocument()
+  })
+})
+
+describe('offsetAt', () => {
+  it('uses the outlet zone offset', () => {
+    expect(offsetAt('Asia/Jakarta', '2026-11-17', '11:00')).toBe('+07:00')
+    expect(offsetAt('Asia/Makassar', '2026-11-17', '11:00')).toBe('+08:00')
+    expect(offsetAt('Asia/Jayapura', '2026-11-17', '11:00')).toBe('+09:00')
   })
 })

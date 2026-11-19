@@ -136,3 +136,11 @@ export const ZONE_LABEL: Record<string, string> = {
   'Asia/Makassar': 'WITA',
   'Asia/Jayapura': 'WIT',
 }
+
+/** UTC offset ("+08:00") of `tz` at a local date and time, so `starts_at` is sent in the outlet zone. */
+export function offsetAt(tz: string, date: string, time: string): string {
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+    .formatToParts(new Date(`${date}T${time}:00Z`)).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT'
+  const m = /GMT([+-])(\d{2}):?(\d{2})?/.exec(name)
+  return m ? `${m[1]}${m[2]}:${m[3] ?? '00'}` : '+00:00'
+}
