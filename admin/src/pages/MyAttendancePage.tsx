@@ -3,7 +3,7 @@
 // GET /ops/me/attendance/{id}/selfies/in|out (PoC: photo bytes).
 // Canvas notes: no clock-in button on phones or in the admin app (only the outlet tablet); a record
 // flagged "perlu dikoreksi" shows a banner; a history row opens the person's own selfies; selfies
-// are kept 30 days, visible to the owner and the person only.
+// are kept 45 days, visible to the owner and the person only.
 import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
@@ -153,7 +153,7 @@ function MySelfies({ record }: { record: AttendanceRecord | undefined }) {
           {record.has_selfie_out && <SelfieImage id={record.id} which="out" label="Selfie pulang" />}
         </>
       ) : (
-        <span className="text-text-muted">Selfie sudah dihapus otomatis setelah 30 hari.</span>
+        <span className="text-text-muted">Selfie sudah dihapus otomatis setelah 45 hari.</span>
       )}
     </div>
   )

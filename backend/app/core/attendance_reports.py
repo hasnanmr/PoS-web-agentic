@@ -5,7 +5,9 @@
   invented. ``flagged_at`` is that due instant ("Ditandai otomatis 23:00 (tutup 22:00 + 1 jam)").
   Until the T-104 scheduler exists the check runs lazily (`run_due_checks`) before every
   attendance read or write, re-checking that the record is still open.
-- Selfie purge (T-122): photos older than 30 days are deleted; the records stay.
+- Selfie purge (T-122): photos older than 45 days are deleted; the records stay. The owner may
+  also delete one (`delete_selfie`, no screen yet). Staff cannot delete a selfie, not even their
+  own (owner-only endpoint; RLS lets only the owner or the system actor delete).
 - O14 (owner): records by outlet, staff and date range (outlet-local days), totals per staff
   member without flagged or open records, corrections with a required reason that keep the
   original values (append-only ``attendance_events``).
@@ -27,10 +29,11 @@ from psycopg_pool import AsyncConnectionPool
 
 from app import db
 from app.core.actor import ActorContext
+from app.core.audit import record_audit
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.localtime import to_local, zone_label
 
-SELFIE_RETENTION_DAYS = 30
+SELFIE_RETENTION_DAYS = 45  # product owner, 2026-11-20 (was 30)
 COUNTED = ("closed", "corrected")
 
 # T-118: due instant per open record. closes_at <= opens_at means the outlet closes after
@@ -382,6 +385,32 @@ async def selfie_image(conn: AsyncConnection, record_id: UUID, which: str) -> tu
     if row is None:
         raise NotFoundError("selfie")
     return row[0], bytes(row[1])
+
+
+async def delete_selfie(
+    conn: AsyncConnection, ctx: ActorContext, record_id: UUID, which: str
+) -> None:
+    """Owner deletes the clock-in (`in`) or clock-out (`out`) photo; the record stays."""
+    column = {"in": "clock_in_selfie_id", "out": "clock_out_selfie_id"}[which]
+    cur = await conn.execute(
+        f"select r.{column}, r.outlet_id from app.attendance_records r where r.id = %s",  # noqa: S608
+        (record_id,),
+    )
+    row = await cur.fetchone()
+    if row is None or row[0] is None:
+        raise NotFoundError("selfie")
+    deleted = await conn.execute("delete from app.attendance_selfies where id = %s", (row[0],))
+    if deleted.rowcount != 1:
+        raise NotFoundError("selfie")
+    await record_audit(
+        conn,
+        ctx,
+        action="attendance_selfie.deleted",
+        entity_type="attendance_record",
+        entity_id=record_id,
+        outlet_id=row[1],
+        data={"which": which},
+    )
 
 
 # S9 / M6 · own attendance ---------------------------------------------------------------------

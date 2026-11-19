@@ -11732,6 +11732,54 @@
       }
     },
     "/api/v1/owner/attendance/{record_id}/selfies/{which}": {
+      "delete": {
+        "description": "Owner deletes a selfie before the 45-day purge; the record and its hours stay. Audited.\nNo screen yet (product owner, 2026-11-20). Staff cannot delete selfies, not even their own.",
+        "operationId": "delete_attendance_selfie_api_v1_owner_attendance__record_id__selfies__which__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "which",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "title": "Which",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Attendance Selfie",
+        "tags": [
+          "owner: attendance"
+        ]
+      },
       "get": {
         "description": "O14 \"Selfie masuk / pulang\". PoC: the photo bytes (no Storage bucket yet), never cached.",
         "operationId": "attendance_selfie_api_v1_owner_attendance__record_id__selfies__which__get",

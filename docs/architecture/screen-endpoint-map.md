@@ -144,7 +144,7 @@ The sidebar item **Pengeluaran** opens this screen with the full expense list un
 
 ### O14 · Kehadiran Staf, Selfie & Koreksi (T-118, T-119, T-122) — backend ✅ (Wave 7c-2)
 
-Owner only (staff get 403, also by direct API call). Before every attendance read or write (O14, S9, K1, K3) the server runs the due checks for the tenant: a record still open at the outlet's closing time of its clock-in day (outlet-local; after midnight when `closes_at <= opens_at`; local midnight when the day has no hours; the clock-in itself when it was after closing) plus `attendance_grace_minutes` becomes `needs_correction` with `flagged_at` = that instant, without a clock-out time; selfies older than 30 days are deleted (records stay). This runs lazily until the T-104 scheduler exists.
+Owner only (staff get 403, also by direct API call). Before every attendance read or write (O14, S9, K1, K3) the server runs the due checks for the tenant: a record still open at the outlet's closing time of its clock-in day (outlet-local; after midnight when `closes_at <= opens_at`; local midnight when the day has no hours; the clock-in itself when it was after closing) plus `attendance_grace_minutes` becomes `needs_correction` with `flagged_at` = that instant, without a clock-out time; selfies older than 45 days are deleted (records stay; PRD v0.16). Staff cannot delete a selfie, not even their own (RLS lets only the owner or the system actor delete). This runs lazily until the T-104 scheduler exists.
 
 | Action | Endpoint | Fields |
 |---|---|---|
@@ -152,6 +152,7 @@ Owner only (staff get 403, also by direct API call). Before every attendance rea
 | Selfie | `GET /owner/attendance/{id}/selfies/in\|out` ✅ | **PoC:** the photo bytes (`Cache-Control: private, no-store`), loaded as a blob like the QRIS image; signed bucket URLs come with the Storage move. Device names are in the detail below. 404 once purged. |
 | Koreksi catatan | `POST /owner/attendance/{id}/corrections` ✅ | `clock_in_at?, clock_out_at?, reason*` → the detail below. `reason_required` for a blank reason; `record_open` (409) while the person is still working; clock-out required, after clock-in, not in the future. Status becomes `corrected`; the change is an append-only `correction` event. |
 | Riwayat koreksi | `GET /owner/attendance/{id}` ✅ | Record fields + `devices:{clock_in, clock_out}` (tablet names), `original:{clock_in_at, clock_out_at}` (from the clock events), `flag:{at, closes_at "22:00", grace_minutes}\|null`, `corrections:[{at, by, from:{clock_in_at, clock_out_at}, to:{…}, reason}]`. |
+| Hapus selfie (no screen yet) | `DELETE /owner/attendance/{id}/selfies/in\|out` ✅ → 204 | Owner only, approved by the product owner on 2026-11-20 without a wireframe control. Deletes the photo before the 45-day purge; the record and its hours stay; audited as `attendance_selfie.deleted`. Staff get 403 and RLS refuses their delete; no `/ops` delete exists. |
 | ⭳ Ekspor CSV | `GET /owner/attendance?format=csv` ✅ | Columns `tanggal, staf, outlet, zona, masuk, pulang, durasi_menit, status`, outlet-local times. |
 
 ### O15 · Dashboard — tab PO & Supplier: Daftar PO, detail, supplier (T-125–T-128) — backend ✅ (T-125–T-128)

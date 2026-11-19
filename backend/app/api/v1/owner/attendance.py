@@ -226,3 +226,15 @@ async def attendance_selfie(
     async with db.transaction(_pool(request), owner.actor()) as conn:
         kind, data = await reports.selfie_image(conn, record_id, which)
     return Response(content=data, media_type=kind, headers={"Cache-Control": "private, no-store"})
+
+
+@router.delete("/attendance/{record_id}/selfies/{which}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_attendance_selfie(
+    record_id: UUID, which: Literal["in", "out"], request: Request, owner: OwnerOnly
+) -> Response:
+    """Owner deletes a selfie before the 45-day purge; the record and its hours stay. Audited.
+    No screen yet (product owner, 2026-11-20). Staff cannot delete selfies, not even their own."""
+    ctx = owner.actor()
+    async with db.transaction(_pool(request), ctx) as conn:
+        await reports.delete_selfie(conn, ctx, record_id, which)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

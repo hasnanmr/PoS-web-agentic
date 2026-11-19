@@ -246,7 +246,7 @@ function CorrectionPanel({ recordId, onSaved }: { recordId: string; onSaved: () 
             )}
           </div>
         ) : (
-          <p className="text-[12px] text-text-muted">Selfie sudah dihapus otomatis (lebih dari 30 hari).</p>
+          <p className="text-[12px] text-text-muted">Selfie sudah dihapus otomatis (lebih dari 45 hari).</p>
         )}
         <div>
           <div>

@@ -747,7 +747,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Satu staf hanya memiliki satu catatan terbuka; clock in kedua ditolak. Staf yang tidak ditugaskan ke outlet itu tidak muncul di daftar, dan permintaan API langsung untuk outlet lain ditolak.
   - Clock in atau clock out dari HP staf sendiri atau admin app tidak tersedia; di admin app staf hanya melihat riwayatnya sendiri, termasuk selfie-nya.
   - Clock out tanpa catatan terbuka ditolak; setelah clock out, durasi ditampilkan.
-  - Sebelum clock in pertama, staf melihat pemberitahuan bahwa selfie disimpan 30 hari dan hanya dilihat owner dan dirinya sendiri.
+  - Sebelum clock in pertama, staf melihat pemberitahuan bahwa selfie disimpan 45 hari dan hanya dilihat owner dan dirinya sendiri.
   - Jika staf belum clock out sampai jam tutup outlet ditambah masa tenggang (default 1 jam, diatur owner per outlet), catatan ditandai "perlu dikoreksi". Sistem tidak mengarang jam pulang, jam kerjanya belum dihitung, dan staf dapat clock in lagi.
   - Staf hanya melihat catatan kehadirannya sendiri.
 - **Traceability:** FR5.1, FR5.3, FR5.7, AC5.1–AC5.3, AC5.5, AC5.6, AC5.8

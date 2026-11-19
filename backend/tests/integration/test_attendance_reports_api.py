@@ -2,7 +2,8 @@
 missing clock-out flag at closing + grace (no invented time, a new clock-in afterwards), the O14
 report with outlet-local day boundaries (WIB/WITA) and totals without flagged records,
 corrections with a required reason that keep the original values, CSV export, selfies for the
-owner and the person only, the 30-day selfie purge, and S9 own status and history.
+owner and the person only, the 45-day selfie purge, selfie deletion by the owner only (never by
+staff, not even their own), and S9 own status and history.
 """
 
 from __future__ import annotations
@@ -385,13 +386,23 @@ def test_my_attendance_today_and_history(client: TestClient, ctx: dict[str, Any]
     assert hist["total_minutes"] >= 510
 
 
-def test_selfies_are_purged_after_30_days(client: TestClient, ctx: dict[str, Any]) -> None:
+def test_selfies_are_purged_after_45_days(client: TestClient, ctx: dict[str, Any]) -> None:
     rid = ctx["maya_closed"]
-    admin_sql(
-        "update app.attendance_selfies set created_at = now() - interval '31 days'"
-        " where id = (select clock_in_selfie_id from app.attendance_records where id = %s)",
-        (rid,),
-    )
+
+    def age(which: str, days: int) -> None:
+        admin_sql(
+            "update app.attendance_selfies set created_at = now() - make_interval(days => %s)"
+            f" where id = (select clock_{which}_selfie_id from app.attendance_records"
+            " where id = %s)",
+            (days, rid),
+        )
+
+    age("in", 44)
+    res = client.get(f"/api/v1/owner/attendance?{_range(ctx)}", headers=ctx["owner"])
+    maya = next(r for r in res.json()["records"] if r["id"] == rid)
+    assert maya["has_selfie_in"] is True  # 44 days: still kept
+
+    age("in", 46)
     res = client.get(f"/api/v1/owner/attendance?{_range(ctx)}", headers=ctx["owner"])
     maya = next(r for r in res.json()["records"] if r["id"] == rid)
     assert maya["has_selfie_in"] is False  # photo gone, record kept
@@ -399,3 +410,46 @@ def test_selfies_are_purged_after_30_days(client: TestClient, ctx: dict[str, Any
     assert maya["duration_minutes"] == 490
     res = client.get(f"/api/v1/owner/attendance/{rid}/selfies/in", headers=ctx["owner"])
     assert res.status_code == 404
+
+
+def test_only_the_owner_deletes_a_selfie(client: TestClient, ctx: dict[str, Any]) -> None:
+    rid = ctx["rina_closed"]
+    # Staff cannot delete, not even their own selfie: the owner endpoint refuses them...
+    res = client.delete(f"/api/v1/owner/attendance/{rid}/selfies/in", headers=ctx["rina"])
+    assert res.status_code == 403
+    # ...there is no staff endpoint...
+    res = client.delete(f"/api/v1/ops/me/attendance/{rid}/selfies/in", headers=ctx["rina"])
+    assert res.status_code == 405
+    # ...and the database refuses a direct delete by the person in the photo.
+    assert APP_URL
+    with psycopg.connect(APP_URL) as conn:
+        conn.execute(
+            "select set_config('app.tenant_id', %s, true), set_config('app.user_id', %s, true),"
+            " set_config('app.actor', 'user', true)",
+            (ctx["tenant"], str(RINA)),
+        )
+        deleted = conn.execute(
+            "delete from app.attendance_selfies where id in (select clock_in_selfie_id"
+            " from app.attendance_records where id = %s)",
+            (rid,),
+        )
+        assert deleted.rowcount == 0
+        conn.rollback()
+    assert (
+        client.get(f"/api/v1/ops/me/attendance/{rid}/selfies/in", headers=ctx["rina"]).status_code
+        == 200
+    )
+
+    res = client.delete(f"/api/v1/owner/attendance/{rid}/selfies/in", headers=ctx["owner"])
+    assert res.status_code == 204
+    detail = client.get(f"/api/v1/owner/attendance/{rid}", headers=ctx["owner"]).json()
+    assert detail["has_selfie_in"] is False and detail["has_selfie_out"] is True
+    assert detail["duration_minutes"] == 510  # the record and its hours stay
+    res = client.delete(f"/api/v1/owner/attendance/{rid}/selfies/in", headers=ctx["owner"])
+    assert res.status_code == 404
+    audit = admin_sql(
+        "select actor_type::text, data->>'which' from app.audit_events"
+        " where action = 'attendance_selfie.deleted' and entity_id = %s",
+        (rid,),
+    )
+    assert audit == [("user", "in")]
