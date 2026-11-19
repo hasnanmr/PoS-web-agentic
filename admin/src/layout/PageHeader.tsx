@@ -7,14 +7,16 @@ import { useShell } from './shell-context'
 interface PageHeaderProps {
   title: string
   actions?: ReactNode
+  /** Tabs right after the title (O2 Dashboard: Ringkasan · PO & Supplier). */
+  tabs?: ReactNode
 }
 
-export function PageHeader({ title, actions }: PageHeaderProps) {
+export function PageHeader({ title, actions, tabs }: PageHeaderProps) {
   const { openDrawer } = useShell()
   const { me, outlet } = useSession()
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-surface px-4 py-3 md:px-6 md:py-4">
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center gap-3 ${tabs ? 'flex-wrap' : ''}`}>
         <button
           type="button"
           onClick={openDrawer}
@@ -23,9 +25,10 @@ export function PageHeader({ title, actions }: PageHeaderProps) {
         >
           ≡
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-[17px] font-bold text-text md:text-[18px]">
+        <h1 className={`min-w-0 truncate text-[17px] font-bold text-text md:text-[18px] ${tabs ? '' : 'flex-1'}`}>
           {title}
         </h1>
+        {tabs && <div className="min-w-0 flex-1">{tabs}</div>}
         {actions}
       </div>
       <p className="mt-0.5 pl-10 text-[11px] text-text-muted md:hidden">

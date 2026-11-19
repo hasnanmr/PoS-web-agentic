@@ -1,20 +1,29 @@
-// Wireframe O2 — Dashboard + keramaian (T-071). Owner only.
-// Built so far: header outlet filter + "Item terlaris" card. The other O2 cards (KPI, peta
-// keramaian, keramaian outlet sekarang, order per jam, stok rendah, komposisi per kanal) and the
-// header period/jam toggles come with T-071/T-123.
-// Endpoint: GET /owner/dashboard/top-items?outlet_id=&period=day|month|year.
-// Canvas notes (Item terlaris): the card has its own period toggle (Hari ini / Bulan ini /
-// Tahun ini, default Hari ini) and follows only the header outlet filter; top 5 by quantity sold
-// (ties: higher revenue); paid orders only; revenue excl. PB1 and delivery fee; empty →
-// "Belum ada item terjual di periode ini."
+// Wireframe O2 — Dashboard (T-071), owner only, with header tabs **Ringkasan** and **PO & Supplier**
+// (PRD v0.15, issue #16).
+// - Tab Ringkasan (O2): header outlet filter + "Item terlaris" card so far. The other O2 cards (KPI,
+//   peta keramaian, keramaian outlet sekarang, order per jam, stok rendah, komposisi per kanal) and
+//   the header period/jam toggles come with T-071/T-123.
+//   Endpoint: GET /owner/dashboard/top-items?outlet_id=&period=day|month|year.
+//   Canvas notes (Item terlaris): the card has its own period toggle (Hari ini / Bulan ini / Tahun
+//   ini, default Hari ini) and follows only the header outlet filter; top 5 by quantity sold (ties:
+//   higher revenue); paid orders only; revenue excl. PB1 and delivery fee; empty → "Belum ada item
+//   terjual di periode ini."
+// - Tab PO & Supplier (O17 cards + O15 list/detail, ./po/PoTab): its own outlet + month filter,
+//   Daftar supplier, + Buka PO (O16, ./po/PoForm, breadcrumb "Dashboard › PO & Supplier").
+// The tab and the O16 view live in the URL (?tab=po, ?tab=po&view=new) so they can be linked.
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
-import { formatNumber, formatRupiah } from '../lib/format'
+import { formatNumber, formatRupiah, todayIn } from '../lib/format'
 import type { TopItems, TopItemsPeriod } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
-import { Alert, Loading, Select } from '../ui/kit'
+import { Alert, Button, Loading, Select } from '../ui/kit'
+import { SupplierDialog } from './po/dialogs'
+import { PoForm } from './po/PoForm'
+import { PoTab } from './po/PoTab'
+import { monthLabel, recentMonths } from './po/util'
 
 const PERIODS: { key: TopItemsPeriod; label: string }[] = [
   { key: 'day', label: 'Hari ini' },
@@ -24,20 +33,87 @@ const PERIODS: { key: TopItemsPeriod; label: string }[] = [
 
 export default function DashboardPage() {
   const { me } = useSession()
+  const [search, setSearch] = useSearchParams()
+  const tab = search.get('tab') === 'po' ? 'po' : 'summary'
+  const creating = tab === 'po' && search.get('view') === 'new'
   const [outletId, setOutletId] = useState('')
+  const [poOutletId, setPoOutletId] = useState('')
+  const tz = me.outlets.find((o) => o.id === poOutletId)?.timezone ?? 'Asia/Jakarta'
+  const currentMonth = todayIn(tz).slice(0, 7)
+  const [month, setMonth] = useState<string>()
+  const [suppliers, setSuppliers] = useState(false)
+  const [focusId, setFocusId] = useState<string>()
+
+  const go = (next: Record<string, string>) => setSearch(next)
+
+  if (creating) {
+    return (
+      <>
+        <PageHeader title="Buka Purchase Order"
+          tabs={<p className="text-[12px] text-text-muted">Dashboard › PO & Supplier</p>} />
+        <div className="p-4 md:p-6">
+          <PoForm defaultOutletId={poOutletId} onCancel={() => go({ tab: 'po' })}
+            onOpened={(po) => {
+              setFocusId(po.id)
+              go({ tab: 'po' })
+            }} />
+        </div>
+      </>
+    )
+  }
+
+  const tabs = (
+    <div role="tablist" aria-label="Tab dashboard" className="flex gap-5 text-[13px]">
+      {([['summary', 'Ringkasan'], ['po', 'PO & Supplier']] as const).map(([key, label]) => (
+        <button key={key} type="button" role="tab" aria-selected={tab === key}
+          onClick={() => {
+            setFocusId(undefined)
+            go(key === 'po' ? { tab: 'po' } : {})
+          }}
+          className={`-mb-3 border-b-[3px] pb-2.5 md:-mb-4 md:pb-3.5 ${tab === key
+            ? 'border-primary font-semibold text-primary'
+            : 'border-transparent text-text-muted'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const outletSelect = (value: string, onChange: (v: string) => void) => (
+    <Select aria-label="Outlet" className="h-8 w-auto text-[12px]" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Semua outlet</option>
+      {me.outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+    </Select>
+  )
+
+  if (tab === 'po') {
+    const shown = month ?? currentMonth
+    return (
+      <>
+        <PageHeader title="Dashboard" tabs={tabs} actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {outletSelect(poOutletId, (v) => {
+              setFocusId(undefined)
+              setPoOutletId(v)
+            })}
+            <Select aria-label="Periode" className="h-8 w-auto text-[12px]" value={shown} onChange={(e) => setMonth(e.target.value)}>
+              {recentMonths(currentMonth).map((m) => <option key={m} value={m}>Periode: {monthLabel(m)}</option>)}
+            </Select>
+            <Button variant="ghost" className="h-8 text-[12px]" onClick={() => setSuppliers(true)}>☰ Daftar supplier</Button>
+            <Button variant="action" className="h-8" onClick={() => go({ tab: 'po', view: 'new' })}>+ Buka PO</Button>
+          </div>
+        } />
+        <div className="p-4 md:p-6">
+          <PoTab key={poOutletId} outletId={poOutletId} month={shown} focusId={focusId} />
+        </div>
+        {suppliers && <SupplierDialog onClose={() => setSuppliers(false)} />}
+      </>
+    )
+  }
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        actions={
-          <Select aria-label="Outlet" className="h-8 w-auto text-[12px]" value={outletId}
-            onChange={(e) => setOutletId(e.target.value)}>
-            <option value="">Semua outlet</option>
-            {me.outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </Select>
-        }
-      />
+      <PageHeader title="Dashboard" tabs={tabs} actions={outletSelect(outletId, setOutletId)} />
       <div className="space-y-4 p-4 md:p-6">
         <TopItemsCard outletId={outletId} />
       </div>

@@ -467,3 +467,127 @@ export interface TopItems {
   period: TopItemsPeriod
   top_items: TopItem[]
 }
+
+// Purchase orders — Dashboard tab "PO & Supplier" (O15–O17), O16/S12, S10, S11 -----------
+export type PaymentTerm = 'pay_later' | 'pay_in_advance'
+export type PoStatus = 'open' | 'difference_found' | 'closed' | 'cancelled'
+export type GoodsStatus = 'not_arrived' | 'partly_arrived' | 'arrived'
+export type PoPaymentStatus = 'unpaid' | 'partially_paid' | 'paid'
+export type PoAction = 'receive' | 'close' | 'close_with_note' | 'record_payment' | 'cancel'
+export type PoChip = 'open' | 'difference_found' | 'awaiting_payment' | 'overdue' | 'closed'
+
+export interface Ref { id: string; name: string }
+
+export interface PoRow {
+  id: string
+  number: string
+  supplier: Ref
+  outlet: Ref
+  payment_term: PaymentTerm
+  ordered_on: string
+  due_date: string | null
+  expected_date: string | null
+  status: PoStatus
+  goods_status: GoodsStatus
+  payment_status: PoPaymentStatus
+  overdue: boolean
+  total: number
+  created_at: string
+  created_by: string | null
+  /** Owner only (null for staff). */
+  amount_paid: number | null
+  amount_owed: number | null
+}
+
+export interface PoPage { items: PoRow[]; next_cursor: string | null }
+
+export interface PoLine {
+  id: string
+  item: string
+  stock_item_id: string | null
+  quantity: string
+  unit: string
+  unit_price: number
+  subtotal: number
+  received_quantity: string
+  remaining_quantity: string
+  check: 'match' | 'short'
+}
+
+export interface PoEvent {
+  at: string
+  kind: 'opened' | 'received' | 'paid' | 'closed' | 'cancelled'
+  actor: { name: string | null; role: string | null }
+  data: Record<string, unknown>
+}
+
+export interface PoDetail extends PoRow {
+  note: string | null
+  close_note: string | null
+  cancel_reason: string | null
+  lines: PoLine[]
+  events: PoEvent[]
+  allowed_actions: PoAction[]
+}
+
+export interface Supplier { id: string; name: string; phone: string | null; note: string | null; is_active: boolean }
+
+export interface Bucket { count: number; amount: number }
+
+export interface PoSummary {
+  month: string
+  total: Bucket
+  status: { open: Bucket; closed: Bucket }
+  goods: Record<GoodsStatus, Bucket>
+  payment: Record<PoPaymentStatus, Bucket>
+  by_term: Record<PaymentTerm, Bucket>
+}
+
+export interface PaymentItem {
+  po_id: string
+  number: string
+  supplier: Ref
+  outlet: Ref
+  payment_term: PaymentTerm
+  reason: 'overdue' | 'due' | 'pay_in_advance'
+  status: 'open' | 'difference_found' | 'closed'
+  due_date: string | null
+  expected_date: string | null
+  days_overdue: number | null
+  total: number
+  amount_paid: number
+  amount_owed: number
+  created_by: string | null
+  /** Bayar only with record_payment. */
+  allowed_actions: PoAction[]
+}
+
+export interface SupplierPayments {
+  debt_total: number
+  overdue_count: number
+  due_7d_amount: number
+  due_7d_count: number
+  prepaid_not_received: number
+  prepaid_not_received_count: number
+  items: PaymentItem[]
+}
+
+export interface PoDifference {
+  po_id: string
+  number: string
+  supplier: Ref
+  outlet: Ref
+  payment_term: PaymentTerm
+  short_lines: { item: string; ordered: string; received: string; short: string; unit: string }[]
+  last_received_on: string | null
+  last_received_at: string | null
+  days_since_last_received: number | null
+  /** Tutup dengan catatan only with close_with_note. */
+  allowed_actions: PoAction[]
+}
+
+export interface PoDashboard {
+  po_summary: PoSummary
+  supplier_payments: SupplierPayments
+  po_differences: PoDifference[]
+}
