@@ -127,6 +127,12 @@ const ERROR_COPY: Record<string, string> = {
   no_difference: 'PO ini tidak ada selisih; tutup lewat cek barang.',
   paid_above_received: 'Sudah dibayar lebih dari nilai barang yang diterima; PO tidak bisa ditutup dengan catatan.',
   owner_only: 'Hanya owner yang bisa melakukan ini.',
+  table_name_taken: 'Nama meja sudah dipakai di outlet ini.',
+  table_in_use: 'Meja masih punya open bill atau reservasi mendatang.',
+  table_has_reservations: 'Ada reservasi mendatang yang lebih besar dari kapasitas baru.',
+  no_table_available: 'Tidak ada meja kosong yang cukup untuk jumlah orang di jam itu.',
+  hold_expired: 'Hold 15 menit sudah lewat; booking otomatis no-show.',
+  too_early: 'Belum lewat jam booking; no-show belum bisa ditandai.',
 }
 
 export function errorMessage(error: unknown): string {
@@ -142,6 +148,24 @@ export function errorMessage(error: unknown): string {
     }
     if (error.code === 'validation_failed' && error.details.field === 'merchant_account_checked') {
       return 'Centang dulu: transaksi sudah ditemukan di akun merchant QRIS.'
+    }
+    if (error.code === 'validation_failed' && typeof error.details.max_party_size === 'number') {
+      return `Maksimal ${error.details.max_party_size} orang per reservasi.`
+    }
+    if (error.code === 'validation_failed' && typeof error.details.capacity === 'number') {
+      return `Meja ini hanya untuk ${error.details.capacity} orang.`
+    }
+    if (error.code === 'validation_failed' && typeof error.details.bookable_until === 'string') {
+      return `Di luar jam booking (${String(error.details.bookable_from)}–${error.details.bookable_until}).`
+    }
+    if (error.code === 'validation_failed' && typeof error.details.booking_window_days === 'number') {
+      return `Hanya bisa booking sampai ${error.details.booking_window_days} hari ke depan.`
+    }
+    if (error.code === 'validation_failed' && error.details.field === 'starts_at') {
+      return 'Jam booking sudah lewat.'
+    }
+    if (error.code === 'validation_failed' && error.details.field === 'bookable_until') {
+      return 'Jam akhir booking harus setelah jam mulai.'
     }
     if (error.code === 'item_sold_out' && typeof error.details.name === 'string') {
       return `${error.details.name} habis. Hapus atau ganti item ini.`

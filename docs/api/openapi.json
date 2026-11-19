@@ -657,52 +657,147 @@
         "title": "BillOrder",
         "type": "object"
       },
-      "Board": {
+      "BoardSettings": {
         "properties": {
-          "awaiting_payment": {
-            "items": {
-              "$ref": "#/components/schemas/OrderCard"
-            },
-            "title": "Awaiting Payment",
-            "type": "array"
+          "bookable_from": {
+            "format": "time",
+            "title": "Bookable From",
+            "type": "string"
           },
-          "confirmed": {
-            "items": {
-              "$ref": "#/components/schemas/OrderCard"
-            },
-            "title": "Confirmed",
-            "type": "array"
+          "bookable_until": {
+            "format": "time",
+            "title": "Bookable Until",
+            "type": "string"
           },
-          "done_today": {
-            "items": {
-              "$ref": "#/components/schemas/OrderCard"
-            },
-            "title": "Done Today",
-            "type": "array"
+          "booking_window_days": {
+            "title": "Booking Window Days",
+            "type": "integer"
           },
-          "preparing": {
-            "items": {
-              "$ref": "#/components/schemas/OrderCard"
-            },
-            "title": "Preparing",
-            "type": "array"
+          "default_duration_minutes": {
+            "title": "Default Duration Minutes",
+            "type": "integer"
           },
-          "ready": {
-            "items": {
-              "$ref": "#/components/schemas/OrderCard"
-            },
-            "title": "Ready",
-            "type": "array"
+          "hold_minutes": {
+            "title": "Hold Minutes",
+            "type": "integer"
+          },
+          "max_party_size": {
+            "title": "Max Party Size",
+            "type": "integer"
           }
         },
         "required": [
-          "awaiting_payment",
-          "confirmed",
-          "preparing",
-          "ready",
-          "done_today"
+          "bookable_from",
+          "bookable_until",
+          "default_duration_minutes",
+          "max_party_size",
+          "booking_window_days",
+          "hold_minutes"
         ],
-        "title": "Board",
+        "title": "BoardSettings",
+        "type": "object"
+      },
+      "BoardTable": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_bookable": {
+            "title": "Is Bookable",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "capacity",
+          "area",
+          "is_bookable"
+        ],
+        "title": "BoardTable",
+        "type": "object"
+      },
+      "BookingIn": {
+        "properties": {
+          "guest_name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Guest Name",
+            "type": "string"
+          },
+          "guest_phone": {
+            "anyOf": [
+              {
+                "pattern": "^\\+?[0-9 -]{8,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Phone"
+          },
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "phone",
+              "in_person"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to assign the smallest free fit",
+            "title": "Table Id"
+          }
+        },
+        "required": [
+          "guest_name",
+          "party_size",
+          "starts_at",
+          "source"
+        ],
+        "title": "BookingIn",
         "type": "object"
       },
       "Breakdown": {
@@ -1732,6 +1827,20 @@
           "available"
         ],
         "title": "MenuOption",
+        "type": "object"
+      },
+      "MoveIn": {
+        "properties": {
+          "table_id": {
+            "format": "uuid",
+            "title": "Table Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table_id"
+        ],
+        "title": "MoveIn",
         "type": "object"
       },
       "MovementCreate": {
@@ -5084,6 +5193,517 @@
         "title": "RejectIn",
         "type": "object"
       },
+      "ReservationDetail": {
+        "properties": {
+          "allowed_actions": {
+            "items": {
+              "enum": [
+                "seat",
+                "move",
+                "cancel",
+                "no_show",
+                "complete"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReservationEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "guest_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for a walk-in (\"Tanpa reservasi\")",
+            "title": "Guest Name"
+          },
+          "hold_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Booked only: start + 15 min, then no-show",
+            "title": "Hold Until"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "no_show_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show At"
+          },
+          "party_size": {
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "phone_masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Masked"
+          },
+          "source": {
+            "enum": [
+              "whatsapp",
+              "phone",
+              "in_person",
+              "walk_in"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "booked",
+              "seated",
+              "completed",
+              "cancelled",
+              "no_show"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "table_id": {
+            "format": "uuid",
+            "title": "Table Id",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "table_id",
+          "table_name",
+          "guest_name",
+          "party_size",
+          "starts_at",
+          "ends_at",
+          "status",
+          "source",
+          "hold_until",
+          "no_show_at",
+          "allowed_actions",
+          "phone_masked",
+          "timezone",
+          "events"
+        ],
+        "title": "ReservationDetail",
+        "type": "object"
+      },
+      "ReservationEvent": {
+        "properties": {
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
+          "actor_type": {
+            "enum": [
+              "user",
+              "system",
+              "agent",
+              "device"
+            ],
+            "title": "Actor Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "booked",
+                  "seated",
+                  "completed",
+                  "cancelled",
+                  "no_show"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "from_table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Table"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "booked",
+                  "seated",
+                  "completed",
+                  "cancelled",
+                  "no_show"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Status"
+          },
+          "to_table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Table"
+          }
+        },
+        "required": [
+          "event",
+          "from_status",
+          "to_status",
+          "from_table",
+          "to_table",
+          "reason",
+          "actor_type",
+          "actor_name",
+          "created_at"
+        ],
+        "title": "ReservationEvent",
+        "type": "object"
+      },
+      "ReservationRow": {
+        "properties": {
+          "allowed_actions": {
+            "items": {
+              "enum": [
+                "seat",
+                "move",
+                "cancel",
+                "no_show",
+                "complete"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "guest_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for a walk-in (\"Tanpa reservasi\")",
+            "title": "Guest Name"
+          },
+          "hold_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Booked only: start + 15 min, then no-show",
+            "title": "Hold Until"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "no_show_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show At"
+          },
+          "party_size": {
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "whatsapp",
+              "phone",
+              "in_person",
+              "walk_in"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "booked",
+              "seated",
+              "completed",
+              "cancelled",
+              "no_show"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "table_id": {
+            "format": "uuid",
+            "title": "Table Id",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "table_id",
+          "table_name",
+          "guest_name",
+          "party_size",
+          "starts_at",
+          "ends_at",
+          "status",
+          "source",
+          "hold_until",
+          "no_show_at",
+          "allowed_actions"
+        ],
+        "title": "ReservationRow",
+        "type": "object"
+      },
+      "ReservationSettingsIn": {
+        "properties": {
+          "bookable_from": {
+            "format": "time",
+            "title": "Bookable From",
+            "type": "string"
+          },
+          "bookable_until": {
+            "description": "Last booking start time (outlet-local)",
+            "format": "time",
+            "title": "Bookable Until",
+            "type": "string"
+          },
+          "booking_window_days": {
+            "maximum": 365.0,
+            "minimum": 0.0,
+            "title": "Booking Window Days",
+            "type": "integer"
+          },
+          "cancellation_cutoff_minutes": {
+            "maximum": 2880.0,
+            "minimum": 0.0,
+            "title": "Cancellation Cutoff Minutes",
+            "type": "integer"
+          },
+          "default_duration_minutes": {
+            "maximum": 600.0,
+            "minimum": 15.0,
+            "title": "Default Duration Minutes",
+            "type": "integer"
+          },
+          "is_enabled": {
+            "description": "\"Reservasi WhatsApp\" toggle; staff bookings always work",
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "max_party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Party Size",
+            "type": "integer"
+          },
+          "reminder_offset_minutes": {
+            "maximum": 2880.0,
+            "minimum": 0.0,
+            "title": "Reminder Offset Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "is_enabled",
+          "bookable_from",
+          "bookable_until",
+          "default_duration_minutes",
+          "booking_window_days",
+          "max_party_size",
+          "reminder_offset_minutes",
+          "cancellation_cutoff_minutes"
+        ],
+        "title": "ReservationSettingsIn",
+        "type": "object"
+      },
+      "ReservationSettingsOut": {
+        "properties": {
+          "bookable_from": {
+            "format": "time",
+            "title": "Bookable From",
+            "type": "string"
+          },
+          "bookable_until": {
+            "description": "Last booking start time (outlet-local)",
+            "format": "time",
+            "title": "Bookable Until",
+            "type": "string"
+          },
+          "booking_window_days": {
+            "maximum": 365.0,
+            "minimum": 0.0,
+            "title": "Booking Window Days",
+            "type": "integer"
+          },
+          "cancellation_cutoff_minutes": {
+            "maximum": 2880.0,
+            "minimum": 0.0,
+            "title": "Cancellation Cutoff Minutes",
+            "type": "integer"
+          },
+          "default_duration_minutes": {
+            "maximum": 600.0,
+            "minimum": 15.0,
+            "title": "Default Duration Minutes",
+            "type": "integer"
+          },
+          "hold_minutes": {
+            "description": "No-show hold, fixed at 15 (read-only)",
+            "title": "Hold Minutes",
+            "type": "integer"
+          },
+          "is_enabled": {
+            "description": "\"Reservasi WhatsApp\" toggle; staff bookings always work",
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "max_party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Party Size",
+            "type": "integer"
+          },
+          "reminder_offset_minutes": {
+            "maximum": 2880.0,
+            "minimum": 0.0,
+            "title": "Reminder Offset Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "is_enabled",
+          "bookable_from",
+          "bookable_until",
+          "default_duration_minutes",
+          "booking_window_days",
+          "max_party_size",
+          "reminder_offset_minutes",
+          "cancellation_cutoff_minutes",
+          "hold_minutes"
+        ],
+        "title": "ReservationSettingsOut",
+        "type": "object"
+      },
       "ReversalIn": {
         "properties": {
           "ingredients": {
@@ -5929,6 +6549,141 @@
         "title": "SupplierPayments",
         "type": "object"
       },
+      "TableCreate": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "capacity": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "is_bookable": {
+            "default": true,
+            "title": "Is Bookable",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "capacity"
+        ],
+        "title": "TableCreate",
+        "type": "object"
+      },
+      "TableOut": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_bookable": {
+            "title": "Is Bookable",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "capacity",
+          "area",
+          "is_bookable"
+        ],
+        "title": "TableOut",
+        "type": "object"
+      },
+      "TablePatch": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity"
+          },
+          "is_bookable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Bookable"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "TablePatch",
+        "type": "object"
+      },
       "TableRow": {
         "properties": {
           "area": {
@@ -6150,6 +6905,75 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "WalkInIn": {
+        "properties": {
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "table_id": {
+            "format": "uuid",
+            "title": "Table Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table_id",
+          "party_size"
+        ],
+        "title": "WalkInIn",
+        "type": "object"
+      },
+      "app__api__v1__ops__orders__Board": {
+        "properties": {
+          "awaiting_payment": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Awaiting Payment",
+            "type": "array"
+          },
+          "confirmed": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Confirmed",
+            "type": "array"
+          },
+          "done_today": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Done Today",
+            "type": "array"
+          },
+          "preparing": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Preparing",
+            "type": "array"
+          },
+          "ready": {
+            "items": {
+              "$ref": "#/components/schemas/OrderCard"
+            },
+            "title": "Ready",
+            "type": "array"
+          }
+        },
+        "required": [
+          "awaiting_payment",
+          "confirmed",
+          "preparing",
+          "ready",
+          "done_today"
+        ],
+        "title": "Board",
+        "type": "object"
+      },
       "app__api__v1__ops__orders__CancelIn": {
         "properties": {
           "reason": {
@@ -6217,6 +7041,45 @@
           }
         },
         "title": "PaymentIn",
+        "type": "object"
+      },
+      "app__api__v1__ops__reservations__Board": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "reservations": {
+            "items": {
+              "$ref": "#/components/schemas/ReservationRow"
+            },
+            "title": "Reservations",
+            "type": "array"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BoardSettings"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/BoardTable"
+            },
+            "title": "Tables",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "timezone",
+          "settings",
+          "tables",
+          "reservations"
+        ],
+        "title": "Board",
         "type": "object"
       },
       "app__api__v1__owner__catalog__Created": {
@@ -7182,7 +8045,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Board"
+                  "$ref": "#/components/schemas/app__api__v1__ops__orders__Board"
                 }
               }
             },
@@ -7522,6 +8385,119 @@
         ]
       }
     },
+    "/api/v1/ops/outlets/{outlet_id}/reservations": {
+      "get": {
+        "operationId": "reservation_board_api_v1_ops_outlets__outlet_id__reservations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Outlet-local; default today",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Outlet-local; default today",
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__v1__ops__reservations__Board"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reservation Board",
+        "tags": [
+          "ops: reservations"
+        ]
+      },
+      "post": {
+        "operationId": "create_booking_api_v1_ops_outlets__outlet_id__reservations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Booking",
+        "tags": [
+          "ops: reservations"
+        ]
+      }
+    },
     "/api/v1/ops/outlets/{outlet_id}/shifts/current": {
       "get": {
         "operationId": "current_shifts_api_v1_ops_outlets__outlet_id__shifts_current_get",
@@ -7830,6 +8806,59 @@
         ]
       }
     },
+    "/api/v1/ops/outlets/{outlet_id}/walk-ins": {
+      "post": {
+        "operationId": "create_walk_in_api_v1_ops_outlets__outlet_id__walk_ins_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalkInIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Walk In",
+        "tags": [
+          "ops: reservations"
+        ]
+      }
+    },
     "/api/v1/ops/payment-proofs/{proof_id}": {
       "get": {
         "operationId": "proof_detail_api_v1_ops_payment_proofs__proof_id__get",
@@ -8134,6 +9163,242 @@
         "summary": "Receive Goods",
         "tags": [
           "ops: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/ops/reservations/{reservation_id}": {
+      "get": {
+        "operationId": "reservation_detail_api_v1_ops_reservations__reservation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reservation Detail",
+        "tags": [
+          "ops: reservations"
+        ]
+      }
+    },
+    "/api/v1/ops/reservations/{reservation_id}/cancel": {
+      "post": {
+        "operationId": "cancel_api_v1_ops_reservations__reservation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "ops: reservations"
+        ]
+      }
+    },
+    "/api/v1/ops/reservations/{reservation_id}/complete": {
+      "post": {
+        "description": "\"Selesai\": the seated guests left and the table is free again (US-026).",
+        "operationId": "complete_api_v1_ops_reservations__reservation_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete",
+        "tags": [
+          "ops: reservations"
+        ]
+      }
+    },
+    "/api/v1/ops/reservations/{reservation_id}/move": {
+      "post": {
+        "operationId": "move_api_v1_ops_reservations__reservation_id__move_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move",
+        "tags": [
+          "ops: reservations"
+        ]
+      }
+    },
+    "/api/v1/ops/reservations/{reservation_id}/no-show": {
+      "post": {
+        "description": "`too_early` before the booking time.",
+        "operationId": "no_show_api_v1_ops_reservations__reservation_id__no_show_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "No Show",
+        "tags": [
+          "ops: reservations"
+        ]
+      }
+    },
+    "/api/v1/ops/reservations/{reservation_id}/seat": {
+      "post": {
+        "description": "`hold_expired` after the 15-minute hold (the booking is already a no-show).",
+        "operationId": "seat_api_v1_ops_reservations__reservation_id__seat_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Seat",
+        "tags": [
+          "ops: reservations"
         ]
       }
     },
@@ -9336,6 +10601,198 @@
         "summary": "Put Qris",
         "tags": [
           "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/reservation-settings": {
+      "get": {
+        "operationId": "get_settings_api_v1_owner_outlets__outlet_id__reservation_settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      },
+      "put": {
+        "operationId": "put_settings_api_v1_owner_outlets__outlet_id__reservation_settings_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservationSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Settings",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/tables": {
+      "get": {
+        "operationId": "list_tables_api_v1_owner_outlets__outlet_id__tables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TableOut"
+                  },
+                  "title": "Response List Tables Api V1 Owner Outlets  Outlet Id  Tables Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tables",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      },
+      "post": {
+        "operationId": "create_table_api_v1_owner_outlets__outlet_id__tables_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Table",
+        "tags": [
+          "owner: tables & reservation rules"
         ]
       }
     },
@@ -11048,6 +12505,94 @@
         "summary": "Update Supplier",
         "tags": [
           "owner: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/owner/tables/{table_id}": {
+      "delete": {
+        "description": "Deactivate the table. `table_in_use` while it has an open bill or an upcoming booking.",
+        "operationId": "delete_table_api_v1_owner_tables__table_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Table",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      },
+      "patch": {
+        "operationId": "update_table_api_v1_owner_tables__table_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TablePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Table",
+        "tags": [
+          "owner: tables & reservation rules"
         ]
       }
     },

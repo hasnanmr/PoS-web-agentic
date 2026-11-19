@@ -188,6 +188,8 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-067 Counter order screen | S1, M2 |
 | T-068 Order board, payment review, reversal, open bills | S2, S3, S4, S5, M1, M3 |
 | T-069 Stock screens | S7, M5 |
+| T-057 Tables and reservation rules | O8 |
+| T-062, T-063, T-064 Staff reservation board, walk-ins, no-show hold (Wave 6) | S6, M4 |
 | T-070 Reservation/table view and cashier shift | S6, S8, M4 |
 | T-071 Owner dashboard | O2 |
 | T-128 Dashboard PO figures (tab PO & Supplier) | O17, O15 |
@@ -218,6 +220,8 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 - Staff accounts are **invite-only**; there is no public sign-up (O1, O4).
 - Attendance is recorded only on the outlet's paired tablet (K0–K4): the staff member taps their name and takes a required selfie, so they must be at the outlet. Staff phones and the admin app only show their own history (S9, M6). No PIN is needed. Selfies are private, visible to the owner and the staff member, and deleted after 30 days.
 - All purchase-order screens for the owner live in their own Dashboard tab **PO & Supplier** (issue #16): O17 cards on top, the O15 list and detail below, Buka PO (O16) and Daftar supplier from the tab header. The tab has its own outlet + month filter (PRD v0.15). The month applies only to Ringkasan PO (by PO open date, FR3.12). Pembayaran supplier and PO ada selisih always show every PO that needs action (FR3.11). The list uses the status chips (FR3.10), and a Ringkasan figure opens it with exactly those POs. Each number appears once: the old O15 KPI row was merged into O17's Pembayaran supplier card. Pengeluaran (O9) is for expenses only. Staff keep S10–S12.
+- S6 / M4 add a **Selesai** action for seated reservations and walk-ins (US-026 "completed"; not drawn on the canvas, approved by the product owner on 2026-11-19) so the table is freed when the guests leave. The canvas should get the button in the next wireframe pass.
+- O8's **⭳ Unduh** QR column is shown disabled until WhatsApp (T-054, pilot) ships.
 - A forgotten clock-out is flagged "perlu dikoreksi" 1 hour after closing time (default) without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
 
 ## Open points

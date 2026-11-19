@@ -595,3 +595,74 @@ export interface PoDashboard {
   supplier_payments: SupplierPayments
   po_differences: PoDifference[]
 }
+
+// O8 · Meja & Aturan Reservasi (T-057)
+export interface OwnerTable {
+  id: string
+  name: string
+  capacity: number
+  area: string | null
+  is_bookable: boolean
+}
+
+export interface ReservationSettings {
+  is_enabled: boolean
+  bookable_from: string
+  bookable_until: string
+  default_duration_minutes: number
+  booking_window_days: number
+  max_party_size: number
+  reminder_offset_minutes: number
+  cancellation_cutoff_minutes: number
+  hold_minutes: number
+}
+
+// S6 / M4 · Reservasi & Meja (T-062, T-063, T-064)
+export type ReservationStatus = 'booked' | 'seated' | 'completed' | 'cancelled' | 'no_show'
+export type ReservationAction = 'seat' | 'move' | 'cancel' | 'no_show' | 'complete'
+
+export interface ReservationRow {
+  id: string
+  table_id: string
+  table_name: string
+  guest_name: string | null
+  party_size: number
+  starts_at: string
+  ends_at: string
+  status: ReservationStatus
+  source: 'whatsapp' | 'phone' | 'in_person' | 'walk_in'
+  hold_until: string | null
+  no_show_at: string | null
+  allowed_actions: ReservationAction[]
+}
+
+export interface ReservationBoard {
+  date: string
+  timezone: string
+  settings: {
+    bookable_from: string
+    bookable_until: string
+    default_duration_minutes: number
+    max_party_size: number
+    booking_window_days: number
+    hold_minutes: number
+  }
+  tables: { id: string; name: string; capacity: number; area: string | null; is_bookable: boolean }[]
+  reservations: ReservationRow[]
+}
+
+export interface ReservationDetail extends ReservationRow {
+  phone_masked: string | null
+  timezone: string
+  events: {
+    event: string
+    from_status: ReservationStatus | null
+    to_status: ReservationStatus | null
+    from_table: string | null
+    to_table: string | null
+    reason: string | null
+    actor_type: 'user' | 'system' | 'agent' | 'device'
+    actor_name: string | null
+    created_at: string
+  }[]
+}
