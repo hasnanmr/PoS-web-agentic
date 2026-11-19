@@ -3,6 +3,7 @@
 import { NavLink } from 'react-router'
 import { NAV, STAFF_SIDEBAR_NOTE, type Role } from '../app/nav'
 import { useSession } from '../app/session'
+import { Brand } from '../ui/Brand'
 
 interface SidebarProps {
   role: Role
@@ -17,9 +18,7 @@ export function Sidebar({ role, onNavigate }: SidebarProps) {
       className="flex h-full w-[220px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-3 py-4"
     >
       <div className="px-2">
-        <div className="text-[15px] font-bold text-primary">
-          <span aria-hidden="true">◼</span> SME POS
-        </div>
+        <Brand className="text-[15px]" />
         {/* Outlet switcher: outlets from GET /me (owner: all, staff: assigned only). */}
         <label className="mt-0.5 block text-[11px] text-text-muted">
           <span>Outlet: {me.tenant?.name} – </span>
