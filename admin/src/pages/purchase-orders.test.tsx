@@ -63,8 +63,8 @@ const posts = (api: ReturnType<typeof fakeApi>) => (api.post as unknown as { moc
 describe('S10 Purchase Order outlet (staff)', () => {
   it('lists the outlet POs with goods and read-only payment status, and filters by status', async () => {
     const api = fakeApi({
-      'GET /ops/outlets/o-dago/purchase-orders': { items: ROWS, next_cursor: null },
-      'GET /ops/outlets/o-dago/purchase-orders?status=closed': { items: [ROWS[2]], next_cursor: null },
+      'GET /ops/outlets/o-dago/purchase-orders': { items: ROWS, next_cursor: null, counts: { active: 3, waiting_goods: 1 } },
+      'GET /ops/outlets/o-dago/purchase-orders?status=closed': { items: [ROWS[2]], next_cursor: null, counts: { active: 3, waiting_goods: 1 } },
     })
     renderPage(api)
     const list = await screen.findByRole('region', { name: 'Daftar PO outlet' })
@@ -79,13 +79,15 @@ describe('S10 Purchase Order outlet (staff)', () => {
     expect(within(closed).getByRole('button', { name: 'Lihat detail PO-A-0012' })).toBeInTheDocument()
     expect(within(list).queryByText(/sisa/i)).not.toBeInTheDocument() // staff never see debt
 
+    expect(screen.getByRole('button', { name: 'Terbuka (3)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Menunggu barang (1)' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ditutup' }))
     await waitFor(() => expect(within(list).queryByText('PO-A-0014')).not.toBeInTheDocument())
   })
 
   it('opens S12 with the assigned-outlet form', async () => {
     const api = fakeApi({
-      'GET /ops/outlets/o-dago/purchase-orders': { items: [], next_cursor: null },
+      'GET /ops/outlets/o-dago/purchase-orders': { items: [], next_cursor: null, counts: { active: 0, waiting_goods: 0 } },
       'GET /ops/suppliers': [],
       'GET /ops/outlets/o-dago/stock': { counts: { low: 0, out: 0 }, items: [] },
     })

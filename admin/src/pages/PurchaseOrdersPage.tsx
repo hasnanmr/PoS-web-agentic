@@ -13,18 +13,18 @@ import { useSearchParams } from 'react-router'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatDay, formatRupiah, formatTime, localDay, plainQuantity, todayIn } from '../lib/format'
-import type { PoChip, PoDetail, PoPage, PoRow } from '../lib/types'
+import type { OutletChip, OutletPoPage, PoDetail, PoRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, LinkButton, Loading, TextInput } from '../ui/kit'
 import { PoForm } from './po/PoForm'
 import { TERM_LABEL, eventText, useIdempotencyKey } from './po/util'
 
-/** S10 filters: the O15 status filters that concern staff (no payment chips; screen-endpoint-map S10). */
-const STAFF_CHIPS: { key: PoChip | null; label: string }[] = [
+/** S10 header chips (wireframe): Terbuka (n) | Menunggu barang (n) | Ditutup, plus Semua (default). */
+const STAFF_CHIPS: { key: OutletChip | null; label: string }[] = [
   { key: null, label: 'Semua' },
-  { key: 'open', label: 'Terbuka' },
-  { key: 'difference_found', label: 'Ada selisih' },
+  { key: 'active', label: 'Terbuka' },
+  { key: 'waiting_goods', label: 'Menunggu barang' },
   { key: 'closed', label: 'Ditutup' },
 ]
 
@@ -83,10 +83,10 @@ function OutletList({ outletId, outletName, timezone, onOpen, onNew }: {
   onNew: () => void
 }) {
   const { api } = useSession()
-  const [chip, setChip] = useState<PoChip | null>(null)
+  const [chip, setChip] = useState<OutletChip | null>(null)
   const query = `${outletId}|${chip ?? ''}`
   const path = `/ops/outlets/${outletId}/purchase-orders${chip ? `?status=${chip}` : ''}`
-  const first = useLoad(() => api.get<PoPage>(path), query)
+  const first = useLoad(() => api.get<OutletPoPage>(path), query)
   const [more, setMore] = useState<{ query: string; items: PoRow[]; cursor: string | null }>()
   const [moreError, setMoreError] = useState<{ query: string; message: string }>()
   const [loadingMore, setLoadingMore] = useState(false)
@@ -94,13 +94,16 @@ function OutletList({ outletId, outletName, timezone, onOpen, onNew }: {
   const rows = [...(first.data?.items ?? []), ...(extra?.items ?? [])]
   const cursor = extra ? extra.cursor : first.data?.next_cursor
   const today = todayIn(timezone)
+  const counts = first.data?.counts
+  const chipLabel = (c: (typeof STAFF_CHIPS)[number]) =>
+    counts && (c.key === 'active' || c.key === 'waiting_goods') ? `${c.label} (${counts[c.key]})` : c.label
 
   async function loadMore() {
     if (!cursor) return
     setLoadingMore(true)
     setMoreError(undefined)
     try {
-      const page = await api.get<PoPage>(`${path}${chip ? '&' : '?'}cursor=${encodeURIComponent(cursor)}`)
+      const page = await api.get<OutletPoPage>(`${path}${chip ? '&' : '?'}cursor=${encodeURIComponent(cursor)}`)
       setMore({ query, items: [...(extra?.items ?? []), ...page.items], cursor: page.next_cursor })
     } catch (err) {
       setMoreError({ query, message: errorMessage(err) })
@@ -119,7 +122,7 @@ function OutletList({ outletId, outletName, timezone, onOpen, onNew }: {
               {STAFF_CHIPS.map((c) => (
                 <button key={c.label} type="button" aria-pressed={chip === c.key} onClick={() => setChip(c.key)}
                   className={`rounded px-1.5 py-0.5 ${chip === c.key ? 'bg-primary-soft font-semibold text-primary' : 'hover:text-text'}`}>
-                  {c.label}
+                  {chipLabel(c)}
                 </button>
               ))}
             </div>

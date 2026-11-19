@@ -501,6 +501,10 @@ export interface PoRow {
 
 export interface PoPage { items: PoRow[]; next_cursor: string | null }
 
+/** S10 chips: Terbuka / Menunggu barang / Ditutup. */
+export type OutletChip = 'active' | 'waiting_goods' | 'closed'
+export interface OutletPoPage extends PoPage { counts: { active: number; waiting_goods: number } }
+
 export interface PoLine {
   id: string
   item: string
