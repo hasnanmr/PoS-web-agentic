@@ -337,9 +337,29 @@ describe('S5 Open Bills', () => {
     // Switching back to Cash must stay possible even without an open shift.
     await userEvent.click(screen.getByRole('button', { name: 'Cash' }))
     expect(screen.getByRole('button', { name: 'Cash' })).toHaveAttribute('aria-pressed', 'true')
+    // ...but paying cash stays blocked until a shift is open.
+    await userEvent.type(screen.getByLabelText('Uang diterima bill'), '120000')
+    expect(screen.getByText('Cash butuh shift kasir terbuka.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Tutup bill & bayar Rp 116\.600/ })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'QRIS' }))
     await userEvent.click(screen.getByRole('button', { name: /Tutup bill & bayar Rp 116\.600/ }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/bills/b1/close', { method: 'qris' }]))
+  })
+
+  it('shows a failed shifts request as an error, not as "no open shift"', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/bills': { payment_mode: 'open_bill', bills: [{ id: 'b1', table_id: 't5', table_name: 'Meja 05',
+        table_area: 'Indoor', guest_name: null, running_total: 27500, order_count: 1, opened_at: new Date().toISOString() }] },
+      'GET /ops/bills/b1': { id: 'b1', table_name: 'Meja 05', table_area: 'Indoor', guest_name: null, status: 'open',
+        opened_at: new Date().toISOString(), orders: [{ id: 'o1', order_no: '#A-1028', channel: 'counter',
+          created_at: new Date().toISOString(), status: 'served', line_total: 25000, items: [{ name: 'Es Kopi Susu Senja', quantity: 1, addons: null }] }],
+        subtotal: 25000, pb1_rate_bps: 1000, pb1_amount: 2500, total: 27500 },
+      'GET /ops/outlets/o-dago/shifts/current': new ApiError(500, 'internal', 'boom'),
+    })
+    render(<WithSession session={fakeSession('staff', { api })}><OpenBillsPage /></WithSession>)
+    expect(await screen.findByText(/Gagal memuat shift kasir/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Coba lagi' })).toBeInTheDocument()
+    expect(screen.queryByText('Cash butuh shift kasir terbuka.')).not.toBeInTheDocument()
   })
 })
 
