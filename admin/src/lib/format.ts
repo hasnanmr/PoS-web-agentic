@@ -144,3 +144,17 @@ export function offsetAt(tz: string, date: string, time: string): string {
   const m = /GMT([+-])(\d{2}):?(\d{2})?/.exec(name)
   return m ? `${m[1]}${m[2]}:${m[3] ?? '00'}` : '+00:00'
 }
+
+const hour2 = (h: number) => String(h % 24).padStart(2, '0')
+
+/** [12, 13, 18, 19] → "12–14 & 18–20"; three or more groups are joined with commas. */
+export function hourRanges(hours: number[]): string {
+  const groups: [number, number][] = []
+  for (const h of [...hours].sort((a, b) => a - b)) {
+    const last = groups[groups.length - 1]
+    if (last && last[1] === h) last[1] = h + 1
+    else groups.push([h, h + 1])
+  }
+  const parts = groups.map(([a, b]) => `${hour2(a)}–${hour2(b)}`)
+  return parts.length === 2 ? parts.join(' & ') : parts.join(', ')
+}

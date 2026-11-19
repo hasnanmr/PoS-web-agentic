@@ -468,6 +468,60 @@ export interface TopItems {
   top_items: TopItem[]
 }
 
+// O2 tab Ringkasan — GET /owner/dashboard (T-071, T-123) ---------------------------------
+export type DashboardPeriod = 'today' | 'week' | 'month'
+export type HoursFilter = 'all' | 'busy' | 'quiet'
+export type CrowdLevel = 'ramai' | 'normal' | 'sepi'
+
+export interface DashboardKpis {
+  revenue_excl_pb1: number
+  change_pct: number | null
+  orders: number
+  cash_count: number
+  qris_count: number
+  pb1_collected: number
+  delivery_fee: number
+  delivery_orders: number
+}
+
+export interface HourSummary {
+  hours: number[]
+  orders: number
+  share_pct: number
+}
+
+export interface DashboardSummary {
+  period: DashboardPeriod
+  hours: HoursFilter
+  as_of: string
+  kpis: DashboardKpis
+  busyness_map: { weekday: number; hour: number; avg_orders: number }[]
+  current_crowd: {
+    outlet_id: string
+    name: string
+    timezone: string
+    occupied_tables: number
+    total_tables: number
+    active_orders: number
+    level: CrowdLevel
+  }[]
+  orders_per_hour: { hour: number; orders: number; mark: 'busy' | 'quiet' | null }[]
+  busy_summary: HourSummary
+  quiet_summary: HourSummary
+  low_stock: {
+    stock_item: string
+    outlet_id: string
+    outlet: string
+    on_hand: string
+    low_threshold: string
+    unit: string
+    display_unit: string | null
+    status: 'low' | 'out'
+  }[]
+  channel_mix: { channel: 'whatsapp_online' | 'whatsapp_table' | 'counter'; orders: number; share_pct: number }[]
+  payment_methods: { method: 'cash' | 'qris'; amount: number; transactions: number }[]
+}
+
 // Purchase orders — Dashboard tab "PO & Supplier" (O15–O17), O16/S12, S10, S11 -----------
 export type PaymentTerm = 'pay_later' | 'pay_in_advance'
 export type PoStatus = 'open' | 'difference_found' | 'closed' | 'cancelled'

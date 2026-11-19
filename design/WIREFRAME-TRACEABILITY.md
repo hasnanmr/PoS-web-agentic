@@ -226,5 +226,5 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 
 ## Open points
 
-- Busy, quiet, and crowded thresholds on O2 are placeholders; the final values will be set during development (T-123).
+- Busy, quiet, and crowded thresholds on O2 are placeholders. T-123 uses busy ≥ 130% and quiet ≤ 60% of the average orders per opening hour, and crowd Ramai at ≥ 75% of tables occupied, Sepi at ≤ 30% (constants in `backend/app/core/dashboard.py`); the product owner can still change them.
 - Phase 2 screens for US-044 (FAQ, upsell) and US-045 (forecast, restock suggestions), and all Phase 3 screens, are not drawn yet.
