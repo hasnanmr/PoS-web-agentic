@@ -11,13 +11,13 @@ describe('Atur password', () => {
     await userEvent.type(field, 'rahasia123')
     expect(field).toHaveAttribute('type', 'password')
 
-    const [toggle] = screen.getAllByRole('button', { name: 'Lihat' })
+    const [toggle] = screen.getAllByRole('button', { name: 'Lihat password' })
     await userEvent.click(toggle)
     expect(field).toHaveAttribute('type', 'text')
     expect(field).toHaveValue('rahasia123')
     expect(screen.getByLabelText('Ulangi password')).toHaveAttribute('type', 'password')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Sembunyikan' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sembunyikan password' }))
     expect(field).toHaveAttribute('type', 'password')
   })
 })

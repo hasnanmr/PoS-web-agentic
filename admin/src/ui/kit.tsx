@@ -68,15 +68,23 @@ export function TextInput(props: ComponentProps<'input'>) {
   return <input {...props} className={`${control} ${props.className ?? ''}`} />
 }
 
-/** Password field with a "Lihat" / "Sembunyikan" toggle so the user can check what they typed. */
+/** Password field with an eye icon toggle so the user can check what they typed. */
 export function PasswordInput(props: Omit<ComponentProps<'input'>, 'type'>) {
   const [visible, setVisible] = useState(false)
   return (
     <div className="relative">
-      <input {...props} type={visible ? 'text' : 'password'} className={`${control} pr-24 ${props.className ?? ''}`} />
-      <button type="button" aria-pressed={visible} aria-controls={props.id} onClick={() => setVisible((v) => !v)}
-        className="absolute inset-y-0 right-0 px-3 text-[12px] font-medium text-primary hover:underline">
-        {visible ? 'Sembunyikan' : 'Lihat'}
+      <input {...props} type={visible ? 'text' : 'password'} className={`${control} pr-10 ${props.className ?? ''}`} />
+      <button type="button" aria-pressed={visible} aria-controls={props.id}
+        aria-label={visible ? 'Sembunyikan password' : 'Lihat password'}
+        title={visible ? 'Sembunyikan password' : 'Lihat password'}
+        onClick={() => setVisible((v) => !v)}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-text-muted hover:text-primary focus-visible:text-primary focus-visible:outline-none">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+          <circle cx="12" cy="12" r="3" />
+          {visible && <path d="M4 4l16 16" />}
+        </svg>
       </button>
     </div>
   )

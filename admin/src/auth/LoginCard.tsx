@@ -1,7 +1,8 @@
 // Wireframe O1 · "Masuk" card (invite-only login, Supabase Auth email + password).
+// The password field has an eye-icon show/hide toggle (same as the Atur password card).
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useState, type FormEvent } from 'react'
-import { Alert, Button, Card, Field, TextInput } from '../ui/kit'
+import { Alert, Button, Card, Field, PasswordInput, TextInput } from '../ui/kit'
 import { authErrorCopy } from './errors'
 
 export function LoginCard({ supabase, error }: { supabase: SupabaseClient; error?: string }) {
@@ -36,9 +37,8 @@ export function LoginCard({ supabase, error }: { supabase: SupabaseClient; error
           />
         </Field>
         <Field label="Password" htmlFor="login-password">
-          <TextInput
+          <PasswordInput
             id="login-password"
-            type="password"
             autoComplete="current-password"
             placeholder="••••••••"
             value={password}
