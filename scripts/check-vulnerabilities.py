@@ -163,6 +163,14 @@ def normalise(name: str, ecosystem: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
+def version_key(version: str) -> list[tuple[int, int, str]]:
+    """Sort key that orders 1.9.0 before 1.10.0: digit runs compare as numbers."""
+    return [
+        (0, int(part), "") if part.isdigit() else (1, 0, part)
+        for part in re.findall(r"\d+|[^\d.]+", version)
+    ]
+
+
 def enrich(hits: list[dict]) -> None:
     """Fill severity, fixed versions and summary from each advisory's own record."""
     for hit in hits:
@@ -177,41 +185,56 @@ def enrich(hits: list[dict]) -> None:
             if normalise(package_name, hit["ecosystem"]) != wanted:
                 continue
             for version_range in affected.get("ranges", []):
+                # GIT ranges carry commit hashes, not versions someone can bump to.
+                if version_range.get("type") == "GIT":
+                    continue
                 for event in version_range.get("events", []):
                     if "fixed" in event:
                         fixed.add(event["fixed"])
-        hit["fixed"] = ", ".join(sorted(fixed)) or "no fix published"
-        hit["aliases"] = [a for a in record.get("aliases", []) if a.startswith("CVE")]
+        hit["fixed"] = ", ".join(sorted(fixed, key=version_key)) or "no fix published"
+        aliases = record.get("aliases", [])
+        hit["aliases"] = sorted(a for a in aliases if a.startswith("CVE"))
+        hit["ids"] = {hit["id"], *aliases}
         hit["summary"] = (record.get("summary") or "").strip()
 
 
 def dedupe(hits: list[dict]) -> list[dict]:
     """One advisory can arrive twice (GHSA and PYSEC for the same CVE); keep the GHSA entry.
 
-    Every id from the collapsed duplicates stays on the kept hit, so an ignore entry written with
-    the PYSEC id, the CVE, or the GHSA id all match the same advisory.
+    Two hits on the same package are the same advisory when they share any id or alias, whatever
+    the order of the aliases and whether or not a CVE is among them. Every id from the collapsed
+    duplicates stays on the kept hit, so an ignore entry written with the PYSEC id, the CVE, or
+    the GHSA id all match the same advisory.
     """
-    groups: dict[tuple[str, str, str, str], list[dict]] = {}
+    groups: list[list[dict]] = []
     for hit in hits:
-        key = (
-            hit["ecosystem"],
-            hit["name"],
-            hit["version"],
-            hit["aliases"][0] if hit["aliases"] else hit["id"],
-        )
-        groups.setdefault(key, []).append(hit)
+        package = (hit["ecosystem"], hit["name"], hit["version"])
+        ids = set(hit["ids"])
+        merged = [hit]
+        remaining = []
+        for group in groups:
+            first = group[0]
+            same_package = (first["ecosystem"], first["name"], first["version"]) == package
+            group_ids = set().union(*(h["ids"] for h in group))
+            if same_package and ids & group_ids:
+                merged = group + merged
+                ids |= group_ids
+            else:
+                remaining.append(group)
+        groups = [*remaining, merged]
 
     kept = []
-    for group in groups.values():
+    for group in groups:
         chosen = next((h for h in group if h["id"].startswith("GHSA")), group[0])
-        chosen["ids"] = {h["id"] for h in group}
+        chosen["ids"] = set().union(*(h["ids"] for h in group))
+        chosen["aliases"] = sorted({a for h in group for a in h["aliases"]})
         kept.append(chosen)
     return kept
 
 
 def ignore_keys(hit: dict) -> set[str]:
-    """Ids and CVE aliases that `.github/osv-ignore.txt` may use to name this advisory."""
-    return {*hit["ids"], *hit["aliases"]}
+    """Ids and aliases that `.github/osv-ignore.txt` may use to name this advisory."""
+    return set(hit["ids"])
 
 
 def main(argv: list[str]) -> int:
