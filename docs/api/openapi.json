@@ -3221,6 +3221,21 @@
       },
       "PaymentItem": {
         "properties": {
+          "allowed_actions": {
+            "description": "Bayar → record_payment",
+            "items": {
+              "enum": [
+                "receive",
+                "close",
+                "close_with_note",
+                "record_payment",
+                "cancel"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
           "amount_owed": {
             "title": "Amount Owed",
             "type": "integer"
@@ -3335,7 +3350,8 @@
           "total",
           "amount_paid",
           "amount_owed",
-          "created_by"
+          "created_by",
+          "allowed_actions"
         ],
         "title": "PaymentItem",
         "type": "object"
@@ -3684,6 +3700,21 @@
       },
       "PoDifference": {
         "properties": {
+          "allowed_actions": {
+            "description": "Tutup dengan catatan → close_with_note",
+            "items": {
+              "enum": [
+                "receive",
+                "close",
+                "close_with_note",
+                "record_payment",
+                "cancel"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
           "days_since_last_received": {
             "anyOf": [
               {
@@ -3759,7 +3790,8 @@
           "short_lines",
           "last_received_on",
           "last_received_at",
-          "days_since_last_received"
+          "days_since_last_received",
+          "allowed_actions"
         ],
         "title": "PoDifference",
         "type": "object"

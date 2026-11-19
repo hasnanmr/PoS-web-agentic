@@ -1052,6 +1052,7 @@ async def supplier_payments(conn: AsyncConnection, *, outlet_id: UUID | None) ->
                 "amount_paid": row["amount_paid"],
                 "amount_owed": owed,
                 "created_by": row["created_by_name"],
+                "allowed_actions": allowed_actions(row, "owner"),
             }
         )
     await cur.execute(
@@ -1079,21 +1080,16 @@ async def po_differences(conn: AsyncConnection, *, outlet_id: UUID | None) -> li
     month, with the short lines and the last delivery; oldest delivery first."""
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
+        "select x.*, r.last_received_on, r.last_received_at from ("  # noqa: S608 (constants)
+        + _ROW_SELECT
+        + " where p.status = 'difference_found'"
+        " and (%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)) x"
         """
-        select p.id, p.po_no, ou.order_prefix, p.outlet_id, ou.name as outlet_name,
-               p.supplier_id, s.name as supplier_name, p.payment_term::text as payment_term,
-               (timezone(ou.timezone, now()))::date as local_today,
-               r.last_received_on, r.last_received_at
-        from app.purchase_orders p
-        join app.outlets ou on ou.id = p.outlet_id
-        join app.suppliers s on s.id = p.supplier_id
         left join lateral (
           select max(received_on) as last_received_on, max(created_at) as last_received_at
-          from app.purchase_order_receipts where purchase_order_id = p.id
+          from app.purchase_order_receipts where purchase_order_id = x.id
         ) r on true
-        where p.status = 'difference_found'
-          and (%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)
-        order by r.last_received_at nulls first, p.created_at
+        order by r.last_received_at nulls first, x.created_at
         """,
         {"outlet": outlet_id},
     )
@@ -1130,6 +1126,7 @@ async def po_differences(conn: AsyncConnection, *, outlet_id: UUID | None) -> li
             "days_since_last_received": (p["local_today"] - p["last_received_on"]).days
             if p["last_received_on"]
             else None,
+            "allowed_actions": allowed_actions(p, "owner"),
         }
         for p in pos
     ]

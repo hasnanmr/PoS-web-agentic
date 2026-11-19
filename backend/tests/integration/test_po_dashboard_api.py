@@ -258,6 +258,8 @@ def test_pembayaran_supplier_ignores_the_month(client, ctx) -> None:
         assert [i["reason"] for i in card["items"]] == ["overdue", "pay_in_advance", "due"]
         assert card["items"][0]["days_overdue"] == (TODAY - PREV_START).days
         assert card["items"][2]["amount_owed"] == 160_000
+        # Buttons come from the server (CLAUDE.md): every item here can be paid.
+        assert all("record_payment" in i["allowed_actions"] for i in card["items"])
         # Debt = closed pay-later POs still owed (AC3.12); unpaid pay-in-advance isn't debt.
         assert card["debt_total"] == 160_000 + 50_000
         assert card["overdue_count"] == 1
@@ -277,6 +279,7 @@ def test_po_ada_selisih_lists_the_shortfall(client, ctx) -> None:
     ]
     assert diff["last_received_on"] == str(TODAY)
     assert diff["days_since_last_received"] == 0
+    assert diff["allowed_actions"] == ["receive", "close_with_note", "record_payment"]
 
 
 def test_each_ringkasan_figure_lists_exactly_its_pos(client, ctx) -> None:

@@ -19,7 +19,14 @@ from fastapi import APIRouter, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app import db
-from app.api.v1.ops.purchase_orders import IdempotencyKey, PoDetail, PoPage, Ref, idempotent
+from app.api.v1.ops.purchase_orders import (
+    IdempotencyKey,
+    PoAction,
+    PoDetail,
+    PoPage,
+    Ref,
+    idempotent,
+)
 from app.auth.deps import OwnerOnly
 from app.core import outlets
 from app.core import purchase_orders as po
@@ -117,6 +124,7 @@ class PaymentItem(BaseModel):
     amount_paid: int
     amount_owed: int
     created_by: str | None
+    allowed_actions: list[PoAction] = Field(description="Bayar → record_payment")
 
 
 class SupplierPayments(BaseModel):
@@ -147,6 +155,7 @@ class PoDifference(BaseModel):
     last_received_on: date | None
     last_received_at: datetime | None
     days_since_last_received: int | None
+    allowed_actions: list[PoAction] = Field(description="Tutup dengan catatan → close_with_note")
 
 
 class PoDashboard(BaseModel):
