@@ -753,6 +753,24 @@
         "title": "Breakdown",
         "type": "object"
       },
+      "Bucket": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "amount"
+        ],
+        "title": "Bucket",
+        "type": "object"
+      },
       "CashCount": {
         "properties": {
           "from": {
@@ -1309,6 +1327,26 @@
           "reason"
         ],
         "title": "ExpenseReversalIn",
+        "type": "object"
+      },
+      "GoodsBuckets": {
+        "properties": {
+          "arrived": {
+            "$ref": "#/components/schemas/Bucket"
+          },
+          "not_arrived": {
+            "$ref": "#/components/schemas/Bucket"
+          },
+          "partly_arrived": {
+            "$ref": "#/components/schemas/Bucket"
+          }
+        },
+        "required": [
+          "not_arrived",
+          "partly_arrived",
+          "arrived"
+        ],
+        "title": "GoodsBuckets",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -3158,6 +3196,150 @@
         "title": "OutletSummary",
         "type": "object"
       },
+      "PaymentBuckets": {
+        "properties": {
+          "paid": {
+            "$ref": "#/components/schemas/Bucket",
+            "description": "amount = paid"
+          },
+          "partially_paid": {
+            "$ref": "#/components/schemas/Bucket",
+            "description": "amount = still owed (sisa)"
+          },
+          "unpaid": {
+            "$ref": "#/components/schemas/Bucket",
+            "description": "amount = still owed"
+          }
+        },
+        "required": [
+          "unpaid",
+          "partially_paid",
+          "paid"
+        ],
+        "title": "PaymentBuckets",
+        "type": "object"
+      },
+      "PaymentItem": {
+        "properties": {
+          "amount_owed": {
+            "title": "Amount Owed",
+            "type": "integer"
+          },
+          "amount_paid": {
+            "title": "Amount Paid",
+            "type": "integer"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "days_overdue": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Overdue"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "expected_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Date"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "payment_term": {
+            "enum": [
+              "pay_later",
+              "pay_in_advance"
+            ],
+            "title": "Payment Term",
+            "type": "string"
+          },
+          "po_id": {
+            "format": "uuid",
+            "title": "Po Id",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "overdue",
+              "due",
+              "pay_in_advance"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "difference_found",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "po_id",
+          "number",
+          "supplier",
+          "outlet",
+          "payment_term",
+          "reason",
+          "status",
+          "due_date",
+          "expected_date",
+          "days_overdue",
+          "total",
+          "amount_paid",
+          "amount_owed",
+          "created_by"
+        ],
+        "title": "PaymentItem",
+        "type": "object"
+      },
       "Period": {
         "properties": {
           "from": {
@@ -3253,6 +3435,30 @@
           "lines"
         ],
         "title": "PoCreate",
+        "type": "object"
+      },
+      "PoDashboard": {
+        "properties": {
+          "po_differences": {
+            "items": {
+              "$ref": "#/components/schemas/PoDifference"
+            },
+            "title": "Po Differences",
+            "type": "array"
+          },
+          "po_summary": {
+            "$ref": "#/components/schemas/PoSummary"
+          },
+          "supplier_payments": {
+            "$ref": "#/components/schemas/SupplierPayments"
+          }
+        },
+        "required": [
+          "po_summary",
+          "supplier_payments",
+          "po_differences"
+        ],
+        "title": "PoDashboard",
         "type": "object"
       },
       "PoDetail": {
@@ -3474,6 +3680,88 @@
           "allowed_actions"
         ],
         "title": "PoDetail",
+        "type": "object"
+      },
+      "PoDifference": {
+        "properties": {
+          "days_since_last_received": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Since Last Received"
+          },
+          "last_received_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Received At"
+          },
+          "last_received_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Received On"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "payment_term": {
+            "enum": [
+              "pay_later",
+              "pay_in_advance"
+            ],
+            "title": "Payment Term",
+            "type": "string"
+          },
+          "po_id": {
+            "format": "uuid",
+            "title": "Po Id",
+            "type": "string"
+          },
+          "short_lines": {
+            "items": {
+              "$ref": "#/components/schemas/ShortLine"
+            },
+            "title": "Short Lines",
+            "type": "array"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/Ref"
+          }
+        },
+        "required": [
+          "po_id",
+          "number",
+          "supplier",
+          "outlet",
+          "payment_term",
+          "short_lines",
+          "last_received_on",
+          "last_received_at",
+          "days_since_last_received"
+        ],
+        "title": "PoDifference",
         "type": "object"
       },
       "PoEvent": {
@@ -3824,6 +4112,42 @@
           "created_by"
         ],
         "title": "PoRow",
+        "type": "object"
+      },
+      "PoSummary": {
+        "properties": {
+          "by_term": {
+            "$ref": "#/components/schemas/TermBuckets"
+          },
+          "goods": {
+            "$ref": "#/components/schemas/GoodsBuckets"
+          },
+          "month": {
+            "examples": [
+              "2026-11"
+            ],
+            "title": "Month",
+            "type": "string"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentBuckets"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StateBuckets"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Bucket"
+          }
+        },
+        "required": [
+          "month",
+          "total",
+          "status",
+          "goods",
+          "payment",
+          "by_term"
+        ],
+        "title": "PoSummary",
         "type": "object"
       },
       "ProductCreate": {
@@ -4947,6 +5271,39 @@
         "title": "ShiftRow",
         "type": "object"
       },
+      "ShortLine": {
+        "properties": {
+          "item": {
+            "title": "Item",
+            "type": "string"
+          },
+          "ordered": {
+            "title": "Ordered",
+            "type": "string"
+          },
+          "received": {
+            "title": "Received",
+            "type": "string"
+          },
+          "short": {
+            "title": "Short",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "ordered",
+          "received",
+          "short",
+          "unit"
+        ],
+        "title": "ShortLine",
+        "type": "object"
+      },
       "StaffMember": {
         "properties": {
           "display_name": {
@@ -5006,6 +5363,23 @@
           "name"
         ],
         "title": "StaffOutlet",
+        "type": "object"
+      },
+      "StateBuckets": {
+        "properties": {
+          "closed": {
+            "$ref": "#/components/schemas/Bucket"
+          },
+          "open": {
+            "$ref": "#/components/schemas/Bucket",
+            "description": "Not closed yet, with or without a difference"
+          }
+        },
+        "required": [
+          "open",
+          "closed"
+        ],
+        "title": "StateBuckets",
         "type": "object"
       },
       "StockCounts": {
@@ -5422,6 +5796,54 @@
         "title": "SupplierPatch",
         "type": "object"
       },
+      "SupplierPayments": {
+        "properties": {
+          "debt_total": {
+            "description": "Still owed on closed pay-later POs; not cash out",
+            "title": "Debt Total",
+            "type": "integer"
+          },
+          "due_7d_amount": {
+            "title": "Due 7D Amount",
+            "type": "integer"
+          },
+          "due_7d_count": {
+            "title": "Due 7D Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "overdue_count": {
+            "title": "Overdue Count",
+            "type": "integer"
+          },
+          "prepaid_not_received": {
+            "description": "Paid pay-in-advance POs not closed yet",
+            "title": "Prepaid Not Received",
+            "type": "integer"
+          },
+          "prepaid_not_received_count": {
+            "title": "Prepaid Not Received Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "debt_total",
+          "overdue_count",
+          "due_7d_amount",
+          "due_7d_count",
+          "prepaid_not_received",
+          "prepaid_not_received_count",
+          "items"
+        ],
+        "title": "SupplierPayments",
+        "type": "object"
+      },
       "TableRow": {
         "properties": {
           "area": {
@@ -5462,6 +5884,22 @@
           "open_bill"
         ],
         "title": "TableRow",
+        "type": "object"
+      },
+      "TermBuckets": {
+        "properties": {
+          "pay_in_advance": {
+            "$ref": "#/components/schemas/Bucket"
+          },
+          "pay_later": {
+            "$ref": "#/components/schemas/Bucket"
+          }
+        },
+        "required": [
+          "pay_later",
+          "pay_in_advance"
+        ],
+        "title": "TermBuckets",
         "type": "object"
       },
       "ThresholdItem": {
@@ -7905,6 +8343,77 @@
         ]
       }
     },
+    "/api/v1/owner/dashboard/purchase-orders": {
+      "get": {
+        "description": "O17: Ringkasan PO for `month` (default: this month in the outlet's zone, WIB for all\noutlets; by PO open date). Pembayaran supplier and PO ada selisih ignore the month and\nlist every PO that needs action (FR3.11).",
+        "operationId": "po_dashboard_api_v1_owner_dashboard_purchase_orders_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "2026-11"
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Po Dashboard",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      }
+    },
     "/api/v1/owner/dashboard/top-items": {
       "get": {
         "description": "O2 \"Item terlaris\": top 5 by quantity sold for today, this month, or this year.",
@@ -9348,7 +9857,7 @@
     },
     "/api/v1/owner/purchase-orders": {
       "get": {
-        "description": "O15 list with the chips Semua / Terbuka / Ada selisih / Menunggu bayar / Overdue /\nDitutup. Menunggu bayar and Overdue come as one page, most urgent due date first.",
+        "description": "O15 list with the chips Semua / Terbuka / Ada selisih / Menunggu bayar / Overdue /\nDitutup. Menunggu bayar and Overdue come as one page, most urgent due date first.\n`month`, `state`, `goods`, `payment`, `term`: the O17 Ringkasan PO drill-down (FR3.12),\nwhich like the report leaves out cancelled POs.",
         "operationId": "list_pos_api_v1_owner_purchase_orders_get",
         "parameters": [
           {
@@ -9418,6 +9927,108 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "2026-11"
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "closed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "goods",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "not_arrived",
+                    "partly_arrived",
+                    "arrived"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Goods"
+            }
+          },
+          {
+            "in": "query",
+            "name": "payment",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "unpaid",
+                    "partially_paid",
+                    "paid"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payment"
+            }
+          },
+          {
+            "in": "query",
+            "name": "term",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pay_later",
+                    "pay_in_advance"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Term"
             }
           }
         ],

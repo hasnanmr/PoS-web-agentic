@@ -36,6 +36,10 @@ from app.core.units import to_quantity
 
 PaymentTerm = Literal["pay_later", "pay_in_advance"]
 ListFilter = Literal["open", "difference_found", "awaiting_payment", "overdue", "closed"]
+# O17 Ringkasan PO drill-down (FR3.12): each figure lists exactly its POs.
+StateFilter = Literal["open", "closed"]
+GoodsFilter = Literal["not_arrived", "partly_arrived", "arrived"]
+PaymentFilter = Literal["unpaid", "partially_paid", "paid"]
 Viewer = Literal["owner", "staff"]
 
 MAX_LINES = 50
@@ -178,6 +182,27 @@ _FILTERS: dict[str, str] = {
     "overdue": _OVERDUE,
     "closed": "p.status = 'closed'",
 }
+# Ringkasan PO buckets (cancelled POs are never counted). "Dibuka" = not closed yet, with or
+# without a difference (AC3.14).
+_STATE: dict[str, str] = {
+    "open": "p.status in ('open', 'difference_found')",
+    "closed": "p.status = 'closed'",
+}
+_GOODS: dict[str, str] = {
+    "arrived": "coalesce(g.lines, 0) > 0 and g.full_lines = g.lines",
+    "partly_arrived": "coalesce(g.received_lines, 0) > 0 and g.full_lines < g.lines",
+    "not_arrived": "coalesce(g.received_lines, 0) = 0",
+}
+
+
+def month_bounds(month: str) -> tuple[date, date]:
+    """`2026-11` → (1 Nov, 1 Dec): PO open dates are outlet-local, so no zone math here."""
+    try:
+        year, mon = (int(part) for part in month.split("-"))
+        start = date(year, mon, 1)
+    except ValueError:
+        raise ValidationFailedError("use YYYY-MM", {"field": "month"}) from None
+    return start, date(year + mon // 12, mon % 12 + 1, 1)
 
 
 def goods_status(row: dict[str, Any]) -> Literal["not_arrived", "partly_arrived", "arrived"]:
@@ -264,12 +289,32 @@ async def list_pos(
     status: ListFilter | None,
     cursor: str | None,
     limit: int,
+    month: str | None = None,
+    state: StateFilter | None = None,
+    goods: GoodsFilter | None = None,
+    payment: PaymentFilter | None = None,
+    term: PaymentTerm | None = None,
 ) -> dict[str, Any]:
-    """O15 list (owner, all outlets or one) and S10 list (staff, one outlet). Newest first."""
+    """O15 list (owner, all outlets or one) and S10 list (staff, one outlet). Newest first.
+    `month`, `state`, `goods`, `payment` and `term` are the O17 Ringkasan PO drill-down: like
+    the report, they never include cancelled POs."""
     after = _decode_cursor(cursor) if cursor else None
     where = ["(%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)"]
     if status:
         where.append(f"({_FILTERS[status]})")
+    month_start, month_end = month_bounds(month) if month else (None, None)
+    if month or state or goods or payment or term:
+        where.append("p.status <> 'cancelled'")
+    if month:
+        where.append("p.ordered_on >= %(month_start)s and p.ordered_on < %(month_end)s")
+    if state:
+        where.append(f"({_STATE[state]})")
+    if goods:
+        where.append(f"({_GOODS[goods]})")
+    if payment:
+        where.append("p.payment_status = %(payment)s::app.po_payment_status")
+    if term:
+        where.append("p.payment_term = %(term)s::app.po_payment_term")
     if after:
         where.append("(p.created_at, p.id) < (%(after_at)s, %(after_id)s)")
     order = "p.created_at desc, p.id desc"
@@ -282,6 +327,10 @@ async def list_pos(
         _ROW_SELECT + " where " + " and ".join(where) + f" order by {order} limit %(limit)s",
         {
             "outlet": outlet_id,
+            "month_start": month_start,
+            "month_end": month_end,
+            "payment": payment,
+            "term": term,
             "after_at": after[0] if after else None,
             "after_id": after[1] if after else None,
             "limit": limit + 1 if status not in ("awaiting_payment", "overdue") else 500,
@@ -885,3 +934,187 @@ async def record_payment(
         data={"amount": amount, "method": method, "shift_id": str(shift_id) if shift_id else None},
     )
     return {"payment_id": payment_id, "ledger_entry_id": entry_id}
+
+
+# Dashboard tab "PO & Supplier" — O17 cards (T-128) ---------------------------------------------
+
+
+def _bucket() -> dict[str, int]:
+    return {"count": 0, "amount": 0}
+
+
+async def po_summary(
+    conn: AsyncConnection, *, outlet_id: UUID | None, month: str
+) -> dict[str, Any]:
+    """Ringkasan PO (FR3.12, AC3.14): POs opened in `month` (outlet-local open date), cancelled
+    ones left out. Amounts: status, goods and term buckets use the PO total; payment buckets
+    use what that bucket means in money — unpaid: amount owed, partly paid: what is still
+    owed ("sisa"), paid: amount paid."""
+    start, end = month_bounds(month)
+    cur = conn.cursor(row_factory=dict_row)
+    await cur.execute(
+        _ROW_SELECT + " where p.status <> 'cancelled'"
+        " and (%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)"
+        " and p.ordered_on >= %(start)s and p.ordered_on < %(end)s",
+        {"outlet": outlet_id, "start": start, "end": end},
+    )
+    out: dict[str, Any] = {
+        "month": month,
+        "total": _bucket(),
+        "status": {"open": _bucket(), "closed": _bucket()},
+        "goods": {k: _bucket() for k in ("not_arrived", "partly_arrived", "arrived")},
+        "payment": {k: _bucket() for k in ("unpaid", "partially_paid", "paid")},
+        "by_term": {"pay_later": _bucket(), "pay_in_advance": _bucket()},
+    }
+
+    def add(bucket: dict[str, int], amount: int) -> None:
+        bucket["count"] += 1
+        bucket["amount"] += amount
+
+    for row in await cur.fetchall():
+        total = row["total"]
+        add(out["total"], total)
+        add(out["status"]["closed" if row["status"] == "closed" else "open"], total)
+        add(out["goods"][goods_status(row)], total)
+        add(out["by_term"][row["payment_term"]], total)
+        pay = row["payment_status"]
+        add(out["payment"][pay], row["amount_paid"] if pay == "paid" else _owed(row))
+    return out
+
+
+async def supplier_payments(conn: AsyncConnection, *, outlet_id: UUID | None) -> dict[str, Any]:
+    """Pembayaran supplier (FR3.11, AC3.8, AC3.9, AC3.12): every PO that needs paying today,
+    whatever the month — closed pay-later POs not fully paid and open pay-in-advance POs not
+    paid. Overdue first, then the nearest due (or expected delivery) date. Supplier debt is
+    what those pay-later POs still owe; goods paid for but not received are pay-in-advance
+    POs paid and not closed yet. Neither is cash out (cash basis)."""
+    cur = conn.cursor(row_factory=dict_row)
+    where = "(%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)"
+    await cur.execute(
+        _ROW_SELECT + f" where {where} and ({_AWAITING_PAYMENT})", {"outlet": outlet_id}
+    )
+    rows = await cur.fetchall()
+    for row in rows:
+        row["is_overdue"] = _overdue(row)
+    rows.sort(
+        key=lambda r: (
+            not r["is_overdue"],
+            r["due_date"] or r["expected_date"] or r["ordered_on"],
+            r["created_at"],
+        )
+    )
+    items = []
+    debt = due_7d = due_7d_count = overdue_count = 0
+    for row in rows:
+        owed = _owed(row)
+        if row["payment_term"] == "pay_later":
+            debt += owed
+            if row["is_overdue"]:
+                overdue_count += 1
+            elif (row["due_date"] - row["local_today"]).days <= 7:
+                due_7d += owed
+                due_7d_count += 1
+        reason = (
+            "overdue"
+            if row["is_overdue"]
+            else ("pay_in_advance" if row["payment_term"] == "pay_in_advance" else "due")
+        )
+        items.append(
+            {
+                "po_id": row["id"],
+                "number": po_label(row["order_prefix"], row["po_no"]),
+                "supplier": {"id": row["supplier_id"], "name": row["supplier_name"]},
+                "outlet": {"id": row["outlet_id"], "name": row["outlet_name"]},
+                "payment_term": row["payment_term"],
+                "reason": reason,
+                "status": row["status"],
+                "due_date": row["due_date"],
+                "expected_date": row["expected_date"],
+                "days_overdue": (row["local_today"] - row["due_date"]).days
+                if row["is_overdue"]
+                else None,
+                "total": row["total"],
+                "amount_paid": row["amount_paid"],
+                "amount_owed": owed,
+                "created_by": row["created_by_name"],
+            }
+        )
+    await cur.execute(
+        "select coalesce(sum(p.amount_paid), 0)::bigint as amount, count(*)::int as count"
+        " from app.purchase_orders p"
+        " where (%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)"
+        " and p.payment_term = 'pay_in_advance' and p.amount_paid > 0"
+        " and p.status in ('open', 'difference_found')",
+        {"outlet": outlet_id},
+    )
+    prepaid = await cur.fetchone()
+    return {
+        "debt_total": debt,
+        "overdue_count": overdue_count,
+        "due_7d_amount": due_7d,
+        "due_7d_count": due_7d_count,
+        "prepaid_not_received": prepaid["amount"] if prepaid else 0,
+        "prepaid_not_received_count": prepaid["count"] if prepaid else 0,
+        "items": items,
+    }
+
+
+async def po_differences(conn: AsyncConnection, *, outlet_id: UUID | None) -> list[dict[str, Any]]:
+    """PO ada selisih (FR3.11, AC4.10): every PO with status difference_found, whatever the
+    month, with the short lines and the last delivery; oldest delivery first."""
+    cur = conn.cursor(row_factory=dict_row)
+    await cur.execute(
+        """
+        select p.id, p.po_no, ou.order_prefix, p.outlet_id, ou.name as outlet_name,
+               p.supplier_id, s.name as supplier_name, p.payment_term::text as payment_term,
+               (timezone(ou.timezone, now()))::date as local_today,
+               r.last_received_on, r.last_received_at
+        from app.purchase_orders p
+        join app.outlets ou on ou.id = p.outlet_id
+        join app.suppliers s on s.id = p.supplier_id
+        left join lateral (
+          select max(received_on) as last_received_on, max(created_at) as last_received_at
+          from app.purchase_order_receipts where purchase_order_id = p.id
+        ) r on true
+        where p.status = 'difference_found'
+          and (%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)
+        order by r.last_received_at nulls first, p.created_at
+        """,
+        {"outlet": outlet_id},
+    )
+    pos = await cur.fetchall()
+    if not pos:
+        return []
+    await cur.execute(
+        "select purchase_order_id, item_name, quantity, received_quantity, unit"
+        " from app.purchase_order_lines"
+        " where purchase_order_id = any(%s) and received_quantity < quantity order by line_no",
+        ([p["id"] for p in pos],),
+    )
+    short: dict[UUID, list[dict[str, Any]]] = {}
+    for line in await cur.fetchall():
+        short.setdefault(line["purchase_order_id"], []).append(
+            {
+                "item": line["item_name"],
+                "ordered": line["quantity"],
+                "received": line["received_quantity"],
+                "short": line["quantity"] - line["received_quantity"],
+                "unit": line["unit"],
+            }
+        )
+    return [
+        {
+            "po_id": p["id"],
+            "number": po_label(p["order_prefix"], p["po_no"]),
+            "supplier": {"id": p["supplier_id"], "name": p["supplier_name"]},
+            "outlet": {"id": p["outlet_id"], "name": p["outlet_name"]},
+            "payment_term": p["payment_term"],
+            "short_lines": short.get(p["id"], []),
+            "last_received_on": p["last_received_on"],
+            "last_received_at": p["last_received_at"],
+            "days_since_last_received": (p["local_today"] - p["last_received_on"]).days
+            if p["last_received_on"]
+            else None,
+        }
+        for p in pos
+    ]
