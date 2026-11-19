@@ -187,7 +187,9 @@ export default function CounterPage() {
                   aria-label={`Tambah ${m.name}`}
                   onClick={() => (m.addon_groups.length ? setPicking(m) : add(m, []))}
                   className="relative flex flex-col rounded-lg border border-border bg-surface p-3 text-left hover:border-primary disabled:cursor-not-allowed disabled:opacity-70">
-                  <span aria-hidden="true" className="mb-2 h-16 rounded bg-page" />
+                  {m.photo_url
+                    ? <img src={m.photo_url} alt="" className="mb-2 h-16 w-full rounded object-cover" />
+                    : <span aria-hidden="true" className="mb-2 h-16 rounded bg-page" />}
                   <span className="text-[13px] font-semibold">{m.name}</span>
                   <span className="text-[12px] text-text-muted">{formatRupiah(m.price)}</span>
                   {m.sold_out ? (

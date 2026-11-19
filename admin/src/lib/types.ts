@@ -85,6 +85,8 @@ export interface ProductRow {
   is_owner_pick: boolean
   is_sample: boolean
   has_photo: boolean
+  /** Signed, short-lived URL of the menu photo (T-132); null without a photo. */
+  photo_url: string | null
   addon_group_count: number
   ingredient_count: number
   price: number | null
@@ -124,6 +126,7 @@ export interface ProductDetail {
   is_active: boolean
   is_sample: boolean
   has_photo: boolean
+  photo_url: string | null
   tags: string[]
   prices: { outlet_id: string; outlet_name: string; price: number | null }[]
   addon_groups: AddonGroup[]
@@ -466,6 +469,29 @@ export interface TopItem {
 export interface TopItems {
   period: TopItemsPeriod
   top_items: TopItem[]
+}
+
+// O11 Audit Log — GET /owner/audit-log (T-101) -------------------------------------------
+export type AuditKind = 'reversal' | 'status' | 'payment'
+
+export interface AuditRow {
+  id: number
+  created_at: string
+  timezone: string
+  outlet_id: string
+  order_id: string
+  order_no: string
+  kind: AuditKind
+  change: string
+  actor: { type: 'user' | 'system' | 'agent' | 'device'; id: string | null; name: string | null; role: string | null }
+  reason: string | null
+}
+
+export interface AuditPage {
+  date_from: string
+  date_to: string
+  items: AuditRow[]
+  next_cursor: string | null
 }
 
 // O2 tab Ringkasan — GET /owner/dashboard (T-071, T-123) ---------------------------------

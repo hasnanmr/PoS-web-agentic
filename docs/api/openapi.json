@@ -232,6 +232,174 @@
         "title": "AffectedProduct",
         "type": "object"
       },
+      "AuditActor": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "type": {
+            "enum": [
+              "user",
+              "system",
+              "agent",
+              "device"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name",
+          "role"
+        ],
+        "title": "AuditActor",
+        "type": "object"
+      },
+      "AuditPage": {
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "items",
+          "next_cursor"
+        ],
+        "title": "AuditPage",
+        "type": "object"
+      },
+      "AuditRow": {
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/AuditActor"
+          },
+          "change": {
+            "title": "Change",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "reversal",
+              "status",
+              "payment"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "timezone",
+          "outlet_id",
+          "order_id",
+          "order_no",
+          "kind",
+          "change",
+          "actor",
+          "reason"
+        ],
+        "title": "AuditRow",
+        "type": "object"
+      },
       "Availability": {
         "properties": {
           "limiting_stock_item": {
@@ -4774,7 +4942,7 @@
             "title": "Description"
           },
           "is_active": {
-            "default": true,
+            "default": false,
             "title": "Is Active",
             "type": "boolean"
           },
@@ -4864,6 +5032,18 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Signed, short-lived",
+            "title": "Photo Url"
           },
           "prices": {
             "items": {
@@ -5017,6 +5197,18 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Signed, short-lived",
+            "title": "Photo Url"
           },
           "price": {
             "anyOf": [
@@ -10094,6 +10286,156 @@
         ]
       }
     },
+    "/api/v1/owner/audit-log": {
+      "get": {
+        "description": "O11 rows: reversals, status changes, and payment changes of orders, newest first.\nDefault range: month to date in the outlet's zone (WIB for all outlets).",
+        "operationId": "audit_log_list_api_v1_owner_audit_log_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Id"
+            }
+          },
+          {
+            "description": "reversal,status,payment",
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "reversal,status,payment",
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit Log List",
+        "tags": [
+          "owner: audit log"
+        ]
+      }
+    },
     "/api/v1/owner/dashboard": {
       "get": {
         "description": "O2 tab Ringkasan: KPI tiles, peta keramaian, keramaian outlet sekarang, order per jam,\nstok rendah & sold out, komposisi per kanal, and metode bayar. The busyness map, current\ncrowd, and low stock ignore `period` and `hours`.",
@@ -11707,6 +12049,73 @@
           }
         },
         "summary": "Product Availability",
+        "tags": [
+          "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/products/{product_id}/photo": {
+      "put": {
+        "description": "O5 \"Foto * ⇪\": the raw JPG/PNG/WebP as the request body (max 5 MB). Replaces the\ncurrent photo; the old object is removed after the change is saved.",
+        "operationId": "put_photo_api_v1_owner_products__product_id__photo_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Photo",
         "tags": [
           "owner: catalog"
         ]

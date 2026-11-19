@@ -21,7 +21,7 @@ from psycopg.rows import dict_row
 from app.core import stock as stock_core
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
-from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
+from app.core.errors import ConflictError, DomainError, NotFoundError, ValidationFailedError
 
 ProductStatus = Literal["active", "sold_out", "inactive"]
 MAX_OPTIONS = 10
@@ -44,7 +44,7 @@ async def list_products(
     await cur.execute(
         """
         select p.id, p.name, p.category, p.is_owner_pick, p.is_sample, p.is_active,
-               p.photo_path is not null as has_photo,
+               p.photo_path is not null as has_photo, p.photo_path,
                (select count(*) from app.addon_groups g where g.product_id = p.id)
                  as addon_group_count,
                (select count(*) from app.recipe_items r where r.product_id = p.id)
@@ -87,7 +87,7 @@ async def get_product(conn: AsyncConnection, product_id: UUID) -> dict[str, Any]
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         "select id, name, category, description, is_owner_pick, is_active, is_sample,"
-        " photo_path is not null as has_photo from app.products where id = %s",
+        " photo_path is not null as has_photo, photo_path from app.products where id = %s",
         (product_id,),
     )
     product = await cur.fetchone()
@@ -176,9 +176,76 @@ async def _set_tags(
         )
 
 
+class PhotoRequiredError(DomainError):
+    """FR2.11 / US-005: every menu item needs a photo (Meta requires one for catalog items),
+    so an item without a photo cannot be switched to active."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("photo_required", "add a photo before activating this item",
+                         {"field": "photo"})  # fmt: skip
+
+
+PHOTO_MAX_BYTES = 5 * 1024 * 1024
+# File signatures, so a renamed file of another type is refused. WebP: "RIFF" ... "WEBP".
+_PHOTO_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+
+
+def validate_photo(content_type: str, data: bytes) -> str:
+    """The normalised content type of a menu photo (JPG, PNG, or WebP, max 5 MB)."""
+    kind = (content_type or "").split(";")[0].strip().lower()
+    if kind == "image/jpg":
+        kind = "image/jpeg"
+    ok = {
+        "image/jpeg": data.startswith(b"\xff\xd8\xff"),
+        "image/png": data.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/webp": data[:4] == b"RIFF" and data[8:12] == b"WEBP",
+    }.get(kind, False)
+    if not ok:
+        raise ValidationFailedError("only JPG, PNG, or WebP images", {"field": "photo"})
+    if len(data) > PHOTO_MAX_BYTES:
+        raise ValidationFailedError("the photo is larger than 5 MB", {"field": "photo"})
+    return kind
+
+
+def photo_object_path(tenant_id: UUID, product_id: UUID, content_type: str) -> str:
+    """A new object name per upload, so a replaced photo never shows from a cache."""
+    return f"{tenant_id}/{product_id}/{uuid4().hex}.{_PHOTO_TYPES[content_type]}"
+
+
+async def set_photo(
+    conn: AsyncConnection, ctx: ActorContext, product_id: UUID, path: str
+) -> str | None:
+    """Point the item at its newly uploaded photo; returns the previous object path (to remove
+    after commit). Replacing a sample item's photo makes it the owner's own item."""
+    cur = await conn.execute(
+        "select photo_path from app.products where id = %s for update", (product_id,)
+    )
+    row = await cur.fetchone()
+    if row is None:
+        raise NotFoundError("product")
+    await conn.execute(
+        "update app.products set photo_path = %s, is_sample = false where id = %s",
+        (path, product_id),
+    )
+    await record_audit(
+        conn,
+        ctx,
+        action="product.photo_updated",
+        entity_type="product",
+        entity_id=product_id,
+        data={"replaced": row[0] is not None},
+    )
+    return row[0]
+
+
 async def create_product(
     conn: AsyncConnection, ctx: ActorContext, fields: dict[str, Any], tags: list[str]
 ) -> UUID:
+    """A new item has no photo yet, so it starts inactive (Nonaktif)."""
+    if fields.get("is_active"):
+        raise PhotoRequiredError
     product_id = uuid4()
     cols = ["id", "tenant_id", *fields]
     await conn.execute(
@@ -208,7 +275,11 @@ async def update_product(
     unknown = set(fields) - set(PRODUCT_FIELDS)
     if unknown:
         raise ValidationFailedError("fields cannot be changed", {"fields": sorted(unknown)})
-    await get_product(conn, product_id)
+    current = await get_product(conn, product_id)
+    # Only switching an item on needs a photo; items that are already active without one
+    # (the sample menu, FR2.12) can still be edited until the owner adds photos.
+    if fields.get("is_active") and not current["is_active"] and not current["has_photo"]:
+        raise PhotoRequiredError
     if fields:
         assignments = ", ".join(f"{f} = %s" for f in fields)
         await conn.execute(
@@ -650,7 +721,7 @@ async def counter_menu(
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         """
-        select p.id as product_id, p.name, p.category, p.is_owner_pick, op.price
+        select p.id as product_id, p.name, p.category, p.is_owner_pick, op.price, p.photo_path
         from app.products p
         join app.outlet_prices op on op.product_id = p.id and op.outlet_id = %s and op.is_available
         where p.is_active
@@ -712,7 +783,6 @@ async def counter_menu(
         out.append(
             {
                 **p,
-                "photo_url": None,
                 "sold_out": sold_out,
                 "sold_out_reason": "Bahan tidak cukup" if sold_out else None,
                 "addon_groups": list(groups.get(p["product_id"], {}).values()),
