@@ -1,6 +1,6 @@
 # User Stories — SME Business Automation Platform
 
-Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story (baseline PRD v0.14). Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
+Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story (baseline PRD v0.15). Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
 
 ## Konvensi
 
@@ -400,7 +400,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Pengeluaran langsung ini berada di tab **Pengeluaran**; pembelian ke supplier lewat PO ada di tab **Purchase Order** (US-057–US-061).
+  - Layar Pengeluaran hanya untuk pengeluaran langsung; pembelian ke supplier lewat PO ada di tab **PO & Supplier** pada Dashboard (US-057–US-061).
   - Owner dapat memasukkan nominal, deskripsi, tanggal, dan outlet.
   - Sistem membuat ledger entry dengan identitas owner.
   - Staff tidak dapat membuka atau menggunakan layar expense.
@@ -477,18 +477,18 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Setiap pengecekan dan penutupan mencatat siapa dan kapan, dan PO yang ditutup tidak dapat dibuka lagi.
 - **Traceability:** FR1.5, FR3.11, FR4.2, FR4.10, FR4.11, AC4.9, AC4.10
 
-### US-061 — Tab Purchase Order dan pengingat pembayaran di dashboard
+### US-061 — Tab PO & Supplier di dashboard dan pengingat pembayaran
 
 **Sebagai** owner, **saya ingin** melihat seluruh PO di tab tersendiri dan semua pembayaran supplier yang perlu dilakukan di dashboard, **sehingga** saya tahu apa yang harus dibayar dan barang apa yang masih ditunggu.
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - Layar Pengeluaran owner memiliki tab **Pengeluaran** (pengeluaran langsung) dan **Purchase Order**; staf mendapat layar Purchase Order untuk outletnya (daftar PO, buka PO, cross-check barang) tanpa pembayaran dan hutang.
-  - Tab Purchase Order memiliki filter terbuka (menunggu barang), ada selisih, menunggu pembayaran, overdue, dan ditutup, serta detail PO berisi baris item, riwayat pengecekan barang, dan riwayat pembayaran beserta pencatatnya.
-  - Dashboard owner memiliki kartu **Pembayaran supplier**: PO tempo yang sudah ditutup dan belum lunas (overdue dulu, lalu jatuh tempo terdekat) dan PO bayar di muka yang terbuka dan belum dibayar, masing-masing dengan tombol catat pembayaran.
-  - Dashboard owner memiliki daftar **PO ada selisih** (supplier, outlet, baris yang kurang, sejak kapan) dengan tombol **Tutup dengan catatan** yang hanya tersedia untuk owner.
+  - Dashboard owner memiliki tab **PO & Supplier** (di samping tab Ringkasan) dengan filter outlet dan bulan sendiri, daftar supplier, dan tombol Buka PO; layar Pengeluaran hanya untuk pengeluaran langsung. Staf mendapat layar Purchase Order untuk outletnya (daftar PO, buka PO, cross-check barang) tanpa pembayaran dan hutang.
+  - Daftar PO di tab itu memiliki filter terbuka (menunggu barang), ada selisih, menunggu pembayaran, overdue, dan ditutup, serta detail PO berisi baris item, riwayat pengecekan barang, dan riwayat pembayaran beserta pencatatnya.
+  - Tab itu memiliki kartu **Pembayaran supplier** (semua PO yang perlu dibayar, tidak ikut filter bulan): PO tempo yang sudah ditutup dan belum lunas (overdue dulu, lalu jatuh tempo terdekat) dan PO bayar di muka yang terbuka dan belum dibayar, masing-masing dengan tombol catat pembayaran.
+  - Tab itu memiliki daftar **PO ada selisih** (supplier, outlet, baris yang kurang, sejak kapan) dengan tombol **Tutup dengan catatan** yang hanya tersedia untuk owner.
   - Kartu itu dan laporan cashflow menampilkan total hutang supplier (jumlah overdue dan jatuh tempo 7 hari) serta barang yang sudah dibayar tetapi belum diterima, terpisah dari kas keluar.
-  - Dashboard owner memiliki laporan **Ringkasan PO** per outlet dan periode: jumlah dan nilai PO yang dibuka vs ditutup, barang belum datang / sebagian / sudah datang, dan pembayaran belum dibayar / sebagian / lunas, dipisah bayar mundur dan bayar di muka; setiap angka membuka daftar PO yang sesuai.
+  - Tab itu memiliki laporan **Ringkasan PO** per outlet dan bulan (menurut tanggal PO dibuka): jumlah dan nilai PO yang dibuka vs ditutup, barang belum datang / sebagian / sudah datang, dan pembayaran belum dibayar / sebagian / lunas, dipisah bayar mundur dan bayar di muka; setiap angka membuka daftar PO yang sesuai.
   - Staf tidak melihat kartu dan laporan ini, termasuk lewat API langsung.
 - **Traceability:** FR3.10, FR3.11, FR3.12, FR7.2, AC3.12, AC3.13, AC3.14
 

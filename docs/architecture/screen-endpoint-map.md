@@ -23,7 +23,9 @@ Every list/action response for an order includes **`allowed_actions`**, computed
 |---|---|---|
 | Create business + first outlet + sample menu | `POST /owner/onboarding` ✅ implemented (sample menu: T-024, Wave 2) | `business:{name, type: cafe\|restaurant}`, `outlet:{name, timezone (default Asia/Jakarta), address, whatsapp_phone}`. Dropshipper shown disabled ("Segera, Phase 3"), so not accepted. Seeds the sample menu (FR2.12). |
 
-### O2 · Dashboard + keramaian (T-071, T-123, T-124)
+### O2 · Dashboard — tab Ringkasan + keramaian (T-071, T-123, T-124)
+
+The Dashboard header has two tabs: **Ringkasan** (this section) and **PO & Supplier** (O17 cards + O15 list, below). Each tab keeps its own filters; the PO tab's figures are not in `GET /owner/dashboard`.
 
 | Card | Endpoint | Query / fields |
 |---|---|---|
@@ -100,7 +102,7 @@ Staff calling it → `403` (AC7.7).
 
 ### O9 · Laporan Cashflow & Pengeluaran (T-041, T-042, T-043)
 
-The sidebar item **Pengeluaran** opens this screen with the full expense list until its own detailed wireframe exists (product owner, 2026-11-17); it uses the same endpoints below. O15 is now drawn with a **Pengeluaran | Purchase Order** tab strip, but only the PO tab is drawn, so the Pengeluaran tab stays on O9 until it is drawn. "Lihat semua →" (Pengeluaran terbaru) and "Lihat semua pengeluaran →" (Pengeluaran per outlet) open the same full list.
+The sidebar item **Pengeluaran** opens this screen with the full expense list until its own detailed wireframe exists (product owner, 2026-11-17); it uses the same endpoints below. Pengeluaran is for expenses only; purchase orders moved to the Dashboard tab **PO & Supplier** (issue #16, O15–O17). "Lihat semua →" (Pengeluaran terbaru) and "Lihat semua pengeluaran →" (Pengeluaran per outlet) open the same full list.
 
 | Card / action | Endpoint | Fields |
 |---|---|---|
@@ -149,16 +151,15 @@ The sidebar item **Pengeluaran** opens this screen with the full expense list un
 | Riwayat koreksi | `GET /owner/attendance/{id}` | `original`, `flagged_at`, `corrections:[{at, by, from, to, reason}]`. |
 | ⭳ Ekspor CSV | `GET /owner/attendance?format=csv` | |
 
-### O15 · Pengeluaran — tab Purchase Order (T-125–T-128) — backend ✅ (T-125–T-127), summary planned (T-128)
+### O15 · Dashboard — tab PO & Supplier: Daftar PO, detail, supplier (T-125–T-128) — backend ✅ (T-125–T-127), month/goods/payment filters planned (T-128)
 
-The sidebar item **Pengeluaran** opens tabs **Pengeluaran** (direct expenses: the O9 endpoints `GET/POST /owner/expenses`) and **Purchase Order**. Issue #16 moves O15/O16/O17 into a Dashboard tab **PO & Supplier**; the endpoints stay the same, only the entry point moves (wireframe pending).
+Dashboard › tab **PO & Supplier** (issue #16): the O17 cards on top, this list and detail below. The tab header holds its own **outlet + month** filter, **Daftar supplier** and **+ Buka PO** (→ O16). The old O15 KPI row is gone; its numbers are in O17 Pembayaran supplier, so each figure is shown once.
 
 PO responses (list rows and detail, owner and staff) share one shape: `{id, number, supplier:{id, name}, outlet:{id, name}, payment_term, ordered_on, due_date?, expected_date?, status: open|difference_found|closed|cancelled, goods_status: not_arrived|partly_arrived|arrived, payment_status: unpaid|partially_paid|paid, overdue, total, created_at, created_by}`, plus `amount_paid, amount_owed` for the owner only (null for staff). Detail adds `note, close_note, cancel_reason, lines, events, allowed_actions` (server-computed: `receive, close, close_with_note, record_payment, cancel`; the UI only renders those). Writes return the updated detail.
 
 | Card / action | Endpoint | Fields |
 |---|---|---|
-| KPI cards (planned, T-128) | `GET /owner/purchase-orders/summary?outlet_id=` | `supplier_debt, overdue_count, due_7d_amount, due_7d_count, prepaid_not_received, open_count, difference_count`. |
-| List + filters | `GET /owner/purchase-orders?outlet_id=&status=open\|difference_found\|awaiting_payment\|overdue\|closed&cursor=&limit=` ✅ | `{items:[PO row], next_cursor}`, newest first. Chips: Terbuka = `open` (waiting for goods, or all matched and not closed yet), Ada selisih = `difference_found`, Menunggu bayar = `awaiting_payment` (closed pay-later POs not fully paid + pay-in-advance POs not paid and not closed), Overdue = pay later, not fully paid, past the due date in the outlet zone, Ditutup = `closed`. Menunggu bayar and Overdue come as one page sorted by due date. Semua (no `status`) includes cancelled POs. |
+| List + filters | `GET /owner/purchase-orders?outlet_id=&status=open\|difference_found\|awaiting_payment\|overdue\|closed&cursor=&limit=` ✅; planned (T-128), only for the O17 Ringkasan drill-down (FR3.12): `month=YYYY-MM` (PO open date in the outlet zone), `goods=not_arrived\|partly_arrived\|arrived`, `payment=unpaid\|partially_paid\|paid`, `term=pay_later\|pay_in_advance`, so each Ringkasan figure lists exactly its POs. The tab's month filter does not apply to the status chips (FR3.10) | `{items:[PO row], next_cursor}`, newest first. Chips: Terbuka = `open` (waiting for goods, or all matched and not closed yet), Ada selisih = `difference_found`, Menunggu bayar = `awaiting_payment` (closed pay-later POs not fully paid + pay-in-advance POs not paid and not closed), Overdue = pay later, not fully paid, past the due date in the outlet zone, Ditutup = `closed`. Menunggu bayar and Overdue come as one page sorted by due date. Semua (no `status`) includes cancelled POs. |
 | Detail | `GET /owner/purchase-orders/{id}` ✅ | Lines `[{id, item, stock_item_id?, quantity, unit, unit_price, subtotal, received_quantity, remaining_quantity, check: match\|short}]`, `events:[{at, kind: opened\|received\|paid\|closed\|cancelled, actor:{name, role}, data}]` oldest first (received: `received_on, note, lines`; paid: `paid_on, amount, method, from_drawer`; closed: `note`; cancelled: `reason`). |
 | Catat pembayaran | `POST /owner/purchase-orders/{id}/payments` (`Idempotency-Key`) ✅ | `paid_on, amount (≤ amount_owed), method: cash\|transfer, drawer_id?` (cash only: taken from that drawer's open shift, which lowers its expected cash; without it, paid outside the drawer). Posts one `expense` ledger entry on `paid_on`, description `PO-A-0012 · <supplier>`. Pay later: instalments, also before the PO is closed. Pay in advance: the full amount at once (`validation_failed` otherwise). Errors: `overpayment`, `already_paid`, `po_cancelled`, `shift_not_open`. A PO payment entry cannot be reversed from O9 (`not_reversible`). |
 | Batalkan PO | `POST /owner/purchase-orders/{id}/cancel` ✅ | `reason*`; `not_cancellable` once paid, any goods received, or closed. |
@@ -172,13 +173,15 @@ PO responses (list rows and detail, owner and staff) share one shape: `{id, numb
 | Buka PO | `POST /ops/outlets/{id}/purchase-orders` (`Idempotency-Key`) ✅ | `supplier_id, ordered_on, payment_term: pay_later\|pay_in_advance, due_date (pay_later) \| expected_date (pay_in_advance), lines:[{stock_item_id? \| item_name, quantity, unit, unit_price}], note?` → PO detail. 1–50 lines; stock items use g/kg, ml/L, or pcs (matching the item's base unit), free-text lines any unit; subtotal = quantity × unit price, rounded half up to whole rupiah. Number `PO-<outlet prefix>-0001` per outlet. Staff only for assigned outlets; no approval; creator recorded; no ledger entry or stock change. |
 | Supplier dropdown | `GET /ops/suppliers` ✅ | `[{id, name}]` active suppliers (read-only for staff). |
 
-### O17 · Dashboard owner — Ringkasan PO & Pembayaran supplier — planned
+### O17 · Dashboard — tab PO & Supplier: Ringkasan PO, Pembayaran supplier, PO ada selisih (T-128) — planned
+
+One call for the three cards, with the tab's own filters (not O2's `period`/`hours`): `GET /owner/dashboard/purchase-orders?outlet_id=&month=YYYY-MM` (default: current month in the outlet zone, WIB for all outlets). `month` applies to `po_summary` only (FR3.12); `supplier_payments` and `po_differences` always list every PO that needs action (FR3.11). Staff → `403`. Header buttons: Daftar supplier and + Buka PO as in O15. The Catat pembayaran dialog uses `POST /owner/purchase-orders/{id}/payments` (O15).
 
 | Card | Endpoint | Fields |
 |---|---|---|
-| Ringkasan PO | `GET /owner/dashboard` ↳ `po_summary` (query `outlet_id`, `period`) | `{total:{count, amount}, status:{open, closed}, goods:{not_arrived, partly_arrived, arrived}, payment:{unpaid, partly_paid, paid}, by_term:{pay_later, pay_in_advance}}`, each `{count, amount}`; by PO open date. |
-| PO ada selisih | ↳ `po_differences` | `[{po_id, number, supplier, outlet, short_lines:[{item, ordered, received, unit}], last_received_at}]`; action: O15 close-with-note. |
-| Pembayaran supplier | ↳ `supplier_payments` | `debt_total, overdue_count, due_7d_amount, prepaid_not_received, items:[{po_id, number, supplier, outlet, payment_term, reason: overdue\|due\|pay_in_advance, due_date?, amount_owed}]` (overdue first, then due date). |
+| Ringkasan PO | ↳ `po_summary` (by `month`) | `{total:{count, amount}, status:{open, closed}, goods:{not_arrived, partly_arrived, arrived}, payment:{unpaid, partly_paid, paid}, by_term:{pay_later, pay_in_advance}}`, each `{count, amount}`; by PO open date. |
+| PO ada selisih (not filtered by month) | ↳ `po_differences` | `[{po_id, number, supplier, outlet, short_lines:[{item, ordered, received, unit}], last_received_at}]`; action: O15 close-with-note. |
+| Pembayaran supplier (as of today, not filtered by month; replaces the old O15 KPI row) | ↳ `supplier_payments` | `debt_total, overdue_count, due_7d_amount, due_7d_count, prepaid_not_received, prepaid_not_received_count, items:[{po_id, number, supplier, outlet, payment_term, reason: overdue\|due\|pay_in_advance, due_date?, amount_owed}]` (overdue first, then due date). |
 
 ## Staff operational screens (owner can use them too)
 
