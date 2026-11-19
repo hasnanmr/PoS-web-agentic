@@ -17,7 +17,8 @@ Usage:
     scripts/check-vulnerabilities.py --offline  # parse the lockfiles only (no network)
 
 Advisories that are known and accepted go in `.github/osv-ignore.txt`, one `ID  # reason` per
-line; a line without a reason is rejected.
+line; a line without a reason is rejected. The id may be the OSV id that the scan prints, a GHSA
+or PYSEC id for the same advisory, or its CVE alias.
 """
 
 from __future__ import annotations
@@ -36,6 +37,9 @@ IGNORE_FILE = ROOT / ".github" / "osv-ignore.txt"
 OSV_BATCH = "https://api.osv.dev/v1/querybatch"
 OSV_VULN = "https://api.osv.dev/v1/vulns/{}"
 TIMEOUT_S = 60
+# querybatch takes at most 1000 queries per request; stay well under it so a growing pnpm-lock
+# cannot turn the gate into an error.
+BATCH_SIZE = 500
 
 
 def fail(message: str) -> None:
@@ -109,19 +113,54 @@ def osv_get(advisory_id: str) -> dict:
 
 
 def query_osv(packages: list[tuple[str, str]], ecosystem: str) -> list[dict]:
-    if not packages:
-        return []
-    queries = [
-        {"package": {"name": name, "ecosystem": ecosystem}, "version": version}
-        for name, version in packages
-    ]
-    batch = osv_post(OSV_BATCH, {"queries": queries})
-
     hits: list[dict] = []
-    for (name, version), result in zip(packages, batch.get("results", []), strict=True):
-        for match in result.get("vulns", []):
-            hits.append({"name": name, "version": version, "id": match["id"]})
+    for start in range(0, len(packages), BATCH_SIZE):
+        chunk = packages[start : start + BATCH_SIZE]
+        batch = osv_post(
+            OSV_BATCH,
+            {"queries": [_query(name, version, ecosystem) for name, version in chunk]},
+        )
+        for (name, version), result in zip(chunk, batch.get("results", []), strict=True):
+            for advisory_id in advisory_ids(result, name, version, ecosystem):
+                hits.append(
+                    {
+                        "name": name,
+                        "version": version,
+                        "ecosystem": ecosystem,
+                        "id": advisory_id,
+                    }
+                )
     return hits
+
+
+def _query(name: str, version: str, ecosystem: str, page_token: str | None = None) -> dict:
+    query = {"package": {"name": name, "ecosystem": ecosystem}, "version": version}
+    if page_token:
+        query["page_token"] = page_token
+    return query
+
+
+def advisory_ids(result: dict, name: str, version: str, ecosystem: str) -> list[str]:
+    """Every advisory id for one package, following next_page_token instead of dropping them."""
+    ids = [vuln["id"] for vuln in result.get("vulns", [])]
+    token = result.get("next_page_token")
+    seen_tokens = {token}
+    while token:
+        page = osv_post(OSV_BATCH, {"queries": [_query(name, version, ecosystem, token)]})
+        result = (page.get("results") or [{}])[0]
+        ids += [vuln["id"] for vuln in result.get("vulns", [])]
+        token = result.get("next_page_token")
+        if token in seen_tokens:
+            fail(f"OSV kept returning page_token {token!r} for {name}@{version}")
+        seen_tokens.add(token)
+    return ids
+
+
+def normalise(name: str, ecosystem: str) -> str:
+    """PyPI names are case-insensitive and treat runs of -_. as one dash (PEP 503)."""
+    if ecosystem != "PyPI":
+        return name
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def enrich(hits: list[dict]) -> None:
@@ -131,9 +170,11 @@ def enrich(hits: list[dict]) -> None:
         severities = [s.get("score", "") for s in record.get("severity", []) if s.get("score")]
         database_severity = record.get("database_specific", {}).get("severity", "")
         hit["severity"] = severities[0] if severities else str(database_severity)
+        wanted = normalise(hit["name"], hit["ecosystem"])
         fixed: set[str] = set()
         for affected in record.get("affected", []):
-            if affected.get("package", {}).get("name") != hit["name"]:
+            package_name = affected.get("package", {}).get("name", "")
+            if normalise(package_name, hit["ecosystem"]) != wanted:
                 continue
             for version_range in affected.get("ranges", []):
                 for event in version_range.get("events", []):
@@ -145,15 +186,32 @@ def enrich(hits: list[dict]) -> None:
 
 
 def dedupe(hits: list[dict]) -> list[dict]:
-    """One advisory can arrive twice (GHSA and PYSEC for the same CVE); keep the GHSA entry."""
-    best: dict[tuple[str, str, str], dict] = {}
+    """One advisory can arrive twice (GHSA and PYSEC for the same CVE); keep the GHSA entry.
+
+    Every id from the collapsed duplicates stays on the kept hit, so an ignore entry written with
+    the PYSEC id, the CVE, or the GHSA id all match the same advisory.
+    """
+    groups: dict[tuple[str, str, str, str], list[dict]] = {}
     for hit in hits:
-        key = (hit["name"], hit["version"], hit["aliases"][0] if hit["aliases"] else hit["id"])
-        current = best.get(key)
-        current_is_ghsa = current is not None and current["id"].startswith("GHSA")
-        if current is None or (hit["id"].startswith("GHSA") and not current_is_ghsa):
-            best[key] = hit
-    return list(best.values())
+        key = (
+            hit["ecosystem"],
+            hit["name"],
+            hit["version"],
+            hit["aliases"][0] if hit["aliases"] else hit["id"],
+        )
+        groups.setdefault(key, []).append(hit)
+
+    kept = []
+    for group in groups.values():
+        chosen = next((h for h in group if h["id"].startswith("GHSA")), group[0])
+        chosen["ids"] = {h["id"] for h in group}
+        kept.append(chosen)
+    return kept
+
+
+def ignore_keys(hit: dict) -> set[str]:
+    """Ids and CVE aliases that `.github/osv-ignore.txt` may use to name this advisory."""
+    return {*hit["ids"], *hit["aliases"]}
 
 
 def main(argv: list[str]) -> int:
@@ -172,33 +230,35 @@ def main(argv: list[str]) -> int:
     if list_only or offline:
         return 0
 
+    # Loaded before the early return: a malformed line has to fail even when the scan is clean,
+    # and a clean scan is exactly when every ignore entry is stale.
+    ignored = load_ignores(IGNORE_FILE)
+
     hits = query_osv(python_packages, "PyPI") + query_osv(js_packages, "npm")
     if not hits:
         print("no known vulnerabilities")
-        return 0
-
     enrich(hits)
     hits = dedupe(hits)
-    ignored = load_ignores(IGNORE_FILE)
 
     unignored = []
     for hit in sorted(hits, key=lambda h: (h["name"], h["id"])):
-        advisory_id = hit["id"]
         cve = f" ({', '.join(hit['aliases'])})" if hit["aliases"] else ""
-        if advisory_id in ignored:
-            print(f"ignored  {hit['name']}@{hit['version']}  {advisory_id}{cve}")
-            print(f"         reason: {ignored[advisory_id]}")
+        matched = sorted(ignore_keys(hit) & ignored.keys())
+        if matched:
+            print(f"ignored  {hit['name']}@{hit['version']}  {hit['id']}{cve}")
+            print(f"         matched ignore entry {matched[0]}")
+            print(f"         reason: {ignored[matched[0]]}")
             continue
         unignored.append(hit)
-        print(f"found    {hit['name']}@{hit['version']}  {advisory_id}{cve}")
+        print(f"found    {hit['name']}@{hit['version']}  {hit['id']}{cve}")
         print(f"         fixed in: {hit['fixed']}")
         if hit["severity"]:
             print(f"         severity: {hit['severity']}")
         if hit["summary"]:
             print(f"         {hit['summary']}")
 
-    stale = sorted(set(ignored) - {h["id"] for h in hits})
-    for advisory_id in stale:
+    known = {key for hit in hits for key in ignore_keys(hit)}
+    for advisory_id in sorted(set(ignored) - known):
         print(
             f"note: {advisory_id} is ignored but no longer matches a locked package; drop the entry"
         )
