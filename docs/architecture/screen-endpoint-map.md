@@ -96,9 +96,9 @@ Staff calling it → `403` (AC7.7).
 
 | Action | Endpoint | Fields |
 |---|---|---|
-| Daftar meja, + Meja | `GET/POST /owner/outlets/{id}/tables`, `PATCH/DELETE /owner/tables/{id}` | `name, capacity, area, is_bookable`. |
-| ⭳ Unduh QR | `GET /owner/tables/{id}/qr.png` | Encodes the outlet's wa.me link with `MEJA {name} · {qr_token}`. |
-| Aturan reservasi | `GET/PUT /owner/outlets/{id}/reservation-settings` | `is_enabled, bookable_from, bookable_until, default_duration_minutes, booking_window_days, max_party_size, reminder_offset_minutes, cancellation_cutoff_minutes`. Hold 15 min is fixed (shown read-only). |
+| Daftar meja, + Meja | `GET/POST /owner/outlets/{id}/tables` ✅, `PATCH/DELETE /owner/tables/{id}` ✅ | `[{id, name, capacity, area, is_bookable}]` (active tables, by name). `table_name_taken` (409). DELETE deactivates (204); `table_in_use` (409) while the table has an open bill or an upcoming booked/seated reservation. Creating a table with a deactivated table's name brings that row back. PATCH `capacity` below an upcoming booking's party: `table_has_reservations` (409, `details.party_size`). Clicking the table name opens the edit form (with "Hapus meja"). |
+| ⭳ Unduh QR | `GET /owner/tables/{id}/qr.png` (**T-054, not served yet**) | Encodes the outlet's wa.me link with `MEJA {name} · {qr_token}`. The column is shown disabled ("Tersedia setelah WhatsApp outlet aktif") until WhatsApp (pilot) ships (product owner, 2026-11-19). |
+| Aturan reservasi | `GET/PUT /owner/outlets/{id}/reservation-settings` ✅ | `is_enabled, bookable_from, bookable_until, default_duration_minutes, booking_window_days, max_party_size, reminder_offset_minutes, cancellation_cutoff_minutes`; GET adds `hold_minutes` (15, fixed, shown read-only). `bookable_until` = last booking start time and must be after `bookable_from` (422, `details.field = "bookable_until"`). The UI shows reminder and cutoff in hours. `is_enabled` is the WhatsApp booking toggle; staff bookings (S6) work either way. Audit `reservation_settings.updated`. |
 
 ### O9 · Laporan Cashflow & Pengeluaran (T-041, T-042, T-043)
 
@@ -240,13 +240,15 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 
 ### S6 / M4 · Reservasi & Meja (T-062, T-063, T-064)
 
+Before every read or write of an outlet's reservations the server releases expired holds: a booking still `booked` 15 minutes after `starts_at` becomes `no_show` (event actor `system`, reason `hold_expired`), so the table is free for new bookings even before the scheduler poller (T-104) runs the `no_show_release` job written at booking time. Overlaps are refused by the database (`no_overlap` exclusion on booked/seated rows).
+
 | Part | Endpoint | Fields |
 |---|---|---|
-| Day timeline | `GET /ops/outlets/{id}/reservations?date=` | `tables:[{id, name, capacity, area}]`, `reservations:[{id, table_id, guest_name, party_size, starts_at, ends_at, status, source, hold_until?, no_show_at?}]`. |
-| + Booking telepon / langsung | `POST /ops/outlets/{id}/reservations` | `guest_name, guest_phone?, party_size, starts_at, table_id?` (auto-assign smallest fit), `source: phone\|in_person`. `conflict` on overlap. |
-| Tandai meja terisi (tanpa reservasi) | `POST /ops/outlets/{id}/walk-ins` | `table_id, party_size`. |
-| Detail | `GET /ops/reservations/{id}` | Source, masked phone, status, `events` (incl. reminder sent). |
-| Seated / Pindah meja / Batalkan / No-show | `POST /ops/reservations/{id}/seat`, `/move` (`table_id`), `/cancel`, `/no-show` | Actor recorded. |
+| Day timeline (‹ date ›) | `GET /ops/outlets/{id}/reservations?date=` ✅ | `date` (outlet-local, default today), `timezone`, `settings:{bookable_from, bookable_until, default_duration_minutes, max_party_size, booking_window_days, hold_minutes}` (timeline axis and booking form), `tables:[{id, name, capacity, area, is_bookable}]` (active tables plus inactive ones that have a reservation that day), `reservations:[{id, table_id, table_name, guest_name (null = walk-in "Tanpa reservasi"), party_size, starts_at, ends_at, status, source, hold_until? (booked only: start + 15 min), no_show_at?, allowed_actions}]` overlapping the local day; cancelled ones are left out. `allowed_actions` ⊆ `seat` (booked, before hold end), `move`, `cancel` (booked, or a seated walk-in), `no_show` (booked, after start), `complete` (seated). |
+| + Booking telepon / langsung | `POST /ops/outlets/{id}/reservations` ✅ | `guest_name, guest_phone?, party_size, starts_at` (with offset), `table_id?` (omit = smallest free bookable table that fits), `source: phone\|in_person`. 201 → detail (below). `ends_at` = start + default duration. Errors: `conflict` (chosen table taken), `no_table_available`, `validation_failed` with `details`: `max_party_size`, `capacity` (table too small), `bookable_from/bookable_until` (outside hours, outlet-local), `booking_window_days`, `field: starts_at` (in the past), `field: table_id` (unknown, other outlet, or not bookable). |
+| Tandai meja terisi (tanpa reservasi) | `POST /ops/outlets/{id}/walk-ins` ✅ | `table_id, party_size`. A `seated` reservation with source `walk_in` from now for the default duration; any active table (bookable or not). `conflict` when it overlaps a booking or another occupancy; `validation_failed` (`capacity`) when the party does not fit. |
+| Detail | `GET /ops/reservations/{id}` ✅ | Row fields above plus `phone_masked` ("+62 813-xxxx-090"), `timezone`, `events:[{event: created\|status_changed\|table_changed\|reminder_sent, from_status, to_status, from_table, to_table, reason, actor_type, actor_name, created_at}]`. The raw phone is never returned. |
+| Seated / Pindah meja / Batalkan / No-show / Selesai | `POST /ops/reservations/{id}/seat`, `/move` (`table_id`), `/cancel`, `/no-show`, `/complete` ✅ | 204. Actor recorded in `reservation_events`. Errors: `hold_expired` (seat after the hold), `too_early` (no-show before start), `invalid_transition`, `conflict` (move onto a taken table), `validation_failed` (move to a table too small, or a non-bookable one for a booked reservation). **Selesai** (`complete`) is not drawn on S6 but required by US-026; added with the product owner's approval (2026-11-19) so a seated table or walk-in can be freed when the guests leave. |
 
 ### S7 / M5 · Stok & Pergerakan (T-020, T-022, T-069)
 

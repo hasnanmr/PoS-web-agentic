@@ -21,6 +21,7 @@ from app.api.v1.ops import orders as ops_orders
 from app.api.v1.ops import proofs as ops_proofs
 from app.api.v1.ops import purchase_orders as ops_purchase_orders
 from app.api.v1.ops import qris as ops_qris
+from app.api.v1.ops import reservations as ops_reservations
 from app.api.v1.ops import stock as ops_stock
 from app.api.v1.owner import (
     catalog,
@@ -30,6 +31,7 @@ from app.api.v1.owner import (
     outlets,
     purchase_orders,
     staff,
+    tables,
 )
 from app.auth.principal import PgUserDirectory, UserDirectory
 from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
@@ -129,6 +131,8 @@ def create_app(
     app.include_router(dashboard.router)
     app.include_router(ops_purchase_orders.router)
     app.include_router(purchase_orders.router)
+    app.include_router(tables.router)
+    app.include_router(ops_reservations.router)
 
     logger.info(
         "api configured",
