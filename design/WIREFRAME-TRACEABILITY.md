@@ -2,7 +2,7 @@
 
 This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME-POS-Wireframe.figcraft) to the user stories in [User-Stories-SME-Automation-Platform.md](../User-Stories-SME-Automation-Platform.md) and the tasks in [Task-Breakdown-SME-Automation-Platform.md](../Task-Breakdown-SME-Automation-Platform.md).
 
-- **Baseline:** PRD v0.14, US-001–US-061, T-001–T-131.
+- **Baseline:** PRD v0.15, US-001–US-061, T-001–T-131.
 - **Open the file:** FigCraft (`figcraft SME-POS-Wireframe.figcraft`). PNG previews of each page are in [`previews/`](previews/).
 - **Labels:** every screen on the canvas has a label above it in the form `Code · Name — US-xxx · T-xxx`, matching the tables below.
 - **Fidelity:** low-to-mid fidelity wireframes. The colours follow the agreed reference (light sidebar, navy primary `#1E4FA3`, light-blue background `#F3F6FB`). Copy is in Bahasa Indonesia, as in the product.
@@ -26,22 +26,22 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | O1 Login (invite-only) & Buat Bisnis | US-001, US-002, US-003, US-008 | T-006, T-010, T-011, T-024, T-066 |
-| O2 Dashboard + keramaian (busy/quiet hours, busyness map, current crowd, item terlaris) | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
+| O2 Dashboard — tab Ringkasan + keramaian (busy/quiet hours, busyness map, current crowd, item terlaris); header tabs Ringkasan · PO & Supplier | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
 | O3 Bisnis & Outlet (PB1, payment mode, QRIS, cash drawers, attendance tablets, grace period) | US-002, US-017, US-018, US-019, US-020, US-053, US-055 | T-011, T-014, T-039, T-066, T-118, T-121 |
 | O4 Staf & Akses (staff invitation, access matrix) | US-003, US-033 | T-006, T-012, T-013, T-066 |
 | O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
 | O6 Resep & Bahan | US-006, US-007 | T-019, T-021, T-022, T-066 |
 | O7 Rekomendasi (owner's picks & tags) | US-028, US-029 | T-073, T-074 |
 | O8 Meja & Aturan Reservasi (+ table QR) | US-013, US-022 | T-054, T-057 |
-| O9 Laporan Cashflow & Pengeluaran | US-030, US-031, US-032 | T-041, T-042, T-043 |
+| O9 Laporan Cashflow & Pengeluaran (biaya saja; PO tidak lagi di sini) | US-030, US-031, US-032 | T-041, T-042, T-043 |
 | O10 Laporan Cash Count | US-018 | T-040, T-102 |
 | O11 Audit Log | US-004, US-016, US-021 | T-031, T-101 |
 | O12 WhatsApp Setup & Template | US-002, US-008, US-015, US-036 | T-045, T-051, T-084, T-100 |
 | O13 Dead-letter & Antrean Pesan | US-036, US-037, US-050 | T-081, T-112 |
 | O14 Kehadiran Staf, Selfie & Koreksi | US-053, US-054 | T-118, T-119, T-122 |
-| O15 Pengeluaran — tab Purchase Order (KPI hutang/jatuh tempo/dibayar belum diterima, daftar PO dengan filter status, detail PO dengan alur, riwayat, sisa hutang) | US-031, US-057, US-058, US-059, US-060, US-061 | T-125, T-126, T-127, T-128, T-130 |
-| O16 Buka PO (owner; staf memakai S12 dengan form yang sama; skema bayar mundur / bayar di muka, item bahan atau teks bebas) | US-057 | T-126, T-130 |
-| O17 Dashboard owner — Ringkasan PO, Pembayaran supplier, PO ada selisih (tutup dengan catatan, owner saja) + dialog Catat pembayaran; kartu tambahan untuk O2 | US-058, US-059, US-061 | T-128, T-130 |
+| O15 Dashboard — tab PO & Supplier: Daftar PO (chip status, filter outlet + bulan milik tab), detail PO dengan alur, riwayat, sisa hutang, Daftar supplier, + Buka PO | US-031, US-057, US-058, US-059, US-060, US-061 | T-125, T-126, T-127, T-128, T-130 |
+| O16 Buka PO (owner dari Dashboard › PO & Supplier; staf memakai S12 dengan form yang sama; skema bayar mundur / bayar di muka, item bahan atau teks bebas) | US-057 | T-126, T-130 |
+| O17 Dashboard — tab PO & Supplier, kartu di atas O15: Ringkasan PO (bulan), Pembayaran supplier (hutang per hari ini, termasuk angka KPI lama O15), PO ada selisih (tutup dengan catatan, owner saja) + dialog Catat pembayaran | US-058, US-059, US-061 | T-128, T-130 |
 
 ### Staff (web admin)
 
@@ -189,6 +189,8 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-069 Stock screens | S7, M5 |
 | T-070 Reservation/table view and cashier shift | S6, S8, M4 |
 | T-071 Owner dashboard | O2 |
+| T-128 Dashboard PO figures (tab PO & Supplier) | O17, O15 |
+| T-130 PO screens | O15, O16, O17, S10, S11, S12 |
 | T-123, T-124 Busyness queries and dashboard views | O2 |
 | T-072 Role-aware navigation, 360 px responsive | sidebars, M1–M6 |
 | T-073 Owner picks, best sellers | O7, W9 |
@@ -214,6 +216,7 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 - AI in the MVP is limited to **Rekomendasi** (W9): read-only suggestions, an immediate "Sebentar ya…" reply, and a fallback to owner's picks + best sellers after an error or 30 seconds. Free-text ordering and booking are Phase 2 (A1, A2).
 - Staff accounts are **invite-only**; there is no public sign-up (O1, O4).
 - Attendance is recorded only on the outlet's paired tablet (K0–K4): the staff member taps their name and takes a required selfie, so they must be at the outlet. Staff phones and the admin app only show their own history (S9, M6). No PIN is needed. Selfies are private, visible to the owner and the staff member, and deleted after 30 days.
+- All purchase-order screens for the owner live in their own Dashboard tab **PO & Supplier** (issue #16): O17 cards on top, the O15 list and detail below, Buka PO (O16) and Daftar supplier from the tab header. The tab has its own outlet + month filter (PRD v0.15). The month applies only to Ringkasan PO (by PO open date, FR3.12). Pembayaran supplier and PO ada selisih always show every PO that needs action (FR3.11). The list uses the status chips (FR3.10), and a Ringkasan figure opens it with exactly those POs. Each number appears once: the old O15 KPI row was merged into O17's Pembayaran supplier card. Pengeluaran (O9) is for expenses only. Staff keep S10–S12.
 - A forgotten clock-out is flagged "perlu dikoreksi" 1 hour after closing time (default) without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
 
 ## Open points

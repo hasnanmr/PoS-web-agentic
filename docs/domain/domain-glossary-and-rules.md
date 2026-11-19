@@ -187,5 +187,5 @@ Permission matrix as in PRD FR1.5. Key points:
 | 2 | PB1 on open bills: per order vs once per bill | Product owner | T-033 (open bills), T-041 (ledger posting) |
 | 3 | Busy/quiet/crowd thresholds | Development (T-123) | T-123 |
 | 4 | Who delivers (outlet staff vs courier) | Product owner | T-053 copy only |
-| 6 | Detailed wireframe for the Pengeluaran menu with tabs Pengeluaran and Purchase Order (T-129) | Design | Pengeluaran screen and PO flows (T-130); until then the menu opens O9 |
+| 6 | Detailed wireframe for the Pengeluaran menu (direct expenses only since PRD v0.15; POs moved to the Dashboard tab PO & Supplier, drawn as O15–O17) | Design | Pengeluaran screen; until then the menu opens O9 |
 | 5 | Cross-border data transfer basis | Legal (T-108) | Any real merchant data |
