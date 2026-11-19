@@ -96,7 +96,7 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `ledger_entry_type` | `revenue`, `pb1`, `delivery_fee`, `refund`, `expense`, `cash_shortage`, `cash_surplus`, `reversal` | Signed amount (+ cash in, − cash out). |
 | `po_payment_term` (T-125) | `pay_later`, `pay_in_advance` | Fixed when the PO is created. |
 | `po_status` (T-125) | `open`, `difference_found`, `closed`, `cancelled` | `open` until goods are checked; `difference_found` while a line is short; `closed` by staff when every line matches, or only by the owner with a note; `cancelled` only with no payment and no goods. |
-| `po_payment_status` (T-125) | `unpaid`, `partially_paid`, `paid` | From payments; never above the PO total. Overdue = pay later, not paid, past the due date (outlet time zone). |
+| `po_payment_status` (T-125) | `unpaid`, `partially_paid`, `paid` | From payments; never above the PO total. Overdue = a closed pay-later PO (its payment reminder is showing, FR3.7), not fully paid, past the due date (outlet time zone); an open PO past its due date is not overdue yet. |
 | `addon_selection` | `single`, `multiple` | Plus `is_required` flag. |
 | `reservation_status` | `booked`, `seated`, `completed`, `cancelled`, `no_show` | |
 | `reservation_source` | `whatsapp`, `phone`, `in_person`, `walk_in` | `walk_in` = table occupancy without booking (FR9.7). |

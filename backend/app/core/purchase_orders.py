@@ -155,6 +155,9 @@ from app.purchase_orders p
 join app.outlets ou on ou.id = p.outlet_id
 join app.suppliers s on s.id = p.supplier_id
 join app.users cu on cu.id = p.created_by
+"""
+# Per-PO line counts `g` behind goods_status (Python) and _GOODS (SQL); see _ROW_SELECT.
+_LINE_COUNTS = """
 left join lateral (
   select count(*) as lines,
          count(*) filter (where l.received_quantity > 0) as received_lines,
@@ -162,6 +165,7 @@ left join lateral (
   from app.purchase_order_lines l where l.purchase_order_id = p.id
 ) g on true
 """
+_ROW_SELECT += _LINE_COUNTS
 
 # "Menunggu bayar" (O15 chip) and the O17 Pembayaran supplier card: closed pay-later POs not
 # fully paid, and open pay-in-advance POs not paid yet (US-058, US-059).
@@ -170,9 +174,12 @@ _AWAITING_PAYMENT = """
   and ((p.payment_term = 'pay_later' and p.status = 'closed')
        or (p.payment_term = 'pay_in_advance' and p.status <> 'closed'))
 """
-# Overdue: pay later, not fully paid, past the due date in the outlet's time zone.
+# Overdue (FR3.7): a closed pay-later PO — its payment reminder is showing — not fully paid and
+# past the due date in the outlet's time zone. A subset of _AWAITING_PAYMENT, so the O15 chip, the
+# row badge and the O17 Pembayaran supplier card always agree. `now()` is the transaction start,
+# so every query of one request sees the same "today".
 _OVERDUE = """
-  p.status <> 'cancelled' and p.payment_term = 'pay_later' and p.payment_status <> 'paid'
+  p.status = 'closed' and p.payment_term = 'pay_later' and p.payment_status <> 'paid'
   and p.due_date < (timezone(ou.timezone, now()))::date
 """
 _FILTERS: dict[str, str] = {
@@ -199,21 +206,22 @@ def month_bounds(month: str) -> tuple[date, date]:
     """`2026-11` → (1 Nov, 1 Dec): PO open dates are outlet-local, so no zone math here."""
     try:
         year, mon = (int(part) for part in month.split("-"))
-        start = date(year, mon, 1)
-    except ValueError:
+        return date(year, mon, 1), date(year + mon // 12, mon % 12 + 1, 1)
+    except ValueError:  # bad format, month 13, or past year 9999
         raise ValidationFailedError("use YYYY-MM", {"field": "month"}) from None
-    return start, date(year + mon // 12, mon % 12 + 1, 1)
 
 
 def goods_status(row: dict[str, Any]) -> Literal["not_arrived", "partly_arrived", "arrived"]:
+    """Python twin of _GOODS (same `g` counts); a test checks both agree."""
     if row["line_count"] and row["full_lines"] == row["line_count"]:
         return "arrived"
     return "partly_arrived" if row["received_lines"] else "not_arrived"
 
 
 def _overdue(row: dict[str, Any]) -> bool:
+    """Python twin of _OVERDUE."""
     return (
-        row["status"] != "cancelled"
+        row["status"] == "closed"
         and row["payment_term"] == "pay_later"
         and row["payment_status"] != "paid"
         and row["due_date"] < row["local_today"]
@@ -939,46 +947,53 @@ async def record_payment(
 # Dashboard tab "PO & Supplier" — O17 cards (T-128) ---------------------------------------------
 
 
-def _bucket() -> dict[str, int]:
-    return {"count": 0, "amount": 0}
+_OWED = "(p.amount_payable - p.amount_paid)"
+# Ringkasan PO buckets: (path, condition, amount). The conditions are the list drill-down filters.
+_SUMMARY_BUCKETS: list[tuple[str, str, str]] = [
+    ("total", "true", "p.total"),
+    *((f"status.{k}", cond, "p.total") for k, cond in _STATE.items()),
+    *((f"goods.{k}", cond, "p.total") for k, cond in _GOODS.items()),
+    ("payment.unpaid", "p.payment_status = 'unpaid'", _OWED),
+    ("payment.partially_paid", "p.payment_status = 'partially_paid'", _OWED),
+    ("payment.paid", "p.payment_status = 'paid'", "p.amount_paid"),
+    ("by_term.pay_later", "p.payment_term = 'pay_later'", "p.total"),
+    ("by_term.pay_in_advance", "p.payment_term = 'pay_in_advance'", "p.total"),
+]
+# Built once from the constants above (no user input).
+_SUMMARY_SQL = (
+    "select "  # noqa: S608
+    + ", ".join(
+        f'count(*) filter (where {cond})::int as "{path}.count",'
+        f' coalesce(sum({amount}) filter (where {cond}), 0)::bigint as "{path}.amount"'
+        for path, cond, amount in _SUMMARY_BUCKETS
+    )
+    + " from app.purchase_orders p"
+    + _LINE_COUNTS
+    + " where p.status <> 'cancelled'"
+    " and (%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)"
+    " and p.ordered_on >= %(start)s and p.ordered_on < %(end)s"
+)
 
 
 async def po_summary(
     conn: AsyncConnection, *, outlet_id: UUID | None, month: str
 ) -> dict[str, Any]:
     """Ringkasan PO (FR3.12, AC3.14): POs opened in `month` (outlet-local open date), cancelled
-    ones left out. Amounts: status, goods and term buckets use the PO total; payment buckets
-    use what that bucket means in money — unpaid: amount owed, partly paid: what is still
-    owed ("sisa"), paid: amount paid."""
+    ones left out, aggregated in SQL with the same conditions as the list drill-down. Amounts:
+    status, goods and term buckets use the PO total; payment buckets use what that bucket means
+    in money — unpaid: amount owed, partly paid: what is still owed ("sisa"), paid: amount
+    paid."""
     start, end = month_bounds(month)
     cur = conn.cursor(row_factory=dict_row)
-    await cur.execute(
-        _ROW_SELECT + " where p.status <> 'cancelled'"
-        " and (%(outlet)s::uuid is null or p.outlet_id = %(outlet)s)"
-        " and p.ordered_on >= %(start)s and p.ordered_on < %(end)s",
-        {"outlet": outlet_id, "start": start, "end": end},
-    )
-    out: dict[str, Any] = {
-        "month": month,
-        "total": _bucket(),
-        "status": {"open": _bucket(), "closed": _bucket()},
-        "goods": {k: _bucket() for k in ("not_arrived", "partly_arrived", "arrived")},
-        "payment": {k: _bucket() for k in ("unpaid", "partially_paid", "paid")},
-        "by_term": {"pay_later": _bucket(), "pay_in_advance": _bucket()},
-    }
-
-    def add(bucket: dict[str, int], amount: int) -> None:
-        bucket["count"] += 1
-        bucket["amount"] += amount
-
-    for row in await cur.fetchall():
-        total = row["total"]
-        add(out["total"], total)
-        add(out["status"]["closed" if row["status"] == "closed" else "open"], total)
-        add(out["goods"][goods_status(row)], total)
-        add(out["by_term"][row["payment_term"]], total)
-        pay = row["payment_status"]
-        add(out["payment"][pay], row["amount_paid"] if pay == "paid" else _owed(row))
+    await cur.execute(_SUMMARY_SQL, {"outlet": outlet_id, "start": start, "end": end})
+    row = await cur.fetchone() or {}
+    out: dict[str, Any] = {"month": month}
+    for path, _, _ in _SUMMARY_BUCKETS:
+        node = out
+        *parents, leaf = path.split(".")
+        for key in parents:
+            node = node.setdefault(key, {})
+        node[leaf] = {"count": row[f"{path}.count"], "amount": row[f"{path}.amount"]}
     return out
 
 

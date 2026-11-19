@@ -187,6 +187,8 @@ def ctx(client: TestClient) -> dict[str, Any]:
     )
     pos["advance_waiting"] = book.open(8_000, term="pay_in_advance", ordered_on=PREV_START)
     book.pay(pos["advance_waiting"], 80_000, on=PREV_START)
+    # Past its due date but not closed: no reminder yet, so not overdue anywhere (FR3.7).
+    pos["open_late"] = book.open(3_000, ordered_on=PREV_START, due=PREV_START)
     return {
         "outlet": outlet,
         "other_outlet": str(other),
@@ -240,7 +242,7 @@ def test_ringkasan_po_counts_this_month_by_open_date(client, ctx) -> None:
         "by_term": {"pay_later": b(5, 760_000), "pay_in_advance": b(1, 200_000)},
     }
     last = _dashboard(client, ctx, month=PREV_MONTH)["po_summary"]
-    assert last["total"] == b(3, 50_000 + 70_000 + 80_000)
+    assert last["total"] == b(4, 50_000 + 70_000 + 80_000 + 30_000)
 
 
 def test_pembayaran_supplier_ignores_the_month(client, ctx) -> None:
@@ -298,7 +300,49 @@ def test_each_ringkasan_figure_lists_exactly_its_pos(client, ctx) -> None:
         pos["overdue"],
         pos["advance_unpaid"],
         pos["advance_waiting"],
+        pos["open_late"],
     }
+
+
+def _rows(client: TestClient, ctx: dict[str, Any], **params: str) -> list[dict[str, Any]]:
+    res = client.get(
+        "/api/v1/owner/purchase-orders",
+        headers=ctx["owner"],
+        params={"outlet_id": ctx["outlet"], "limit": "100", **params},
+    )
+    assert res.status_code == 200, res.text
+    return res.json()["items"]
+
+
+def test_every_ringkasan_bucket_matches_its_drill_down(client, ctx) -> None:
+    """The report (SQL aggregate) and the list (row filters + Python goods_status) must never
+    disagree: each bucket's count equals its drill-down list, and the rows carry that value."""
+    for month in (THIS_MONTH, PREV_MONTH):
+        summary = _dashboard(client, ctx, month=month)["po_summary"]
+        for param, group, field in (
+            ("state", "status", None),
+            ("goods", "goods", "goods_status"),
+            ("payment", "payment", "payment_status"),
+            ("term", "by_term", "payment_term"),
+        ):
+            for value, bucket in summary[group].items():
+                rows = _rows(client, ctx, month=month, **{param: value})
+                assert len(rows) == bucket["count"], (month, param, value)
+                if field:
+                    assert {r[field] for r in rows} <= {value}, (month, param, value)
+                if group != "payment":  # payment amounts are owed/paid, not the PO total
+                    assert sum(r["total"] for r in rows) == bucket["amount"], (month, param, value)
+
+
+def test_overdue_chip_badge_and_card_agree(client, ctx) -> None:
+    pos = ctx["pos"]
+    card = _dashboard(client, ctx)["supplier_payments"]
+    chip = _rows(client, ctx, status="overdue")
+    assert [r["id"] for r in chip] == [pos["overdue"]["id"]]
+    assert card["overdue_count"] == len(chip)
+    flags = {r["id"]: r["overdue"] for r in _rows(client, ctx)}
+    assert flags[pos["overdue"]["id"]] is True
+    assert flags[pos["open_late"]["id"]] is False  # open: no reminder yet
 
 
 def test_outlet_filter_validation_and_staff_refused(client, ctx) -> None:
@@ -312,12 +356,16 @@ def test_outlet_filter_validation_and_staff_refused(client, ctx) -> None:
     everywhere = client.get("/api/v1/owner/dashboard/purchase-orders", headers=ctx["owner"])
     assert everywhere.json()["po_summary"]["total"] == b(6, 960_000)
 
-    for bad in ("2026-13", "2026-1", "nov"):
+    for bad in ("2026-13", "2026-1", "nov", "9999-12", "0000-01"):
         res = client.get(
             "/api/v1/owner/dashboard/purchase-orders",
             headers=ctx["owner"],
             params={"month": bad},
         )
         assert res.status_code == 422, bad
+        listed = client.get(
+            "/api/v1/owner/purchase-orders", headers=ctx["owner"], params={"month": bad}
+        )
+        assert listed.status_code == 422, bad
     for path in ("/api/v1/owner/dashboard/purchase-orders", "/api/v1/owner/purchase-orders"):
         assert client.get(path, headers=ctx["staff"]).status_code == 403

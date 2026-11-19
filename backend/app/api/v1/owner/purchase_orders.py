@@ -9,7 +9,7 @@ Contract: docs/architecture/screen-endpoint-map.md → O15, O17.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -23,7 +23,7 @@ from app.api.v1.ops.purchase_orders import IdempotencyKey, PoDetail, PoPage, Ref
 from app.auth.deps import OwnerOnly
 from app.core import outlets
 from app.core import purchase_orders as po
-from app.core.localtime import DEFAULT_TIMEZONE, local_date
+from app.core.localtime import DEFAULT_TIMEZONE
 
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: purchase orders"])
 
@@ -201,12 +201,15 @@ async def po_dashboard(
 ) -> PoDashboard:
     """O17: Ringkasan PO for `month` (default: this month in the outlet's zone, WIB for all
     outlets; by PO open date). Pembayaran supplier and PO ada selisih ignore the month and
-    list every PO that needs action (FR3.11)."""
+    list every PO that needs action (FR3.11). One transaction, so every card reads the same
+    Postgres `now()` — the default month included — and they agree around midnight."""
     async with db.transaction(_pool(request), user.actor()) as conn:
         tz = DEFAULT_TIMEZONE
         if outlet_id:
             tz = (await outlets.require_outlet(conn, outlet_id))["timezone"]
-        month = month or local_date(datetime.now(UTC), tz).strftime("%Y-%m")
+        if not month:
+            cur = await conn.execute("select to_char(timezone(%s, now()), 'YYYY-MM')", (tz,))
+            month = (await cur.fetchone())[0]  # type: ignore[index]
         return PoDashboard(
             po_summary=PoSummary(**await po.po_summary(conn, outlet_id=outlet_id, month=month)),
             supplier_payments=SupplierPayments(

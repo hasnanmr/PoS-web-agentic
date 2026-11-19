@@ -8345,7 +8345,7 @@
     },
     "/api/v1/owner/dashboard/purchase-orders": {
       "get": {
-        "description": "O17: Ringkasan PO for `month` (default: this month in the outlet's zone, WIB for all\noutlets; by PO open date). Pembayaran supplier and PO ada selisih ignore the month and\nlist every PO that needs action (FR3.11).",
+        "description": "O17: Ringkasan PO for `month` (default: this month in the outlet's zone, WIB for all\noutlets; by PO open date). Pembayaran supplier and PO ada selisih ignore the month and\nlist every PO that needs action (FR3.11). One transaction, so every card reads the same\nPostgres `now()` — the default month included — and they agree around midnight.",
         "operationId": "po_dashboard_api_v1_owner_dashboard_purchase_orders_get",
         "parameters": [
           {
