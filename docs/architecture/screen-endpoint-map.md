@@ -277,6 +277,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | Part | Endpoint | Fields |
 |---|---|---|
 | Daftar PO outlet | `GET /ops/outlets/{id}/purchase-orders?status=&cursor=&limit=` ✅ | Same rows and filters as O15; payment status read-only; `amount_paid`/`amount_owed` null (no debt, also for the owner on this endpoint). |
+| Filter chips (admin) | same endpoint, `status=` | Semua / Terbuka (`open`) / Ada selisih (`difference_found`) / Ditutup (`closed`), no counts. The wireframe header reads "Terbuka (3) \| Menunggu barang (1) \| Ditutup"; "Menunggu barang" and the counts have no API filter yet (open question in the S10 PR). |
 | + Buka PO | opens S12 (O16 endpoint) | |
 
 ### S11 · Cross-check barang datang (staf & owner) — backend ✅

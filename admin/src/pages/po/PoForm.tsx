@@ -1,4 +1,5 @@
-// Wireframe O16 — Buka PO (owner, from Dashboard › PO & Supplier); staff use the same form as S12.
+// Wireframes O16 / S12 — Buka PO: owner from Dashboard › PO & Supplier (O16), staff from S10 (S12,
+// assigned outlets only — the session lists only those).
 // Endpoints: GET /ops/suppliers (active suppliers), GET /ops/outlets/{id}/stock (bahan stok, as S7),
 // POST /ops/outlets/{id}/purchase-orders (Idempotency-Key).
 // Canvas notes: the PO is open straight away without approval and is recorded under its creator;
@@ -35,8 +36,8 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
   onCancel: () => void
   onOpened: (po: PoDetail) => void
 }) {
-  const { api, me, role } = useSession()
-  const [outletId, setOutletId] = useState(defaultOutletId || me.outlets[0]?.id || '')
+  const { api, me, role, outlet } = useSession()
+  const [outletId, setOutletId] = useState(defaultOutletId || outlet?.id || me.outlets[0]?.id || '')
   const tz = me.outlets.find((o) => o.id === outletId)?.timezone ?? 'Asia/Jakarta'
   const today = todayIn(tz)
   const [supplierId, setSupplierId] = useState('')
@@ -110,7 +111,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
     <div className="grid gap-4 lg:grid-cols-[1fr_336px]">
       <section aria-label="Form Buka PO" className="rounded-lg border border-border bg-surface p-4">
         <div className="grid gap-x-3 sm:grid-cols-3">
-          <Field label="Outlet *" htmlFor="po-outlet">
+          <Field label={role === 'owner' ? 'Outlet *' : 'Outlet * (yang ditugaskan)'} htmlFor="po-outlet">
             <Select id="po-outlet" value={outletId} onChange={(e) => {
               setOutletId(e.target.value)
               setLines([emptyLine()])
