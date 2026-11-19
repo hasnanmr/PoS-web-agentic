@@ -333,7 +333,10 @@ describe('S5 Open Bills', () => {
     expect(await screen.findByText('Mode outlet: Open bill')).toBeInTheDocument()
     expect(await screen.findByText('Total berjalan')).toBeInTheDocument()
     expect(screen.getByText('2× Es Kopi Susu Senja + Oat milk')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cash' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'QRIS' }))
+    // Switching back to Cash must stay possible even without an open shift.
+    await userEvent.click(screen.getByRole('button', { name: 'Cash' }))
+    expect(screen.getByRole('button', { name: 'Cash' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(screen.getByRole('button', { name: 'QRIS' }))
     await userEvent.click(screen.getByRole('button', { name: /Tutup bill & bayar Rp 116\.600/ }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/bills/b1/close', { method: 'qris' }]))

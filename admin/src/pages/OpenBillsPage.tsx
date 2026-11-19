@@ -192,8 +192,7 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
       <div className="grid grid-cols-2 gap-2 text-[12px]">
         {(['cash', 'qris'] as const).map((m) => (
           <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)}
-            disabled={m === 'cash' && openShifts.length === 0}
-            className={`h-9 rounded-md border ${method === m ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-border'} disabled:opacity-50`}>
+            className={`h-9 rounded-md border ${method === m ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-border'}`}>
             {m === 'cash' ? 'Cash' : 'QRIS'}
           </button>
         ))}
