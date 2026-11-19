@@ -47,7 +47,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
   const [expectedDate, setExpectedDate] = useState('')
   const [lines, setLines] = useState<Line[]>([emptyLine()])
   const [note, setNote] = useState('')
-  const keyFor = useIdempotencyKey()
+  const { keyFor, settled } = useIdempotencyKey()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
@@ -97,6 +97,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
       }
       const po = await api.post<PoDetail>(`/ops/outlets/${outletId}/purchase-orders`, body,
         { 'Idempotency-Key': keyFor({ outletId, ...body }) })
+      settled()
       onOpened(po)
     } catch (err) {
       setError(errorMessage(err))

@@ -223,15 +223,18 @@ function GoodsCheck({ id, onBack }: { id: string; onBack: () => void }) {
   const tz = me.outlets.find((o) => o.id === po?.outlet.id)?.timezone ?? 'Asia/Jakarta'
   const today = todayIn(tz)
   const [arriving, setArriving] = useState<Record<string, string>>({})
-  const [receivedOn, setReceivedOn] = useState(today)
+  // Seeded with the PO outlet's date once the PO is known (not the WIB date of the first render).
+  const [pickedDate, setReceivedOn] = useState<string>()
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState<'save' | 'close'>()
   const [error, setError] = useState<string>()
-  const keyFor = useIdempotencyKey()
+  const { keyFor, settled } = useIdempotencyKey()
 
   if (loaded.error && !po) return <><PageHeader title="Cek barang datang" /><div className="p-4 md:p-6"><Alert>{errorMessage(loaded.error)}</Alert></div></>
   if (!po) return <><PageHeader title="Cek barang datang" /><Loading /></>
 
+  const receivedOn = pickedDate ?? today
+  const dateValid = receivedOn !== '' && receivedOn >= po.ordered_on && receivedOn <= today
   const canReceive = po.allowed_actions.includes('receive')
   const canClose = po.allowed_actions.includes('close')
   const rows = po.lines.map((l) => {
@@ -259,10 +262,11 @@ function GoodsCheck({ id, onBack }: { id: string; onBack: () => void }) {
       const body = {
         received_on: receivedOn,
         note: note.trim() || null,
-        lines: toSave.map((r) => ({ line_id: r.line.id, quantity: fromMilli(r.nowMilli).replace(',', '.') })),
+        lines: toSave.map((r) => ({ line_id: r.line.id, quantity: (r.nowMilli / 1000).toFixed(3) })),
       }
       const next = await api.post<PoDetail>(`/ops/purchase-orders/${po.id}/receipts`, body,
         { 'Idempotency-Key': keyFor({ po: po.id, ...body }) })
+      settled() // an identical second delivery must be recorded, not replayed
       setSaved(next)
       setArriving({})
       setNote('')
@@ -345,6 +349,11 @@ function GoodsCheck({ id, onBack }: { id: string; onBack: () => void }) {
                 Tanggal terima
                 <TextInput type="date" className="mt-1" value={receivedOn} min={po.ordered_on} max={today}
                   onChange={(e) => setReceivedOn(e.target.value)} />
+                {!dateValid && (
+                  <span className="mt-0.5 block text-[10px] text-danger">
+                    Isi tanggal antara {formatDay(po.ordered_on)} (tanggal order) dan hari ini.
+                  </span>
+                )}
               </label>
               <label className="text-[12px] text-text">
                 Catatan
@@ -369,7 +378,7 @@ function GoodsCheck({ id, onBack }: { id: string; onBack: () => void }) {
                 <Button variant="ghost" disabled className="bg-page">🔒 Tutup PO terkunci — {lockReason}</Button>
               )}
               {canReceive && (
-                <Button disabled={busy !== undefined || anyInvalid || toSave.length === 0 || receivedOn > today} onClick={save}>
+                <Button disabled={busy !== undefined || anyInvalid || toSave.length === 0 || !dateValid} onClick={save}>
                   {busy === 'save' ? 'Menyimpan…' : 'Simpan penerimaan'}
                 </Button>
               )}

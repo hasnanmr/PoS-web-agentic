@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { todayIn } from '../lib/format'
 import type { PoDetail, PoRow } from '../lib/types'
 import { fakeApi, fakeSession } from '../test/fakes'
@@ -11,7 +11,7 @@ import PurchaseOrdersPage from './PurchaseOrdersPage'
 const DAGO = { id: 'o-dago', name: 'Bandung – Dago' }
 const base: Omit<PoRow, 'id' | 'number'> = {
   supplier: { id: 's1', name: 'Bandung Fresh Supply' }, outlet: DAGO, payment_term: 'pay_later',
-  ordered_on: '2026-11-20', due_date: '2099-11-28', expected_date: null, status: 'open', goods_status: 'not_arrived',
+  ordered_on: '2026-11-10', due_date: '2099-11-28', expected_date: null, status: 'open', goods_status: 'not_arrived',
   payment_status: 'unpaid', overdue: false, total: 1090000, created_at: '2026-11-20T03:00:00Z', created_by: 'Rina',
   amount_paid: null, amount_owed: null,
 }
@@ -71,7 +71,7 @@ describe('S10 Purchase Order outlet (staff)', () => {
     const short = within(list).getByRole('row', { name: /PO-A-0014/ })
     expect(within(short).getByText('⚠ Ada selisih')).toBeInTheDocument()
     expect(within(short).getByText('— (setelah PO ditutup)')).toBeInTheDocument()
-    expect(within(short).getByText(/dibuka Rina · 20 Nov/)).toBeInTheDocument()
+    expect(within(short).getByText(/dibuka Rina · 10 Nov/)).toBeInTheDocument()
     const advance = within(list).getByRole('row', { name: /PO-A-0015/ })
     expect(within(advance).getByText('Menunggu dibayar owner (notif di dashboard owner)')).toBeInTheDocument()
     const closed = within(list).getByRole('row', { name: /PO-A-0012/ })
@@ -121,7 +121,7 @@ describe('S11 Cek barang datang', () => {
     await waitFor(() => expect(posts(api)).toHaveLength(1))
     expect(posts(api)[0][1]).toEqual({
       received_on: todayIn('Asia/Jakarta'), note: 'Susu kurang 4 L',
-      lines: [{ line_id: 'l1', quantity: '10' }, { line_id: 'l2', quantity: '8' }, { line_id: 'l3', quantity: '40' }],
+      lines: [{ line_id: 'l1', quantity: '10.000' }, { line_id: 'l2', quantity: '8.000' }, { line_id: 'l3', quantity: '40.000' }],
     })
     expect(posts(api)[0][2]).toEqual({ 'Idempotency-Key': expect.any(String) })
     expect(await within(form).findByText('⚠ Kurang 4 L')).toBeInTheDocument() // server state now
@@ -155,5 +155,43 @@ describe('S11 Cek barang datang', () => {
       allowed_actions: [] }
     renderPage(fakeApi({ 'GET /ops/purchase-orders/po-14': unpaid }), '/purchase-orders?po=po-14')
     expect(await screen.findByRole('button', { name: /Tutup PO terkunci — PO bayar di muka belum dibayar owner/ })).toBeDisabled()
+  })
+
+  it('records a second identical delivery with a new Idempotency-Key, and sends 1000 pcs as 1000', async () => {
+    const big: PoDetail = { ...OPEN, lines: [line('l9', 'Gelas', '3000.000', 'pcs', '0.000', null)] }
+    const api = fakeApi({ 'GET /ops/purchase-orders/po-14': big })
+    let received = 0
+    api.post = (async () => {
+      received += 1000
+      return { ...big, lines: [line('l9', 'Gelas', '3000.000', 'pcs', `${received}.000`, null)] }
+    }) as typeof api.post
+    const spy = vi.spyOn(api, 'post')
+    renderPage(api, '/purchase-orders?po=po-14')
+    const form = await screen.findByRole('region', { name: 'Cek barang PO-A-0014' })
+    for (let i = 0; i < 2; i++) {
+      await userEvent.type(within(form).getByLabelText('Datang sekarang Gelas'), '1000')
+      await userEvent.click(within(form).getByRole('button', { name: 'Simpan penerimaan' }))
+      await waitFor(() => expect(spy).toHaveBeenCalledTimes(i + 1))
+      await waitFor(() => expect(within(form).getByLabelText('Datang sekarang Gelas')).toHaveValue(''))
+    }
+    const [first, second] = spy.mock.calls
+    expect(first[1]).toEqual(second[1]) // same body…
+    expect((first[1] as { lines: { quantity: string }[] }).lines[0].quantity).toBe('1000.000')
+    expect((first[2] as Record<string, string>)['Idempotency-Key'])
+      .not.toBe((second[2] as Record<string, string>)['Idempotency-Key']) // …new request
+  })
+
+  it('refuses an empty receive date or one before the order date', async () => {
+    renderPage(fakeApi({ 'GET /ops/purchase-orders/po-14': OPEN }), '/purchase-orders?po=po-14')
+    const form = await screen.findByRole('region', { name: 'Cek barang PO-A-0014' })
+    await userEvent.type(within(form).getByLabelText('Datang sekarang Kentang beku'), '2')
+    const save = within(form).getByRole('button', { name: 'Simpan penerimaan' })
+    expect(save).toBeEnabled()
+    const date = within(form).getByLabelText('Tanggal terima')
+    await userEvent.clear(date)
+    expect(save).toBeDisabled()
+    await userEvent.type(date, '2026-11-09') // order date is 10 Nov
+    expect(save).toBeDisabled()
+    expect(within(form).getByText(/Isi tanggal antara 10 Nov \(tanggal order\) dan hari ini/)).toBeInTheDocument()
   })
 })

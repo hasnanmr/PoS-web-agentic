@@ -25,15 +25,21 @@ export function newKey(): string {
     : `k-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-/** One Idempotency-Key per request body. Retrying the same body reuses the key (safe after a
- * network error: the server answers with the stored result); a corrected form sends a new body
- * and gets a new key, so the server never replays an old result for it. */
-export function useIdempotencyKey(): (body: unknown) => string {
+/** Idempotency-Key for one write. Until it succeeds, retrying the same body reuses the key (safe
+ * after a network error: the server answers with the stored result) and a corrected body gets a
+ * new key. Call `settled()` after a success: the next write — even with an identical body, e.g. a
+ * second delivery of the same qty — is a new request with a new key, never a replay. */
+export function useIdempotencyKey(): { keyFor: (body: unknown) => string; settled: () => void } {
   const last = useRef<{ body: string; key: string } | undefined>(undefined)
-  return (body) => {
-    const text = JSON.stringify(body)
-    if (last.current?.body !== text) last.current = { body: text, key: newKey() }
-    return last.current.key
+  return {
+    keyFor(body) {
+      const text = JSON.stringify(body)
+      if (last.current?.body !== text) last.current = { body: text, key: newKey() }
+      return last.current.key
+    },
+    settled() {
+      last.current = undefined
+    },
   }
 }
 
