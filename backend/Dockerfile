@@ -1,6 +1,10 @@
-# Backend image for Railway (API service; the WhatsApp worker reuses it with a different
+# Runtime image for Railway (API service; the WhatsApp worker reuses it with a different
 # start command). Build context: backend/
-FROM python:3.13-slim AS base
+#
+# Pinned to a patch release, not the floating `3.13-slim` tag: a cached base layer can otherwise
+# keep serving an old interpreter. Bump it when Python ships a security release (3.13.18 carries
+# CVE-2026-115557 for the compromised eMudhra CA keys); `make audit` reports the next one.
+FROM python:3.13.18-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

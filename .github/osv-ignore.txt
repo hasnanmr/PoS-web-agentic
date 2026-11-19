@@ -1,0 +1,9 @@
+# Advisories we have looked at and accepted, read by scripts/check-vulnerabilities.py (make audit).
+#
+# Format, one per line:   <id>  # why it does not apply / when it will be fixed
+# The id can be the OSV id the scan prints, a GHSA/PYSEC id for the same advisory, or its CVE
+# alias: one advisory is reported once (GHSA and PYSEC duplicates are merged), and any of its
+# ids matches. A line without a `# reason` fails the check. Delete an entry once the package is
+# bumped; the script prints a note when an ignored id no longer matches anything.
+#
+# Empty today: every locked package in backend/uv.lock and admin/pnpm-lock.yaml is clean in OSV.

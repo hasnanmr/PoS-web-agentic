@@ -1,7 +1,8 @@
 # Local development shortcuts. Run `make help` for the list.
 .DEFAULT_GOAL := help
 .PHONY: help setup up down api worker admin test lint fmt build check \
-        backend-test backend-lint admin-test admin-lint db-reset db-migrate db-new db-test check-migrations openapi
+        backend-test backend-lint admin-test admin-lint db-reset db-migrate db-new db-test check-migrations openapi \
+        audit
 
 # Local service passwords live only in backend/.env (copied from backend/.env.example).
 -include backend/.env
@@ -69,6 +70,10 @@ admin-test: ## Admin tests
 
 admin-lint: ## Admin lint + typecheck
 	cd admin && pnpm lint && pnpm typecheck
+
+audit: ## Known vulnerabilities in the locked dependencies (OSV; works with any npm registry)
+	scripts/check-vulnerabilities.py
+	cd admin && pnpm audit --registry https://registry.npmjs.org --audit-level=high
 
 test: backend-test admin-test ## All tests
 

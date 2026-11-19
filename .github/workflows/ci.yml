@@ -127,13 +127,33 @@ jobs:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
 
+  # Locked dependencies (backend/uv.lock, admin/pnpm-lock.yaml) against OSV. Deliberately not
+  # `pnpm audit` alone: that needs an audit endpoint on the configured registry, and a mirror
+  # registry (registry.npmmirror.com) has none, so it fails while looking like a clean run.
+  security:
+    name: Known vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Locked dependencies (OSV)
+        run: scripts/check-vulnerabilities.py
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: admin/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Admin dependencies (npm registry)
+        working-directory: admin
+        run: pnpm audit --registry https://registry.npmjs.org --audit-level=high
+
   # CD on every push to main (a merged PR), once CI is green:
   #   snapshot -> migrate -> deploy backend + admin -> smoke test
   # If a deploy or the smoke test fails after the migration succeeded, both services are
   # rolled back to the snapshot (the database stays migrated: migrations are additive).
   snapshot:
     name: Snapshot running deployments
-    needs: [backend, admin]
+    needs: [backend, admin, security]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
