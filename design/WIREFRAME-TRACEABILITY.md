@@ -40,6 +40,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O13 Dead-letter & Antrean Pesan | US-036, US-037, US-050 | T-081, T-112 |
 | O14 Kehadiran Staf, Selfie & Koreksi | US-053, US-054 | T-118, T-119, T-122 |
 | O15 Dashboard — tab PO & Supplier: Daftar PO (chip status, filter outlet + bulan milik tab), detail PO dengan alur, riwayat, sisa hutang, Daftar supplier, + Buka PO | US-031, US-057, US-058, US-059, US-060, US-061 | T-125, T-126, T-127, T-128, T-130 |
+| O15 Daftar supplier (dialog from the PO & Supplier tab header; owner only: list, add, edit, deactivate, no delete) | US-057 | T-126, T-130 |
 | O16 Buka PO (owner dari Dashboard › PO & Supplier; staf memakai S12 dengan form yang sama; skema bayar mundur / bayar di muka, item bahan atau teks bebas) | US-057 | T-126, T-130 |
 | O17 Dashboard — tab PO & Supplier, kartu di atas O15: Ringkasan PO (bulan), Pembayaran supplier (hutang per hari ini, termasuk angka KPI lama O15), PO ada selisih (tutup dengan catatan, owner saja) + dialog Catat pembayaran | US-058, US-059, US-061 | T-128, T-130 |
 

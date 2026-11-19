@@ -164,7 +164,7 @@ PO responses (list rows and detail, owner and staff) share one shape: `{id, numb
 | Catat pembayaran | `POST /owner/purchase-orders/{id}/payments` (`Idempotency-Key`) ✅ | `paid_on, amount (≤ amount_owed), method: cash\|transfer, drawer_id?` (cash only: taken from that drawer's open shift, which lowers its expected cash; without it, paid outside the drawer). Posts one `expense` ledger entry on `paid_on`, description `PO-A-0012 · <supplier>`. Pay later: instalments, also before the PO is closed. Pay in advance: the full amount at once (`validation_failed` otherwise). Errors: `overpayment`, `already_paid`, `po_cancelled`, `shift_not_open`. A PO payment entry cannot be reversed from O9 (`not_reversible`). |
 | Batalkan PO | `POST /owner/purchase-orders/{id}/cancel` ✅ | `reason*`; `not_cancellable` once paid, any goods received, or closed. |
 | Tutup dengan catatan | `POST /owner/purchase-orders/{id}/close` ✅ | `note*`; only the owner, only for a PO with a difference (`no_difference` otherwise). Pay later: amount owed becomes received × unit price (`paid_above_received` if more was already paid). Pay in advance must be paid first (`payment_required`). |
-| Daftar supplier | `GET/POST /owner/suppliers`, `PATCH /owner/suppliers/{id}` ✅ | `name, phone?, note?, is_active` (PATCH may deactivate; inactive suppliers leave the S12 dropdown). `supplier_exists` on a duplicate name. |
+| Daftar supplier (dialog, drawn as "O15 · Daftar supplier") | `GET/POST /owner/suppliers`, `PATCH /owner/suppliers/{id}` ✅ | `name, phone?, note?, is_active` (PATCH may deactivate; inactive suppliers leave the S12 dropdown). `supplier_exists` on a duplicate name. |
 
 ### O16 / S12 · Buka PO (owner: O16, staf: S12) — backend ✅
 
@@ -172,6 +172,7 @@ PO responses (list rows and detail, owner and staff) share one shape: `{id, numb
 |---|---|---|
 | Buka PO | `POST /ops/outlets/{id}/purchase-orders` (`Idempotency-Key`) ✅ | `supplier_id, ordered_on, payment_term: pay_later\|pay_in_advance, due_date (pay_later) \| expected_date (pay_in_advance), lines:[{stock_item_id? \| item_name, quantity, unit, unit_price}], note?` → PO detail. 1–50 lines; stock items use g/kg, ml/L, or pcs (matching the item's base unit), free-text lines any unit; subtotal = quantity × unit price, rounded half up to whole rupiah. Number `PO-<outlet prefix>-0001` per outlet. Staff only for assigned outlets; no approval; creator recorded; no ledger entry or stock change. |
 | Supplier dropdown | `GET /ops/suppliers` ✅ | `[{id, name}]` active suppliers (read-only for staff). |
+| Bahan stok dropdown (item column) | `GET /ops/outlets/{id}/stock` ✅ (S7) | `items[{stock_item_id, name, unit, display_unit}]`; the unit choices follow the base unit (g → g/kg, ml → ml/L, pcs). Free-text lines type any unit. |
 
 ### O17 · Dashboard — tab PO & Supplier: Ringkasan PO, Pembayaran supplier, PO ada selisih (T-128) — backend ✅
 

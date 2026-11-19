@@ -115,6 +115,18 @@ const ERROR_COPY: Record<string, string> = {
   shift_closed: 'Shift ini sudah ditutup.',
   already_reversed: 'Entry ini sudah pernah di-reversal.',
   not_reversible: 'Hanya pengeluaran yang bisa di-reversal di sini.',
+  supplier_exists: 'Supplier dengan nama ini sudah ada.',
+  over_receipt: 'Jumlah diterima melebihi qty PO.',
+  overpayment: 'Nominal melebihi sisa yang harus dibayar.',
+  already_paid: 'PO ini sudah lunas.',
+  po_cancelled: 'PO ini sudah dibatalkan.',
+  not_cancellable: 'PO yang sudah dibayar, sudah ada barang diterima, atau sudah ditutup tidak bisa dibatalkan.',
+  payment_required: 'PO bayar di muka harus dibayar dulu sebelum ditutup.',
+  difference_found: 'Qty barang belum sesuai PO. Hanya owner yang bisa menutupnya dengan catatan.',
+  goods_not_received: 'Barang belum diterima semua.',
+  no_difference: 'PO ini tidak ada selisih; tutup lewat cek barang.',
+  paid_above_received: 'Sudah dibayar lebih dari nilai barang yang diterima; PO tidak bisa ditutup dengan catatan.',
+  owner_only: 'Hanya owner yang bisa melakukan ini.',
 }
 
 export function errorMessage(error: unknown): string {
