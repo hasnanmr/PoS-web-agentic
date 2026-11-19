@@ -2,7 +2,7 @@
 
 Each request, worker message, or scheduled job runs with one `ActorContext`. It is
 used to set the database session (`app.tenant_id`, `app.user_id`, `app.actor`,
-`app.device_outlet_id`, see `app.db.transaction`) and is recorded on every
+`app.device_outlet_id`, `app.device_id`, see `app.db.transaction`) and is recorded on every
 ledger, stock, order, reservation, attendance, and audit write (NFR3).
 
 Actor types match the database enum `app.actor_type`:
@@ -116,5 +116,6 @@ class ActorContext:
             "app.user_id": str(self.user_id) if self.user_id else "",
             "app.actor": self.actor_type.value,
             "app.device_outlet_id": str(self.device_outlet_id) if self.device_outlet_id else "",
+            "app.device_id": str(self.device_id) if self.device_id else "",
             "app.correlation_id": self.correlation_id,
         }

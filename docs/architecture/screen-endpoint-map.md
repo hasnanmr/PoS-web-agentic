@@ -49,7 +49,7 @@ Staff calling it → `403` (AC7.7).
 | Jam buka (atur per hari) | `PUT /owner/outlets/{id}/opening-hours` ✅ | `[{weekday, opens_at, closes_at}]`. |
 | QRIS statis | `PUT /owner/outlets/{id}/qris?filename=` ✅ (raw PNG/JPG body), `GET /owner/outlets/{id}/qris` ✅ → `image:{filename, content_type, size, uploaded_at}\|null`; image bytes: `GET /ops/outlets/{id}/qris/image` ✅ (staff of the outlet too) | PNG/JPG (checked by file signature), max 2 MB, owner only (`outlet_qris`, RLS). **PoC demo:** stored in the database (migration `20261118000500`), not Supabase Storage; the move to a signed-URL bucket (`outlets.qris_image_path`) is a follow-up. Shown to the customer at S1 and S5 (below). |
 | Cash drawer | `GET/POST /owner/outlets/{id}/drawers`, `PATCH/DELETE /owner/drawers/{id}` ✅ | `name` (max 40), `has_open_shift`; delete refused while a shift is open (`shift_open`) or for the last drawer (`last_drawer`). |
-| Tablet absensi | `GET /owner/outlets/{id}/attendance-devices` (`name, last_seen_at, revoked_at`), `POST /owner/outlets/{id}/attendance-pairing-codes` → `{code (6 digits), expires_at (10 min)}`, `POST /owner/attendance-devices/{id}/revoke` | Tenggang lupa clock out = `attendance_grace_minutes` above. |
+| Tablet absensi | `GET /owner/outlets/{id}/attendance-devices` ✅ → `[{id, name, paired_at, last_seen_at, revoked_at}]` (active first), `POST /owner/outlets/{id}/attendance-pairing-codes` ✅ → `{code (6 digits), expires_at (10 min)}`, `POST /owner/attendance-devices/{id}/revoke` ✅ → the device | O3 shows active tablets ("Kasir Dago · aktif 2 menit lalu · Cabut"). The wireframe has no name field, so a tablet is named "Tablet n" per outlet when paired. Only hashes of codes and device tokens are stored. Tenggang lupa clock out = `attendance_grace_minutes` above. |
 
 ### O4 · Staf & Akses (T-012, T-013)
 
@@ -292,15 +292,17 @@ Recorded by staff at the outlet where the goods arrive. The owner does not recor
 | Simpan penerimaan | `POST /ops/purchase-orders/{id}/receipts` (`Idempotency-Key`) ✅ | `received_on, note?, lines:[{line_id, quantity}]` (never above the remaining quantity: `over_receipt`; lines with 0 are skipped). Creates `restock` movements in base units (kg/L × 1000) referencing the PO (note = PO number); free-text lines add no stock. Returns the PO detail: per-line `check: match\|short`, `status` `difference_found` while any line is short, else `open`. `po_not_open` on a closed or cancelled PO. |
 | Tutup PO | `POST /ops/purchase-orders/{id}/close` ✅ | Owner or staff, only when every line matches (`difference_found` → refused, the owner closes it with a note from O17/O15; `goods_not_received` when nothing or not everything arrived); pay-in-advance POs must be paid first (`payment_required`). Closed POs never reopen. |
 
-## Attendance tablet (K0–K4)
+## Attendance tablet (K0–K4) — backend ✅ (Wave 7c)
+
+Admin app route `/tablet` (full screen, no sidebar, no Supabase sign-in). The tablet sends its device token as `Authorization: Bearer dev_…`; Supabase tokens are refused on `/device/*` (`device_unpaired`) and device tokens are refused everywhere else. In the database the tablet runs as actor `device` for its outlet: a restrictive `no_device` policy on every other table means it can only list the outlet's staff (definer function) and write attendance (migration `20261119170052`).
 
 | Screen | Endpoint | Fields |
 |---|---|---|
-| K0 Pairing | `POST /device/pair` | `code` (6 digits, one-time, 10 min) → `{device_token, outlet:{name, timezone}}`. |
-| K1 Pilih nama | `GET /device/staff` | `[{user_id, display_name, status: not_clocked_in\|working, since?}]` — only staff assigned to this outlet; `server_time`. |
-| K2/K3 Selfie | `POST /device/selfies` → `{upload_url, selfie_id}` | Upload JPEG/WebP, max 2 MB. |
-| K3 Simpan | `POST /device/attendance` | `user_id, selfie_id`. Server decides clock in vs clock out (working → clock out). Response: `{action: clock_in\|clock_out, at, duration_minutes?, first_time_notice: bool}`. |
-| K4 errors | error codes | `selfie_required`, `device_revoked` (→ back to K0), `not_assigned`. Offline is detected client-side; nothing is queued. |
+| K0 Pairing | `POST /device/pair` ✅ | `code` (6 digits, one-time, 10 min) → `{device_token, device_name, outlet:{name, timezone}}`. `pairing_code_invalid` (400) for a wrong, used, or expired code; `too_many_attempts` (429) after 10 wrong codes per client (100 in total) in 10 minutes. |
+| K1 Pilih nama | `GET /device/staff` ✅ | `{outlet:{name, timezone}, device_name, server_time, staff:[{user_id, display_name, status: not_clocked_in\|working, since?, first_time}]}` — only active staff assigned to this outlet; `since` = open record at this outlet ("Bekerja sejak 07:30"); `first_time` = never clocked in, so K3 shows "Pertama kali absen". |
+| K2/K3 Selfie | `POST /device/selfies` ✅ (raw JPEG/WebP body, max 2 MB, checked by file signature) → `{selfie_id}` | **PoC demo:** stored in the database (`attendance_selfies`), like the QRIS image; a private Supabase Storage bucket with signed URLs is the follow-up. The tablet uploads on "Simpan", then records. |
+| K3 Simpan | `POST /device/attendance` ✅ | `user_id, selfie_id` (uploaded by this tablet in the last 10 minutes, not used yet). Server decides clock in vs clock out (working → clock out). Response: `{action: clock_in\|clock_out, record_id, display_name, at, clock_in_at, duration_minutes?, first_time_notice, timezone}`. |
+| K4 errors | error codes | `selfie_required` (422), `device_revoked` / `device_unpaired` (401 → back to K0), `not_assigned` (403), `open_elsewhere` (409: still clocked in at another outlet; one open record per staff member). Offline is detected client-side; nothing is queued. |
 
 ## Customer screens (W1–W12)
 

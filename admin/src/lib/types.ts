@@ -58,6 +58,20 @@ export interface Drawer {
   has_open_shift: boolean
 }
 
+// O3 · Tablet absensi (T-121) ------------------------------------------------------------
+export interface AttendanceDevice {
+  id: string
+  name: string
+  paired_at: string
+  last_seen_at: string | null
+  revoked_at: string | null
+}
+
+export interface PairingCode {
+  code: string
+  expires_at: string
+}
+
 export interface StaffMember {
   id: string
   display_name: string

@@ -8,6 +8,7 @@ import { AppRoutes } from './app/routes'
 import { AuthGate } from './auth/AuthGate'
 import { parseEnv } from './env'
 import { EnvErrorScreen } from './EnvErrorScreen'
+import { TabletApp } from './tablet/TabletApp'
 
 const envResult = parseEnv(import.meta.env)
 const root = createRoot(document.getElementById('root')!)
@@ -15,6 +16,13 @@ const root = createRoot(document.getElementById('root')!)
 if (!envResult.ok) {
   console.error('Invalid admin configuration', envResult.issues)
   root.render(<EnvErrorScreen issues={envResult.issues} />)
+} else if (window.location.pathname.replace(/\/+$/, '') === '/tablet') {
+  // K0–K4: the outlet attendance tablet, a separate full-screen app with its own device session.
+  root.render(
+    <StrictMode>
+      <TabletApp apiBaseUrl={envResult.env.VITE_API_BASE_URL} />
+    </StrictMode>,
+  )
 } else {
   const { env } = envResult
   // Supabase is used for sign-in only; data goes through the FastAPI backend.
