@@ -187,27 +187,31 @@ def difference_kind(difference: int) -> Literal["shortage", "surplus", "none"]:
     return "none"
 
 
-async def _cash_movements(conn: AsyncConnection, shift_id: UUID) -> tuple[int, int, int]:
-    """Cash received (payments), how many, and cash refunded (positive) for one shift."""
+async def _cash_movements(conn: AsyncConnection, shift_id: UUID) -> tuple[int, int, int, int]:
+    """Cash received (payments), how many, cash refunded, and cash paid out of the drawer for
+    supplier payments (both positive) for one shift."""
     cur = await conn.execute(
         """
         select coalesce((select sum(amount) from app.payments
                          where shift_id = %(s)s and method = 'cash'), 0),
                (select count(*) from app.payments where shift_id = %(s)s and method = 'cash'),
                coalesce((select -sum(amount) from app.ledger_entries
-                         where shift_id = %(s)s and type = 'refund'), 0)
+                         where shift_id = %(s)s and type = 'refund'), 0),
+               coalesce((select -sum(amount) from app.ledger_entries
+                         where shift_id = %(s)s and type = 'expense'), 0)
         """,
         {"s": shift_id},
     )
-    cash_in, count, refunds = await cur.fetchone()  # type: ignore[misc]
-    return int(cash_in), int(count), int(refunds)
+    cash_in, count, refunds, paid_out = await cur.fetchone()  # type: ignore[misc]
+    return int(cash_in), int(count), int(refunds), int(paid_out)
 
 
 async def close_shift(
     conn: AsyncConnection, ctx: ActorContext, shift_id: UUID, breakdown: Mapping[str, int]
 ) -> dict[str, Any]:
     """S8 "Submit hitungan & tutup shift". Expected = starting cash + cash received - cash
-    refunded; difference = counted - expected; non-zero difference posts to the ledger."""
+    refunded - cash paid to suppliers from this drawer; difference = counted - expected;
+    a non-zero difference posts to the ledger."""
     counted = counted_total(breakdown)
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
@@ -221,8 +225,8 @@ async def close_shift(
         raise NotFoundError("shift")
     if shift["status"] != "open":
         raise ConflictError("shift_closed", "this shift is already closed")
-    cash_in, _, refunds = await _cash_movements(conn, shift_id)
-    expected = shift["starting_cash"] + cash_in - refunds
+    cash_in, _, refunds, paid_out = await _cash_movements(conn, shift_id)
+    expected = shift["starting_cash"] + cash_in - refunds - paid_out
     difference = counted - expected
     kind = difference_kind(difference)
     closed_at = datetime.now(UTC)
@@ -270,6 +274,7 @@ async def close_shift(
         "starting_cash": shift["starting_cash"],
         "cash_in": cash_in,
         "cash_refunds": refunds,
+        "cash_paid_out": paid_out,
         "expected_cash": expected,
         "counted_cash": counted,
         "difference": difference,

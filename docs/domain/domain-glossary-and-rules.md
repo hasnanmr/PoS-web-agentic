@@ -87,16 +87,16 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in. Counter: dine_in/takeaway. |
 | `order_status` | `pending_payment`, `confirmed`, `preparing`, `ready`, `out_for_delivery`, `served`, `completed`, `cancelled` | Flows in §5. |
 | `payment_status` | `unpaid`, `proof_submitted`, `paid`, `refunded` | `refunded` only through a reversal. |
-| `payment_method` | `cash`, `qris`, `transfer` (proposed, T-125) | Online orders: QRIS only. `transfer` only for supplier payments. |
+| `payment_method` | `cash`, `qris`, `transfer` (T-125) | Online orders: QRIS only. `transfer` only for supplier payments. |
 | `payment_proof_status` | `pending`, `accepted`, `rejected` | Rejection needs a reason. |
 | `bill_status` | `open`, `closed`, `voided` | `voided`: every order on the bill was cancelled. |
 | `cashier_shift_status` | `open`, `closed` | One open shift per drawer. |
 | `stock_unit` | `g`, `ml`, `pcs` | Base units. kg/L are display conversions (T-007). |
 | `stock_movement_type` | `sale`, `sale_reversal`, `restock`, `waste`, `adjustment` | Signed quantity. `adjustment` can be + or −. |
 | `ledger_entry_type` | `revenue`, `pb1`, `delivery_fee`, `refund`, `expense`, `cash_shortage`, `cash_surplus`, `reversal` | Signed amount (+ cash in, − cash out). |
-| `po_payment_term` (proposed, T-125) | `pay_later`, `pay_in_advance` | Fixed when the PO is created. |
-| `po_status` (proposed) | `open`, `difference_found`, `closed`, `cancelled` | `open` until goods are checked; `difference_found` while a line is short; `closed` by staff when every line matches, or only by the owner with a note; `cancelled` only with no payment and no goods. |
-| `po_payment_status` (proposed) | `unpaid`, `partially_paid`, `paid` | From payments; never above the PO total. Overdue = pay later, not paid, past the due date (outlet time zone). |
+| `po_payment_term` (T-125) | `pay_later`, `pay_in_advance` | Fixed when the PO is created. |
+| `po_status` (T-125) | `open`, `difference_found`, `closed`, `cancelled` | `open` until goods are checked; `difference_found` while a line is short; `closed` by staff when every line matches, or only by the owner with a note; `cancelled` only with no payment and no goods. |
+| `po_payment_status` (T-125) | `unpaid`, `partially_paid`, `paid` | From payments; never above the PO total. Overdue = pay later, not paid, past the due date (outlet time zone). |
 | `addon_selection` | `single`, `multiple` | Plus `is_required` flag. |
 | `reservation_status` | `booked`, `seated`, `completed`, `cancelled`, `no_show` | |
 | `reservation_source` | `whatsapp`, `phone`, `in_person`, `walk_in` | `walk_in` = table occupancy without booking (FR9.7). |

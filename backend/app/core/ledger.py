@@ -32,7 +32,7 @@ EntryType = Literal[
     "cash_surplus",
     "reversal",
 ]
-Method = Literal["cash", "qris"]
+Method = Literal["cash", "qris", "transfer"]
 
 DESCRIPTION_MAX = 120
 EXPENSE_MAX = 1_000_000_000
@@ -54,14 +54,15 @@ async def post(
     description: str | None = None,
     pb1_portion: int = 0,
     reverses_entry_id: int | None = None,
+    purchase_order_id: UUID | None = None,
 ) -> int:
     """Insert one ledger row and return its id."""
     cur = await conn.execute(
         """
         insert into app.ledger_entries (tenant_id, outlet_id, type, amount, payment_method,
           order_id, bill_id, payment_id, shift_id, description, business_date, actor_type, actor_id,
-          pb1_portion, reverses_entry_id)
-        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+          pb1_portion, reverses_entry_id, purchase_order_id)
+        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         returning id
         """,
         (
@@ -80,6 +81,7 @@ async def post(
             ctx.actor_id,
             pb1_portion,
             reverses_entry_id,
+            purchase_order_id,
         ),
     )
     return (await cur.fetchone())[0]  # type: ignore[index]
@@ -215,7 +217,7 @@ async def reverse_entry(conn: AsyncConnection, ctx: ActorContext, entry_id: int)
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         "select id, outlet_id, type::text as type, amount, payment_method::text as method,"
-        " business_date from app.ledger_entries where id = %s",
+        " business_date, purchase_order_id from app.ledger_entries where id = %s",
         (entry_id,),
     )
     entry = await cur.fetchone()
@@ -225,6 +227,8 @@ async def reverse_entry(conn: AsyncConnection, ctx: ActorContext, entry_id: int)
         raise ConflictError(
             "not_reversible", "only expenses are reversed here; reverse sales from the order"
         )
+    if entry["purchase_order_id"] is not None:
+        raise ConflictError("not_reversible", "supplier payments cannot be reversed (US-058)")
     try:  # a concurrent second reversal hits the unique index (no row lock: append-only table)
         async with conn.transaction():
             reversal_id = await post(
