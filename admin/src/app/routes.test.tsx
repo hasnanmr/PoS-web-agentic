@@ -28,6 +28,14 @@ describe('app shell', () => {
     expect(within(nav).queryByText(/hanya untuk owner/)).not.toBeInTheDocument()
   })
 
+  it('shows the Thinker brand (logo + name) at the top of the sidebar', () => {
+    renderAt('/', 'staff')
+    const nav = screen.getByRole('navigation', { name: 'Navigasi utama' })
+    const brand = within(nav).getByText('Thinker')
+    expect(brand.querySelector('img')).toHaveAttribute('src', '/favicon.svg')
+    expect(within(nav).queryByText(/SME POS/)).not.toBeInTheDocument()
+  })
+
   it('staff is redirected away from owner pages and sees the footer note', () => {
     renderAt('/finance/cashflow', 'staff')
     expect(screen.getByRole('heading', { level: 1, name: 'Order Board' })).toBeInTheDocument()

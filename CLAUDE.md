@@ -40,6 +40,7 @@ Every backend endpoint used by an admin or tablet screen must serve exactly what
 | danger | `#D93636` on `#FDECEC` | sold out, rejected, required-field errors |
 | teal | `#0F766E` on `#E6F4F2` | status badges (e.g. normal crowd) |
 
+- Brand: the product is called **Thinker**. Logo = "Gelembung T" (navy rounded square, white thought bubble with a navy T, orange dot), drawn in `design/` → page 99 · Components → "Logo Thinker"; in the admin it is `admin/public/favicon.svg` (+ `apple-touch-icon.png`) and `<Brand />` (`admin/src/ui/Brand.tsx`) for the sidebar and login.
 - Font: Inter. Sizes: 11/12/13 regular for body and tables, 13 semibold for labels, 16–20 bold/semibold for headings.
 - Sidebar: light, 220 px, padding 16/12, grouped sections with uppercase headings. Owner groups: OPERASIONAL, KATALOG, KEUANGAN (OWNER), PENGATURAN. Staff: OPERASIONAL only (+ "Absensi Saya") with the note "Menu, harga, laporan & pengaturan hanya untuk owner." Outlet switcher under the logo.
 - Mobile 360 px (M1–M6): hamburger + title header, filter chips under the title, kanban columns become status tabs, bottom nav (Order, Counter, Bill, Reservasi, Stok), primary action as a full-width bottom bar; no horizontal scroll (AC7.2).

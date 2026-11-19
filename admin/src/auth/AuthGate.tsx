@@ -15,6 +15,7 @@ import { Loading } from '../ui/kit'
 import { LoginCard } from './LoginCard'
 import { OnboardingCard } from './OnboardingCard'
 import { SetPasswordCard } from './SetPasswordCard'
+import { Brand } from '../ui/Brand'
 
 type State =
   | { kind: 'loading' }
@@ -147,9 +148,7 @@ export function AuthGate({ supabase, apiBaseUrl, children }: {
 function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col items-center bg-page px-4 py-10 text-text">
-      <div className="mb-6 text-[18px] font-bold text-primary">
-        <span aria-hidden="true">◼</span> SME POS
-      </div>
+      <Brand size={28} className="mb-6 text-[18px]" />
       <div className="w-full max-w-[440px]">{children}</div>
     </div>
   )
