@@ -558,6 +558,8 @@ export interface PaymentItem {
   amount_paid: number
   amount_owed: number
   created_by: string | null
+  /** Bayar only with record_payment. */
+  allowed_actions: PoAction[]
 }
 
 export interface SupplierPayments {
@@ -580,6 +582,8 @@ export interface PoDifference {
   last_received_on: string | null
   last_received_at: string | null
   days_since_last_received: number | null
+  /** Tutup dengan catatan only with close_with_note. */
+  allowed_actions: PoAction[]
 }
 
 export interface PoDashboard {

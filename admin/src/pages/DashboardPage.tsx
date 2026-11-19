@@ -66,7 +66,10 @@ export default function DashboardPage() {
     <div role="tablist" aria-label="Tab dashboard" className="flex gap-5 text-[13px]">
       {([['summary', 'Ringkasan'], ['po', 'PO & Supplier']] as const).map(([key, label]) => (
         <button key={key} type="button" role="tab" aria-selected={tab === key}
-          onClick={() => go(key === 'po' ? { tab: 'po' } : {})}
+          onClick={() => {
+            setFocusId(undefined)
+            go(key === 'po' ? { tab: 'po' } : {})
+          }}
           className={`-mb-3 border-b-[3px] pb-2.5 md:-mb-4 md:pb-3.5 ${tab === key
             ? 'border-primary font-semibold text-primary'
             : 'border-transparent text-text-muted'}`}>
@@ -89,7 +92,10 @@ export default function DashboardPage() {
       <>
         <PageHeader title="Dashboard" tabs={tabs} actions={
           <div className="flex flex-wrap items-center gap-2">
-            {outletSelect(poOutletId, setPoOutletId)}
+            {outletSelect(poOutletId, (v) => {
+              setFocusId(undefined)
+              setPoOutletId(v)
+            })}
             <Select aria-label="Periode" className="h-8 w-auto text-[12px]" value={shown} onChange={(e) => setMonth(e.target.value)}>
               {recentMonths(currentMonth).map((m) => <option key={m} value={m}>Periode: {monthLabel(m)}</option>)}
             </Select>
@@ -98,7 +104,7 @@ export default function DashboardPage() {
           </div>
         } />
         <div className="p-4 md:p-6">
-          <PoTab outletId={poOutletId} month={shown} focusId={focusId} />
+          <PoTab key={poOutletId} outletId={poOutletId} month={shown} focusId={focusId} />
         </div>
         {suppliers && <SupplierDialog onClose={() => setSuppliers(false)} />}
       </>

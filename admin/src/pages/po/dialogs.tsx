@@ -11,7 +11,7 @@ import type { PaymentTerm, ShiftRow, Supplier } from '../../lib/types'
 import { useLoad } from '../../lib/useLoad'
 import { Alert, Button, Field, LinkButton, Loading, Select, TextInput } from '../../ui/kit'
 import { Dialog } from './ui'
-import { TERM_LABEL, newKey } from './util'
+import { TERM_LABEL, useIdempotencyKey } from './util'
 
 export interface PayTarget {
   id: string
@@ -41,26 +41,28 @@ export function PaymentDialog({ target, onClose, onDone }: {
   const [amount, setAmount] = useState(String(target.owed))
   const [method, setMethod] = useState<Method>('transfer')
   const [drawerId, setDrawerId] = useState('')
-  const [key] = useState(newKey)
+  const keyFor = useIdempotencyKey()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const shifts = useLoad(() => api.get<ShiftRow[]>(`/ops/outlets/${target.outletId}/shifts/current`), target.outletId)
   const openShifts = shifts.data ?? []
   const fixed = target.term === 'pay_in_advance'
   const value = fixed ? target.owed : Number(amount)
-  const valid = Number.isInteger(value) && value > 0 && value <= target.owed && paidOn !== ''
+  const today = todayIn(tz)
+  const valid = Number.isInteger(value) && value > 0 && value <= target.owed && paidOn !== '' && paidOn <= today
     && (method !== 'cash_drawer' || drawerId !== '')
 
   async function save() {
     setBusy(true)
     setError(undefined)
     try {
-      await api.post(`/owner/purchase-orders/${target.id}/payments`, {
+      const body = {
         paid_on: paidOn,
         amount: value,
         method: method === 'transfer' ? 'transfer' : 'cash',
         drawer_id: method === 'cash_drawer' ? drawerId : null,
-      }, { 'Idempotency-Key': key })
+      }
+      await api.post(`/owner/purchase-orders/${target.id}/payments`, body, { 'Idempotency-Key': keyFor(body) })
       onDone()
     } catch (err) {
       setError(errorMessage(err))
@@ -77,7 +79,8 @@ export function PaymentDialog({ target, onClose, onDone }: {
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Tanggal bayar" htmlFor="pay-date">
-          <TextInput id="pay-date" type="date" value={paidOn} max={todayIn(tz)} onChange={(e) => setPaidOn(e.target.value)} />
+          <TextInput id="pay-date" type="date" value={paidOn} max={today} onChange={(e) => setPaidOn(e.target.value)} />
+          {paidOn > today && <p className="mt-1 text-[11px] text-danger">Tanggal bayar tidak boleh di masa depan.</p>}
         </Field>
         <Field label={fixed ? 'Nominal (bayar penuh)' : 'Nominal (maks. sisa)'} htmlFor="pay-amount">
           <TextInput id="pay-amount" type="number" inputMode="numeric" min={1} max={target.owed} disabled={fixed}

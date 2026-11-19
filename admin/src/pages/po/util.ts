@@ -1,5 +1,6 @@
 // Shared helpers for the purchase-order screens: Dashboard tab "PO & Supplier" (O15–O17), Buka PO
 // (O16, staff S12) and the staff screens S10/S11. Labels are the wireframe's Bahasa Indonesia copy.
+import { useRef } from 'react'
 import { MONTHS, formatDay } from '../../lib/format'
 import type { PaymentTerm, PoChip, PoRow } from '../../lib/types'
 
@@ -22,6 +23,18 @@ export function newKey(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `k-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+/** One Idempotency-Key per request body. Retrying the same body reuses the key (safe after a
+ * network error: the server answers with the stored result); a corrected form sends a new body
+ * and gets a new key, so the server never replays an old result for it. */
+export function useIdempotencyKey(): (body: unknown) => string {
+  const last = useRef<{ body: string; key: string } | undefined>(undefined)
+  return (body) => {
+    const text = JSON.stringify(body)
+    if (last.current?.body !== text) last.current = { body: text, key: newKey() }
+    return last.current.key
+  }
 }
 
 /** "2026-11" → "Nov 2026". */

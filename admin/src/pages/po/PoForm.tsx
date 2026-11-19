@@ -11,7 +11,7 @@ import { formatRupiah, todayIn } from '../../lib/format'
 import type { PaymentTerm, PoDetail, StockResponse } from '../../lib/types'
 import { useLoad } from '../../lib/useLoad'
 import { Alert, Button, Field, LinkButton, Select, TextInput } from '../../ui/kit'
-import { lineSubtotal, newKey } from './util'
+import { lineSubtotal, newKey, useIdempotencyKey } from './util'
 
 const UNITS: Record<string, string[]> = { g: ['g', 'kg'], ml: ['ml', 'L'], pcs: ['pcs'] }
 const FREE = '__free__'
@@ -46,7 +46,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
   const [expectedDate, setExpectedDate] = useState('')
   const [lines, setLines] = useState<Line[]>([emptyLine()])
   const [note, setNote] = useState('')
-  const [key] = useState(newKey)
+  const keyFor = useIdempotencyKey()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
@@ -56,7 +56,9 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
   const byId = useMemo(() => new Map(items.map((i) => [i.stock_item_id, i])), [items])
 
   const total = lines.reduce((sum, l) => sum + lineSubtotal(l.quantity, Number(l.unitPrice)), 0)
-  const linesValid = lines.every((l) => (l.stockItemId && l.stockItemId !== FREE ? true : l.itemName.trim() !== '')
+  // Money is whole rupiah (glossary): a unit price with a fraction is refused here, as by the API.
+  const fractionalPrice = lines.some((l) => l.unitPrice !== '' && !Number.isInteger(Number(l.unitPrice)))
+  const linesValid = !fractionalPrice && lines.every((l) => (l.stockItemId && l.stockItemId !== FREE ? true : l.itemName.trim() !== '')
     && Number(l.quantity.replace(',', '.')) > 0 && l.unit.trim() !== '' && l.unitPrice !== '' && Number(l.unitPrice) >= 0)
   const dateValid = term === 'pay_later' ? dueDate >= orderedOn && dueDate !== '' : expectedDate >= orderedOn && expectedDate !== ''
   const valid = outletId && supplierId && orderedOn && orderedOn <= today && dateValid && linesValid
@@ -78,7 +80,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
     setBusy(true)
     setError(undefined)
     try {
-      const po = await api.post<PoDetail>(`/ops/outlets/${outletId}/purchase-orders`, {
+      const body = {
         supplier_id: supplierId,
         ordered_on: orderedOn,
         payment_term: term,
@@ -91,7 +93,9 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
           unit_price: Number(l.unitPrice),
         })),
         note: note.trim() || null,
-      }, { 'Idempotency-Key': key })
+      }
+      const po = await api.post<PoDetail>(`/ops/outlets/${outletId}/purchase-orders`, body,
+        { 'Idempotency-Key': keyFor({ outletId, ...body }) })
       onOpened(po)
     } catch (err) {
       setError(errorMessage(err))
@@ -124,6 +128,8 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
             <TextInput id="po-date" type="date" value={orderedOn} max={today} onChange={(e) => setOrderedOn(e.target.value)} />
           </Field>
         </div>
+        {suppliers.error ? <div className="mb-3"><Alert>Daftar supplier belum bisa dimuat: {errorMessage(suppliers.error)}</Alert></div> : null}
+        {stock.error ? <div className="mb-3"><Alert>Daftar bahan stok belum bisa dimuat: {errorMessage(stock.error)}</Alert></div> : null}
         {suppliers.data?.length === 0 && (
           <p className="-mt-2 mb-2 text-[11px] text-warning">
             Belum ada supplier aktif. {role === 'owner' ? 'Tambahkan lewat Daftar supplier.' : 'Minta owner menambahkan supplier.'}
@@ -206,7 +212,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
                       )}
                     </td>
                     <td className="px-1 py-1">
-                      <TextInput aria-label={`Harga satuan ${i + 1}`} type="number" inputMode="numeric" min={0} className="h-8 text-[12px]"
+                      <TextInput aria-label={`Harga satuan ${i + 1}`} type="number" inputMode="numeric" min={0} step={1} className="h-8 text-[12px]"
                         value={l.unitPrice} onChange={(e) => update(i, { unitPrice: e.target.value })} />
                     </td>
                     <td className="px-2 py-1 text-right text-text">{formatRupiah(lineSubtotal(l.quantity, Number(l.unitPrice)))}</td>
@@ -221,6 +227,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
             </tbody>
           </table>
         </div>
+        {fractionalPrice && <p className="mt-1 text-[11px] text-danger">Harga satuan harus rupiah bulat (tanpa desimal).</p>}
         <LinkButton className="mt-2 text-[12px]" disabled={lines.length >= MAX_LINES}
           onClick={() => setLines((prev) => [...prev, emptyLine()])}>
           + Tambah item (bahan dari daftar stok, atau teks bebas — tidak menambah stok)

@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
+import { ApiError } from '../lib/api'
 import { todayIn } from '../lib/format'
 import type { PoDashboard, PoDetail, PoPage, PoRow } from '../lib/types'
 import { fakeApi, fakeSession } from '../test/fakes'
@@ -27,16 +28,22 @@ const DASH: PoDashboard = {
     items: [
       { po_id: 'po-7', number: 'PO-R-0007', supplier: { id: 's2', name: 'CV Kopi Priangan' }, outlet: { id: 'o-riau', name: 'Bandung – Riau' },
         payment_term: 'pay_later', reason: 'overdue', status: 'closed', due_date: '2026-11-15', expected_date: null, days_overdue: 3,
-        total: 250000, amount_paid: 0, amount_owed: 250000, created_by: 'Rina' },
+        total: 250000, amount_paid: 0, amount_owed: 250000, created_by: 'Rina', allowed_actions: ['record_payment'] },
       { po_id: 'po-12', number: 'PO-A-0012', supplier: { id: 's1', name: 'Toko Susu Segar' }, outlet: DAGO,
         payment_term: 'pay_later', reason: 'due', status: 'closed', due_date: '2026-11-30', expected_date: null, days_overdue: null,
-        total: 360000, amount_paid: 200000, amount_owed: 160000, created_by: 'Olga' },
+        total: 360000, amount_paid: 200000, amount_owed: 160000, created_by: 'Olga', allowed_actions: ['record_payment'] },
     ],
   },
   po_differences: [
     { po_id: 'po-3', number: 'PO-C-0003', supplier: { id: 's3', name: 'Bali Fresh Supply' }, outlet: DAGO, payment_term: 'pay_later',
       short_lines: [{ item: 'Kentang beku', ordered: '10.000', received: '6.000', short: '4.000', unit: 'kg' }],
-      last_received_on: '2026-11-21', last_received_at: '2026-11-21T03:00:00Z', days_since_last_received: 0 },
+      last_received_on: '2026-11-21', last_received_at: '2026-11-21T03:00:00Z', days_since_last_received: 0,
+      allowed_actions: ['receive', 'close_with_note', 'record_payment'] },
+    { po_id: 'po-8', number: 'PO-K-0008', supplier: { id: 's2', name: 'CV Kopi Priangan' }, outlet: DAGO, payment_term: 'pay_in_advance',
+      short_lines: [{ item: 'Biji kopi', ordered: '10.000', received: '4.000', short: '6.000', unit: 'kg' },
+        { item: 'Biji kopi', ordered: '5.000', received: '1.000', short: '4.000', unit: 'kg' }],
+      last_received_on: '2026-11-20', last_received_at: '2026-11-20T03:00:00Z', days_since_last_received: 1,
+      allowed_actions: ['receive', 'record_payment'] },
   ],
 }
 
@@ -210,5 +217,83 @@ describe('Dashboard tab PO & Supplier (O17 + O15)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Simpan supplier' }))
     await waitFor(() => expect(api.calls).toContainEqual(
       ['POST', '/owner/suppliers', { name: 'Bali Fresh Supply', phone: null, note: null }]))
+  })
+
+  it('shows card buttons only when the server allows them', async () => {
+    renderTab(fakeApi(BASE))
+    const diff = await screen.findByRole('region', { name: 'PO ada selisih' })
+    expect(within(diff).getByRole('button', { name: 'Tutup dengan catatan PO-C-0003' })).toBeInTheDocument()
+    // Pay-in-advance PO with a difference: not closable until paid, so no button.
+    expect(within(diff).getByText(/PO-K-0008/)).toBeInTheDocument()
+    expect(within(diff).queryByRole('button', { name: 'Tutup dengan catatan PO-K-0008' })).not.toBeInTheDocument()
+    expect(within(diff).getAllByText(/Biji kopi/)).toHaveLength(2) // same item twice, both rendered
+  })
+
+  it('sends a new Idempotency-Key when the corrected form is retried', async () => {
+    const api = fakeApi({
+      ...BASE,
+      'GET /ops/suppliers': [{ id: 's1', name: 'Toko Susu Segar' }],
+      'GET /ops/outlets/o-dago/stock': { counts: { low: 0, out: 0 }, items: [] },
+    })
+    const posts: Record<string, string>[] = []
+    let attempt = 0
+    api.post = (async (_path: string, _body: unknown, headers?: Record<string, string>) => {
+      posts.push(headers ?? {})
+      attempt += 1
+      if (attempt === 1) throw new ApiError(422, 'validation_failed', 'bad')
+      return { ...DETAIL, id: 'po-new', number: 'PO-A-0013' }
+    }) as typeof api.post
+    renderTab(api, '/dashboard?tab=po&view=new')
+    const form = screen.getByRole('region', { name: 'Form Buka PO' })
+    await within(form).findByRole('option', { name: 'Toko Susu Segar' })
+    await userEvent.selectOptions(within(form).getByLabelText('Supplier *'), 's1')
+    await userEvent.type(within(form).getByLabelText('Jatuh tempo'), '2099-12-31')
+    await userEvent.type(within(form).getByLabelText('Nama item 1'), 'Gas')
+    await userEvent.type(within(form).getByLabelText('Qty 1'), '1')
+    await userEvent.type(within(form).getByLabelText('Satuan 1'), 'tabung')
+    await userEvent.type(within(form).getByLabelText('Harga satuan 1'), '215000')
+    await userEvent.click(within(form).getByRole('button', { name: 'Buka PO' }))
+    expect(await within(form).findByRole('alert')).toBeInTheDocument()
+    await userEvent.type(within(form).getByLabelText('Nama item 1'), ' LPG')
+    await userEvent.click(within(form).getByRole('button', { name: 'Buka PO' }))
+    await waitFor(() => expect(posts).toHaveLength(2))
+    expect(posts[0]['Idempotency-Key']).not.toBe(posts[1]['Idempotency-Key'])
+  })
+
+  it('refuses a unit price with a fraction', async () => {
+    const api = fakeApi({
+      ...BASE,
+      'GET /ops/suppliers': [{ id: 's1', name: 'Toko Susu Segar' }],
+      'GET /ops/outlets/o-dago/stock': new Error('down'),
+    })
+    renderTab(api, '/dashboard?tab=po&view=new')
+    const form = screen.getByRole('region', { name: 'Form Buka PO' })
+    expect(await within(form).findByText(/Daftar bahan stok belum bisa dimuat/)).toBeInTheDocument()
+    await userEvent.type(within(form).getByLabelText('Harga satuan 1'), '1500.5')
+    expect(within(form).getByText('Harga satuan harus rupiah bulat (tanpa desimal).')).toBeInTheDocument()
+  })
+
+  it('shows an error when the next page of POs fails', async () => {
+    const api = fakeApi({ ...BASE, 'GET /owner/purchase-orders': { items: [ROW], next_cursor: 'c1' } })
+    renderTab(api)
+    const list = await screen.findByRole('region', { name: 'Daftar PO' })
+    await userEvent.click(await within(list).findByRole('button', { name: 'Muat lagi' }))
+    expect(await within(list).findByText(/PO berikutnya belum bisa dimuat/)).toBeInTheDocument()
+  })
+
+  it('focuses the dialog, closes it with Escape and keeps a future pay date out', async () => {
+    const api = fakeApi({ ...BASE, 'GET /ops/outlets/o-riau/shifts/current': [] })
+    renderTab(api)
+    const pay = await screen.findByRole('region', { name: 'Pembayaran supplier' })
+    await userEvent.click(within(pay).getByRole('button', { name: 'Bayar PO-R-0007' }))
+    const dialog = screen.getByRole('dialog', { name: 'Catat pembayaran PO-R-0007' })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    const date = within(dialog).getByLabelText('Tanggal bayar')
+    await userEvent.clear(date)
+    await userEvent.type(date, '2099-01-01')
+    expect(within(dialog).getByText('Tanggal bayar tidak boleh di masa depan.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Simpan pembayaran' })).toBeDisabled()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

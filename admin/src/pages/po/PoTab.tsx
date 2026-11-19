@@ -226,7 +226,9 @@ function PaymentsCard({ data, onPay, onShowAll }: {
               <p>{item.number} · {item.supplier.name} · {shortOutlet(item.outlet.name)}</p>
               <p>{item.amount_paid > 0 ? `Sisa ${formatRupiah(item.amount_owed)} dari ${formatRupiah(item.total)}` : formatRupiah(item.amount_owed)}</p>
             </div>
-            <Button variant="action" className="h-8 shrink-0" aria-label={`Bayar ${item.number}`} onClick={() => onPay(item)}>Bayar</Button>
+            {item.allowed_actions.includes('record_payment') && (
+              <Button variant="action" className="h-8 shrink-0" aria-label={`Bayar ${item.number}`} onClick={() => onPay(item)}>Bayar</Button>
+            )}
           </li>
         ))}
       </ul>
@@ -256,16 +258,18 @@ function DifferencesCard({ items, onOpen, onClose }: {
         {items.map((item) => (
           <li key={item.po_id} className="rounded-md bg-warning-soft px-2.5 py-2 text-[11px] text-text">
             <p>{item.number} · {item.supplier.name} · {shortOutlet(item.outlet.name)} · {TERM_LABEL[item.payment_term].toLowerCase()}</p>
-            {item.short_lines.map((l) => (
-              <p key={l.item}>
+            {item.short_lines.map((l, i) => (
+              <p key={`${i}-${l.item}`}>
                 {l.item} {plainQuantity(l.received)} / {plainQuantity(l.ordered)} {l.unit} (kurang {plainQuantity(l.short)} {l.unit})
                 {item.last_received_on ? ` · diterima ${formatDay(item.last_received_on)}` : ''}
               </p>
             ))}
             <div className="mt-2 flex gap-2">
               <Button variant="ghost" className="h-7 text-[11px]" onClick={() => onOpen(item.po_id)}>Lihat PO</Button>
-              <Button variant="action" className="h-7 text-[11px]" aria-label={`Tutup dengan catatan ${item.number}`}
-                onClick={() => onClose(item)}>Tutup dengan catatan</Button>
+              {item.allowed_actions.includes('close_with_note') && (
+                <Button variant="action" className="h-7 text-[11px]" aria-label={`Tutup dengan catatan ${item.number}`}
+                  onClick={() => onClose(item)}>Tutup dengan catatan</Button>
+              )}
             </div>
           </li>
         ))}
@@ -300,6 +304,7 @@ function PoList({ outletId, month, filter, selected, onFilter, onSelect }: {
   const first = useLoad(() => api.get<PoPage>(`/owner/purchase-orders${query ? `?${query}` : ''}`), query)
   const [more, setMore] = useState<{ query: string; items: PoRow[]; cursor: string | null }>()
   const [loadingMore, setLoadingMore] = useState(false)
+  const [moreError, setMoreError] = useState<{ query: string; message: string }>()
   const extra = more?.query === query ? more : undefined
   const rows = [...(first.data?.items ?? []), ...(extra?.items ?? [])]
   const cursor = extra ? extra.cursor : first.data?.next_cursor
@@ -308,9 +313,12 @@ function PoList({ outletId, month, filter, selected, onFilter, onSelect }: {
   async function loadMore() {
     if (!cursor) return
     setLoadingMore(true)
+    setMoreError(undefined)
     try {
       const page = await api.get<PoPage>(`/owner/purchase-orders?${query ? `${query}&` : ''}cursor=${encodeURIComponent(cursor)}`)
       setMore({ query, items: [...(extra?.items ?? []), ...page.items], cursor: page.next_cursor })
+    } catch (err) {
+      setMoreError({ query, message: errorMessage(err) })
     } finally {
       setLoadingMore(false)
     }
@@ -373,6 +381,9 @@ function PoList({ outletId, month, filter, selected, onFilter, onSelect }: {
             </tbody>
           </table>
         </div>
+      )}
+      {moreError?.query === query && (
+        <div className="mt-3"><Alert>PO berikutnya belum bisa dimuat: {moreError.message}</Alert></div>
       )}
       {cursor && (
         <div className="mt-3 text-center">
