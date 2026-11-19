@@ -14,6 +14,38 @@
         "title": "AcceptIn",
         "type": "object"
       },
+      "Actor": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "required": [
+          "name",
+          "role"
+        ],
+        "title": "Actor",
+        "type": "object"
+      },
       "AddonGroupInput": {
         "properties": {
           "is_required": {
@@ -721,24 +753,6 @@
         "title": "Breakdown",
         "type": "object"
       },
-      "CancelIn": {
-        "properties": {
-          "reason": {
-            "anyOf": [
-              {
-                "maxLength": 300,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "title": "CancelIn",
-        "type": "object"
-      },
       "CashCount": {
         "properties": {
           "from": {
@@ -971,6 +985,21 @@
           "pb1_collected"
         ],
         "title": "CashflowTotals",
+        "type": "object"
+      },
+      "CloseIn": {
+        "properties": {
+          "note": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "title": "CloseIn",
         "type": "object"
       },
       "Drawer": {
@@ -2185,7 +2214,7 @@
             "type": "array"
           },
           "payment": {
-            "$ref": "#/components/schemas/PaymentIn"
+            "$ref": "#/components/schemas/app__api__v1__ops__orders__PaymentIn"
           },
           "table_id": {
             "anyOf": [
@@ -3129,57 +3158,6 @@
         "title": "OutletSummary",
         "type": "object"
       },
-      "PaymentIn": {
-        "properties": {
-          "cash_received": {
-            "anyOf": [
-              {
-                "maximum": 1000000000.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cash Received"
-          },
-          "drawer_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Drawer Id"
-          },
-          "method": {
-            "anyOf": [
-              {
-                "enum": [
-                  "cash",
-                  "qris"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Method"
-          },
-          "to_open_bill": {
-            "default": false,
-            "title": "To Open Bill",
-            "type": "boolean"
-          }
-        },
-        "title": "PaymentIn",
-        "type": "object"
-      },
       "Period": {
         "properties": {
           "from": {
@@ -3198,6 +3176,654 @@
           "to"
         ],
         "title": "Period",
+        "type": "object"
+      },
+      "PoCreate": {
+        "properties": {
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "pay_later",
+            "title": "Due Date"
+          },
+          "expected_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "pay_in_advance",
+            "title": "Expected Date"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PoLineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "ordered_on": {
+            "format": "date",
+            "title": "Ordered On",
+            "type": "string"
+          },
+          "payment_term": {
+            "enum": [
+              "pay_later",
+              "pay_in_advance"
+            ],
+            "title": "Payment Term",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "title": "Supplier Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "supplier_id",
+          "ordered_on",
+          "payment_term",
+          "lines"
+        ],
+        "title": "PoCreate",
+        "type": "object"
+      },
+      "PoDetail": {
+        "properties": {
+          "allowed_actions": {
+            "items": {
+              "enum": [
+                "receive",
+                "close",
+                "close_with_note",
+                "record_payment",
+                "cancel"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "amount_owed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owner only",
+            "title": "Amount Owed"
+          },
+          "amount_paid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owner only",
+            "title": "Amount Paid"
+          },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "close_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Note"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/PoEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "expected_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Date"
+          },
+          "goods_status": {
+            "enum": [
+              "not_arrived",
+              "partly_arrived",
+              "arrived"
+            ],
+            "title": "Goods Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PoLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "number": {
+            "examples": [
+              "PO-A-0012"
+            ],
+            "title": "Number",
+            "type": "string"
+          },
+          "ordered_on": {
+            "format": "date",
+            "title": "Ordered On",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "payment_status": {
+            "enum": [
+              "unpaid",
+              "partially_paid",
+              "paid"
+            ],
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "payment_term": {
+            "enum": [
+              "pay_later",
+              "pay_in_advance"
+            ],
+            "title": "Payment Term",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "difference_found",
+              "closed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "supplier",
+          "outlet",
+          "payment_term",
+          "ordered_on",
+          "due_date",
+          "expected_date",
+          "status",
+          "goods_status",
+          "payment_status",
+          "overdue",
+          "total",
+          "created_at",
+          "created_by",
+          "note",
+          "close_note",
+          "cancel_reason",
+          "lines",
+          "events",
+          "allowed_actions"
+        ],
+        "title": "PoDetail",
+        "type": "object"
+      },
+      "PoEvent": {
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "kind": {
+            "enum": [
+              "opened",
+              "received",
+              "paid",
+              "closed",
+              "cancelled"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "kind",
+          "actor",
+          "data"
+        ],
+        "title": "PoEvent",
+        "type": "object"
+      },
+      "PoLine": {
+        "properties": {
+          "check": {
+            "enum": [
+              "match",
+              "short"
+            ],
+            "title": "Check",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item": {
+            "title": "Item",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "received_quantity": {
+            "title": "Received Quantity",
+            "type": "string"
+          },
+          "remaining_quantity": {
+            "title": "Remaining Quantity",
+            "type": "string"
+          },
+          "stock_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Item Id"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "unit_price": {
+            "title": "Unit Price",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "item",
+          "stock_item_id",
+          "quantity",
+          "unit",
+          "unit_price",
+          "subtotal",
+          "received_quantity",
+          "remaining_quantity",
+          "check"
+        ],
+        "title": "PoLine",
+        "type": "object"
+      },
+      "PoLineIn": {
+        "properties": {
+          "item_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Name"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "stock_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Item Id"
+          },
+          "unit": {
+            "description": "g/kg/ml/L/pcs for stock items",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          },
+          "unit_price": {
+            "description": "Rupiah per unit",
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Unit Price",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quantity",
+          "unit",
+          "unit_price"
+        ],
+        "title": "PoLineIn",
+        "type": "object"
+      },
+      "PoPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PoRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "PoPage",
+        "type": "object"
+      },
+      "PoRow": {
+        "properties": {
+          "amount_owed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owner only",
+            "title": "Amount Owed"
+          },
+          "amount_paid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Owner only",
+            "title": "Amount Paid"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "expected_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Date"
+          },
+          "goods_status": {
+            "enum": [
+              "not_arrived",
+              "partly_arrived",
+              "arrived"
+            ],
+            "title": "Goods Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "number": {
+            "examples": [
+              "PO-A-0012"
+            ],
+            "title": "Number",
+            "type": "string"
+          },
+          "ordered_on": {
+            "format": "date",
+            "title": "Ordered On",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "payment_status": {
+            "enum": [
+              "unpaid",
+              "partially_paid",
+              "paid"
+            ],
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "payment_term": {
+            "enum": [
+              "pay_later",
+              "pay_in_advance"
+            ],
+            "title": "Payment Term",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "difference_found",
+              "closed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "supplier",
+          "outlet",
+          "payment_term",
+          "ordered_on",
+          "due_date",
+          "expected_date",
+          "status",
+          "goods_status",
+          "payment_status",
+          "overdue",
+          "total",
+          "created_at",
+          "created_by"
+        ],
+        "title": "PoRow",
         "type": "object"
       },
       "ProductCreate": {
@@ -3893,6 +4519,69 @@
         "title": "QuoteResponse",
         "type": "object"
       },
+      "ReceiptIn": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReceiptLineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "received_on": {
+            "format": "date",
+            "title": "Received On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "received_on",
+          "lines"
+        ],
+        "title": "ReceiptIn",
+        "type": "object"
+      },
+      "ReceiptLineIn": {
+        "properties": {
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          }
+        },
+        "required": [
+          "line_id",
+          "quantity"
+        ],
+        "title": "ReceiptLineIn",
+        "type": "object"
+      },
       "RecipeLine": {
         "properties": {
           "quantity": {
@@ -3951,6 +4640,25 @@
           "unit"
         ],
         "title": "RecipeLineRow",
+        "type": "object"
+      },
+      "Ref": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "Ref",
         "type": "object"
       },
       "RejectIn": {
@@ -4071,6 +4779,11 @@
             "title": "Cash In",
             "type": "integer"
           },
+          "cash_paid_out": {
+            "description": "Cash paid to suppliers from this drawer (PO)",
+            "title": "Cash Paid Out",
+            "type": "integer"
+          },
           "cash_refunds": {
             "title": "Cash Refunds",
             "type": "integer"
@@ -4143,6 +4856,7 @@
           "starting_cash",
           "cash_in",
           "cash_refunds",
+          "cash_paid_out",
           "expected_cash",
           "counted_cash",
           "difference",
@@ -4548,6 +5262,166 @@
         "title": "StockRow",
         "type": "object"
       },
+      "Supplier": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "note",
+          "is_active"
+        ],
+        "title": "Supplier",
+        "type": "object"
+      },
+      "SupplierIn": {
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SupplierIn",
+        "type": "object"
+      },
+      "SupplierOption": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SupplierOption",
+        "type": "object"
+      },
+      "SupplierPatch": {
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "SupplierPatch",
+        "type": "object"
+      },
       "TableRow": {
         "properties": {
           "area": {
@@ -4753,6 +5627,75 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "app__api__v1__ops__orders__CancelIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "CancelIn",
+        "type": "object"
+      },
+      "app__api__v1__ops__orders__PaymentIn": {
+        "properties": {
+          "cash_received": {
+            "anyOf": [
+              {
+                "maximum": 1000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Received"
+          },
+          "drawer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawer Id"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "cash",
+                  "qris"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "to_open_bill": {
+            "default": false,
+            "title": "To Open Bill",
+            "type": "boolean"
+          }
+        },
+        "title": "PaymentIn",
+        "type": "object"
+      },
       "app__api__v1__owner__catalog__Created": {
         "properties": {
           "catalog_sync": {
@@ -4784,6 +5727,64 @@
           "id"
         ],
         "title": "Created",
+        "type": "object"
+      },
+      "app__api__v1__owner__purchase_orders__CancelIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "CancelIn",
+        "type": "object"
+      },
+      "app__api__v1__owner__purchase_orders__PaymentIn": {
+        "properties": {
+          "amount": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000.0,
+            "title": "Amount",
+            "type": "integer"
+          },
+          "drawer_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cash taken from this drawer's open shift",
+            "title": "Drawer Id"
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "transfer"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "paid_on": {
+            "format": "date",
+            "title": "Paid On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "paid_on",
+          "amount",
+          "method"
+        ],
+        "title": "PaymentIn",
         "type": "object"
       }
     }
@@ -5084,7 +6085,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CancelIn"
+                "$ref": "#/components/schemas/app__api__v1__ops__orders__CancelIn"
               }
             }
           },
@@ -5739,6 +6740,170 @@
         ]
       }
     },
+    "/api/v1/ops/outlets/{outlet_id}/purchase-orders": {
+      "get": {
+        "description": "S10 Daftar PO outlet: payment status read-only, no debt totals (also for the owner).",
+        "operationId": "outlet_pos_api_v1_ops_outlets__outlet_id__purchase_orders_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "difference_found",
+                    "awaiting_payment",
+                    "overdue",
+                    "closed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outlet Pos",
+        "tags": [
+          "ops: purchase orders"
+        ]
+      },
+      "post": {
+        "description": "S12 / O16 Buka PO: no approval, creator recorded, no ledger entry or stock change.",
+        "operationId": "open_po_api_v1_ops_outlets__outlet_id__purchase_orders_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Po",
+        "tags": [
+          "ops: purchase orders"
+        ]
+      }
+    },
     "/api/v1/ops/outlets/{outlet_id}/qris/image": {
       "get": {
         "description": "The outlet's static QRIS, shown to the customer at the counter and at bill close.",
@@ -6293,6 +7458,164 @@
         ]
       }
     },
+    "/api/v1/ops/purchase-orders/{po_id}": {
+      "get": {
+        "description": "S11 form: lines with ordered / received / remaining quantity. Staff see no payments.",
+        "operationId": "po_form_api_v1_ops_purchase_orders__po_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "po_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Po Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Po Form",
+        "tags": [
+          "ops: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/ops/purchase-orders/{po_id}/close": {
+      "post": {
+        "description": "S11 Tutup PO: only when every line matches; pay-in-advance POs must be paid first.\nA PO with a difference is closed by the owner with a note (owner endpoint).",
+        "operationId": "close_po_api_v1_ops_purchase_orders__po_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "po_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Po Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Po",
+        "tags": [
+          "ops: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/ops/purchase-orders/{po_id}/receipts": {
+      "post": {
+        "description": "S11 Simpan penerimaan: per line match/short; ingredient lines restock in base units.",
+        "operationId": "receive_goods_api_v1_ops_purchase_orders__po_id__receipts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "po_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Po Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receive Goods",
+        "tags": [
+          "ops: purchase orders"
+        ]
+      }
+    },
     "/api/v1/ops/shifts/{shift_id}/close": {
       "post": {
         "description": "S8 \"Submit hitungan & tutup shift\". Expected cash is revealed only in this response.",
@@ -6360,6 +7683,32 @@
         "summary": "Close Shift",
         "tags": [
           "ops: bills & shifts"
+        ]
+      }
+    },
+    "/api/v1/ops/suppliers": {
+      "get": {
+        "description": "S12/O16 supplier dropdown (active suppliers, read-only).",
+        "operationId": "supplier_options_api_v1_ops_suppliers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SupplierOption"
+                  },
+                  "title": "Response Supplier Options Api V1 Ops Suppliers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Supplier Options",
+        "tags": [
+          "ops: purchase orders"
         ]
       }
     },
@@ -7997,6 +9346,330 @@
         ]
       }
     },
+    "/api/v1/owner/purchase-orders": {
+      "get": {
+        "description": "O15 list with the chips Semua / Terbuka / Ada selisih / Menunggu bayar / Overdue /\nDitutup. Menunggu bayar and Overdue come as one page, most urgent due date first.",
+        "operationId": "list_pos_api_v1_owner_purchase_orders_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "difference_found",
+                    "awaiting_payment",
+                    "overdue",
+                    "closed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Pos",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/owner/purchase-orders/{po_id}": {
+      "get": {
+        "operationId": "po_detail_api_v1_owner_purchase_orders__po_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "po_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Po Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Po Detail",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/owner/purchase-orders/{po_id}/cancel": {
+      "post": {
+        "description": "Batalkan PO: reason required; refused once paid or any goods were received.",
+        "operationId": "cancel_po_api_v1_owner_purchase_orders__po_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "po_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Po Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__owner__purchase_orders__CancelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Po",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/owner/purchase-orders/{po_id}/close": {
+      "post": {
+        "description": "Tutup dengan catatan: only for a PO with a difference. Pay later then owes\nreceived x unit price.",
+        "operationId": "close_with_note_api_v1_owner_purchase_orders__po_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "po_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Po Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close With Note",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/owner/purchase-orders/{po_id}/payments": {
+      "post": {
+        "description": "Catat pembayaran: one `expense` ledger entry on `paid_on`; never above what is owed.",
+        "operationId": "record_payment_api_v1_owner_purchase_orders__po_id__payments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "po_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Po Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__owner__purchase_orders__PaymentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Payment",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      }
+    },
     "/api/v1/owner/reports/cash-count": {
       "get": {
         "operationId": "cash_count_report_api_v1_owner_reports_cash_count_get",
@@ -8564,6 +10237,123 @@
         "summary": "Set Thresholds",
         "tags": [
           "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/suppliers": {
+      "get": {
+        "operationId": "list_suppliers_api_v1_owner_suppliers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Supplier"
+                  },
+                  "title": "Response List Suppliers Api V1 Owner Suppliers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Suppliers",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      },
+      "post": {
+        "operationId": "create_supplier_api_v1_owner_suppliers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Supplier",
+        "tags": [
+          "owner: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/owner/suppliers/{supplier_id}": {
+      "patch": {
+        "operationId": "update_supplier_api_v1_owner_suppliers__supplier_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "supplier_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Supplier Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Supplier",
+        "tags": [
+          "owner: purchase orders"
         ]
       }
     },

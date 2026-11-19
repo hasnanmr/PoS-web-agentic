@@ -149,26 +149,28 @@ The sidebar item **Pengeluaran** opens this screen with the full expense list un
 | Riwayat koreksi | `GET /owner/attendance/{id}` | `original`, `flagged_at`, `corrections:[{at, by, from, to, reason}]`. |
 | ⭳ Ekspor CSV | `GET /owner/attendance?format=csv` | |
 
-### O15 · Pengeluaran — tab Purchase Order (T-125–T-128) — planned
+### O15 · Pengeluaran — tab Purchase Order (T-125–T-128) — backend ✅ (T-125–T-127), summary planned (T-128)
 
-The sidebar item **Pengeluaran** opens tabs **Pengeluaran** (direct expenses: the O9 endpoints `GET/POST /owner/expenses`) and **Purchase Order**.
+The sidebar item **Pengeluaran** opens tabs **Pengeluaran** (direct expenses: the O9 endpoints `GET/POST /owner/expenses`) and **Purchase Order**. Issue #16 moves O15/O16/O17 into a Dashboard tab **PO & Supplier**; the endpoints stay the same, only the entry point moves (wireframe pending).
+
+PO responses (list rows and detail, owner and staff) share one shape: `{id, number, supplier:{id, name}, outlet:{id, name}, payment_term, ordered_on, due_date?, expected_date?, status: open|difference_found|closed|cancelled, goods_status: not_arrived|partly_arrived|arrived, payment_status: unpaid|partially_paid|paid, overdue, total, created_at, created_by}`, plus `amount_paid, amount_owed` for the owner only (null for staff). Detail adds `note, close_note, cancel_reason, lines, events, allowed_actions` (server-computed: `receive, close, close_with_note, record_payment, cancel`; the UI only renders those). Writes return the updated detail.
 
 | Card / action | Endpoint | Fields |
 |---|---|---|
-| KPI cards | `GET /owner/purchase-orders/summary?outlet_id=` | `supplier_debt, overdue_count, due_7d_amount, due_7d_count, prepaid_not_received, open_count, difference_count`. |
-| List + filters | `GET /owner/purchase-orders?outlet_id=&status=open\|difference_found\|awaiting_payment\|overdue\|closed&cursor=` | `[{id, number ("PO-A-0012"), supplier, outlet, payment_term, due_date?, expected_date?, status, payment_status, overdue, total, amount_paid, amount_owed}]`. |
-| Detail | `GET /owner/purchase-orders/{id}` | Lines `[{item, stock_item_id?, quantity, unit, unit_price, received_quantity, subtotal}]`, `events:[{at, kind: opened\|received\|closed\|paid\|cancelled, actor:{name, role}, data}]`, `amount_owed`. |
-| Catat pembayaran | `POST /owner/purchase-orders/{id}/payments` (`Idempotency-Key`) | `paid_on, amount (≤ amount_owed), method: cash\|transfer, drawer_id?` (cash from an open shift). Posts one `expense` ledger entry. |
-| Batalkan PO | `POST /owner/purchase-orders/{id}/cancel` | `reason*`; refused once paid or received. |
-| Tutup dengan catatan | `POST /owner/purchase-orders/{id}/close` | `note*`; only the owner, only for a PO with a difference. |
-| Daftar supplier | `GET/POST /owner/suppliers`, `PATCH /owner/suppliers/{id}` | `name, phone?, note?`. |
+| KPI cards (planned, T-128) | `GET /owner/purchase-orders/summary?outlet_id=` | `supplier_debt, overdue_count, due_7d_amount, due_7d_count, prepaid_not_received, open_count, difference_count`. |
+| List + filters | `GET /owner/purchase-orders?outlet_id=&status=open\|difference_found\|awaiting_payment\|overdue\|closed&cursor=&limit=` ✅ | `{items:[PO row], next_cursor}`, newest first. Chips: Terbuka = `open` (waiting for goods, or all matched and not closed yet), Ada selisih = `difference_found`, Menunggu bayar = `awaiting_payment` (closed pay-later POs not fully paid + pay-in-advance POs not paid and not closed), Overdue = pay later, not fully paid, past the due date in the outlet zone, Ditutup = `closed`. Menunggu bayar and Overdue come as one page sorted by due date. Semua (no `status`) includes cancelled POs. |
+| Detail | `GET /owner/purchase-orders/{id}` ✅ | Lines `[{id, item, stock_item_id?, quantity, unit, unit_price, subtotal, received_quantity, remaining_quantity, check: match\|short}]`, `events:[{at, kind: opened\|received\|paid\|closed\|cancelled, actor:{name, role}, data}]` oldest first (received: `received_on, note, lines`; paid: `paid_on, amount, method, from_drawer`; closed: `note`; cancelled: `reason`). |
+| Catat pembayaran | `POST /owner/purchase-orders/{id}/payments` (`Idempotency-Key`) ✅ | `paid_on, amount (≤ amount_owed), method: cash\|transfer, drawer_id?` (cash only: taken from that drawer's open shift, which lowers its expected cash; without it, paid outside the drawer). Posts one `expense` ledger entry on `paid_on`, description `PO-A-0012 · <supplier>`. Pay later: instalments, also before the PO is closed. Pay in advance: the full amount at once (`validation_failed` otherwise). Errors: `overpayment`, `already_paid`, `po_cancelled`, `shift_not_open`. A PO payment entry cannot be reversed from O9 (`not_reversible`). |
+| Batalkan PO | `POST /owner/purchase-orders/{id}/cancel` ✅ | `reason*`; `not_cancellable` once paid, any goods received, or closed. |
+| Tutup dengan catatan | `POST /owner/purchase-orders/{id}/close` ✅ | `note*`; only the owner, only for a PO with a difference (`no_difference` otherwise). Pay later: amount owed becomes received × unit price (`paid_above_received` if more was already paid). Pay in advance must be paid first (`payment_required`). |
+| Daftar supplier | `GET/POST /owner/suppliers`, `PATCH /owner/suppliers/{id}` ✅ | `name, phone?, note?, is_active` (PATCH may deactivate; inactive suppliers leave the S12 dropdown). `supplier_exists` on a duplicate name. |
 
-### O16 / S12 · Buka PO (owner: O16, staf: S12) — planned
+### O16 / S12 · Buka PO (owner: O16, staf: S12) — backend ✅
 
 | Action | Endpoint | Fields |
 |---|---|---|
-| Buka PO | `POST /ops/outlets/{id}/purchase-orders` (`Idempotency-Key`) | `supplier_id, ordered_on, payment_term: pay_later\|pay_in_advance, due_date (pay_later) \| expected_date (pay_in_advance), lines:[{stock_item_id? \| item_name, quantity, unit, unit_price}], note?`. Staff only for assigned outlets; no approval; creator recorded. |
-| Supplier dropdown | `GET /ops/suppliers` | `[{id, name}]` (read-only for staff). |
+| Buka PO | `POST /ops/outlets/{id}/purchase-orders` (`Idempotency-Key`) ✅ | `supplier_id, ordered_on, payment_term: pay_later\|pay_in_advance, due_date (pay_later) \| expected_date (pay_in_advance), lines:[{stock_item_id? \| item_name, quantity, unit, unit_price}], note?` → PO detail. 1–50 lines; stock items use g/kg, ml/L, or pcs (matching the item's base unit), free-text lines any unit; subtotal = quantity × unit price, rounded half up to whole rupiah. Number `PO-<outlet prefix>-0001` per outlet. Staff only for assigned outlets; no approval; creator recorded; no ledger entry or stock change. |
+| Supplier dropdown | `GET /ops/suppliers` ✅ | `[{id, name}]` active suppliers (read-only for staff). |
 
 ### O17 · Dashboard owner — Ringkasan PO & Pembayaran supplier — planned
 
@@ -254,7 +256,7 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 |---|---|---|
 | Drawer cards | `GET /ops/outlets/{id}/drawers` ✅ (always includes the current shift; no query parameters) | `[{drawer:{id, name}, shift?:{id, opened_by, opened_at, starting_cash, cash_in, cash_in_count, cash_refunds}}]` — **no expected cash** before the count. |
 | Buka shift | `POST /ops/drawers/{id}/shifts` ✅ | `starting_cash`. `conflict` if one is open. |
-| Submit hitungan & tutup shift | `POST /ops/shifts/{id}/close` ✅ (`Idempotency-Key`) | `count_breakdown:{"100000":12, "50000":6, "20000":9, "10000":5, "5000":4, "2000":3, "coins":4400}` (note counts; `coins` = "Rp 1.000 & koin" as an amount) → server sums `counted_cash`; the response then reveals `drawer:{id, name}, starting_cash, cash_in, cash_refunds, expected_cash (= starting + cash in − cash refunds), counted_cash, difference, kind: shortage\|surplus\|none, counted_by, closed_at, timezone`. A non-zero difference posts `cash_shortage`/`cash_surplus` to the ledger. `shift_closed` (409) when already closed; cash payments wait for or refuse a shift being closed. |
+| Submit hitungan & tutup shift | `POST /ops/shifts/{id}/close` ✅ (`Idempotency-Key`) | `count_breakdown:{"100000":12, "50000":6, "20000":9, "10000":5, "5000":4, "2000":3, "coins":4400}` (note counts; `coins` = "Rp 1.000 & koin" as an amount) → server sums `counted_cash`; the response then reveals `drawer:{id, name}, starting_cash, cash_in, cash_refunds, cash_paid_out, expected_cash (= starting + cash in − cash refunds − cash paid to suppliers from this drawer), counted_cash, difference, kind: shortage\|surplus\|none, counted_by, closed_at, timezone`. A non-zero difference posts `cash_shortage`/`cash_surplus` to the ledger. `shift_closed` (409) when already closed; cash payments wait for or refuse a shift being closed. |
 
 ### S9 / M6 · Absensi Saya (T-116, T-117, T-122)
 
@@ -264,20 +266,20 @@ All under `/ops/outlets/{outlet_id}/…`; outlet access checked live.
 | Riwayat minggu ini | `GET /ops/me/attendance?from=&to=` | Own records only + `total_minutes` (flagged excluded). |
 | Lihat selfie sendiri | `GET /ops/me/attendance/{id}/selfies` | Signed URLs. No clock-in endpoint exists for staff tokens. |
 
-### S10 · Purchase Order outlet (staf) — planned
+### S10 · Purchase Order outlet (staf) — backend ✅
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Daftar PO outlet | `GET /ops/outlets/{id}/purchase-orders?status=` | Same rows as O15 plus `created_by`; payment status read-only; no debt totals. |
+| Daftar PO outlet | `GET /ops/outlets/{id}/purchase-orders?status=&cursor=&limit=` ✅ | Same rows and filters as O15; payment status read-only; `amount_paid`/`amount_owed` null (no debt, also for the owner on this endpoint). |
 | + Buka PO | opens S12 (O16 endpoint) | |
 
-### S11 · Cross-check barang datang (staf & owner) — planned
+### S11 · Cross-check barang datang (staf & owner) — backend ✅
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Form | `GET /ops/purchase-orders/{id}` | Lines with `quantity, received_quantity, unit`. |
-| Simpan penerimaan | `POST /ops/purchase-orders/{id}/receipts` (`Idempotency-Key`) | `received_on, note?, lines:[{line_id, quantity}]` (never above the remaining quantity). Creates restock movements for ingredient lines; returns per-line `match\|short` and PO `status`. |
-| Tutup PO | `POST /ops/purchase-orders/{id}/close` | Staff, only when every line matches (`difference_found` → refused; the owner closes it with a note from O17/O15); pay-in-advance POs must be paid first. |
+| Form | `GET /ops/purchase-orders/{id}` ✅ | PO detail without payment events or debt; lines with `quantity, received_quantity, remaining_quantity, unit, check`. |
+| Simpan penerimaan | `POST /ops/purchase-orders/{id}/receipts` (`Idempotency-Key`) ✅ | `received_on, note?, lines:[{line_id, quantity}]` (never above the remaining quantity: `over_receipt`; lines with 0 are skipped). Creates `restock` movements in base units (kg/L × 1000) referencing the PO (note = PO number); free-text lines add no stock. Returns the PO detail: per-line `check: match\|short`, `status` `difference_found` while any line is short, else `open`. `po_not_open` on a closed or cancelled PO. |
+| Tutup PO | `POST /ops/purchase-orders/{id}/close` ✅ | Owner or staff, only when every line matches (`difference_found` → refused, the owner closes it with a note from O17/O15; `goods_not_received` when nothing or not everything arrived); pay-in-advance POs must be paid first (`payment_required`). Closed POs never reopen. |
 
 ## Attendance tablet (K0–K4)
 
@@ -296,6 +298,8 @@ WhatsApp flows, not REST endpoints. They use the same core functions (quote, cre
 ## Schema fields added for the wireframes
 
 Added to T-004 when this map was written: `outlets.order_prefix` (#A-1036), `outlets.whatsapp_status`, `outlets.catalog_synced_at` (O3/O12), `users.invited_at`, `users.invitation_accepted_at` ("Diundang", O4), `cashier_shifts.count_breakdown` (S8), `order_events.data` (S3 timeline), default drawer name "Kasir depan" (O3/S8); removed configurable hold minutes (O8 shows 15 minutes fixed).
+
+Purchase orders (migrations `20261119000100`, `20261119000200`): `payment_method` value `transfer` (supplier payments only); tables `suppliers`, `purchase_orders` (cached `amount_payable`, `amount_paid`, `status`, `payment_status`), `purchase_order_lines` (`received_quantity` cached; `base_factor` for stock lines), `purchase_order_receipts` + `purchase_order_receipt_lines`, `purchase_order_payments` (append-only, owner-only including reads); `purchase_order_id` on `ledger_entries` (expense only) and `stock_movements` (restock only). A trigger refuses staff changes to money, terms, or cancellation and any reopening; supplier writes are owner-only. S8 close returns `cash_paid_out` (cash paid to suppliers from the drawer), and `expected_cash` = starting + cash in − cash refunds − cash paid out.
 
 Wave 4 (migration `20261118000400`): `payment_proofs.merchant_checked_at` (S4 merchant-account step, required on accepted proofs), one reversal per ledger entry (unique `reverses_entry_id`), and a restrictive policy so only an owner (or the system) can insert `expense`/`reversal` ledger rows (O9).
 

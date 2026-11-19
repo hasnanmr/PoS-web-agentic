@@ -19,9 +19,18 @@ from app.api.v1 import me
 from app.api.v1.ops import bills as ops_bills
 from app.api.v1.ops import orders as ops_orders
 from app.api.v1.ops import proofs as ops_proofs
+from app.api.v1.ops import purchase_orders as ops_purchase_orders
 from app.api.v1.ops import qris as ops_qris
 from app.api.v1.ops import stock as ops_stock
-from app.api.v1.owner import catalog, dashboard, finance, onboarding, outlets, staff
+from app.api.v1.owner import (
+    catalog,
+    dashboard,
+    finance,
+    onboarding,
+    outlets,
+    purchase_orders,
+    staff,
+)
 from app.auth.principal import PgUserDirectory, UserDirectory
 from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
@@ -118,6 +127,8 @@ def create_app(
     app.include_router(ops_qris.router)
     app.include_router(finance.router)
     app.include_router(dashboard.router)
+    app.include_router(ops_purchase_orders.router)
+    app.include_router(purchase_orders.router)
 
     logger.info(
         "api configured",

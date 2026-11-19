@@ -141,6 +141,7 @@ class ShiftClosed(BaseModel):
     starting_cash: int
     cash_in: int
     cash_refunds: int
+    cash_paid_out: int = Field(description="Cash paid to suppliers from this drawer (PO)")
     expected_cash: int
     counted_cash: int
     difference: int
