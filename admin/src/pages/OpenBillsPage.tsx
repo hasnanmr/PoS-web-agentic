@@ -154,6 +154,8 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
   const shift = openShifts.find((s) => s.drawer_id === drawerId) ?? myShift ??
     (openShifts.length === 1 ? openShifts[0] : undefined)
   const drawerAmbiguous = !shift && openShifts.length > 1
+  // A failed shifts request is not the same as "no open shift": show the error, not the shift hint.
+  const shiftsFailed = shifts.data === undefined && Boolean(shifts.error)
   const canPay = b.orders.length > 0 && (method === 'qris' || (Boolean(shift) && cash >= b.total))
 
   return (
@@ -192,8 +194,7 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
       <div className="grid grid-cols-2 gap-2 text-[12px]">
         {(['cash', 'qris'] as const).map((m) => (
           <button key={m} type="button" aria-pressed={method === m} onClick={() => setMethod(m)}
-            disabled={m === 'cash' && openShifts.length === 0}
-            className={`h-9 rounded-md border ${method === m ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-border'} disabled:opacity-50`}>
+            className={`h-9 rounded-md border ${method === m ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-border'}`}>
             {m === 'cash' ? 'Cash' : 'QRIS'}
           </button>
         ))}
@@ -220,7 +221,17 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
           </Select>
         </label>
       )}
-      {method === 'cash' && !shift && !drawerAmbiguous && <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka.</p>}
+      {method === 'cash' && shifts.data !== undefined && !shift && !drawerAmbiguous && (
+        <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka.</p>
+      )}
+      {method === 'cash' && shiftsFailed && (
+        <div className="mt-2">
+          <Alert>
+            Gagal memuat shift kasir: {errorMessage(shifts.error)}{' '}
+            <LinkButton onClick={() => void shifts.reload()}>Coba lagi</LinkButton>
+          </Alert>
+        </div>
+      )}
       {method === 'qris' && b.orders.length > 0 && <QrisPayPanel outletId={outlet.id} amount={b.total} />}
       <p className="mt-2 text-[11px] text-text-muted">Split bill tidak didukung di MVP.</p>
       {error && <div className="mt-2"><Alert>{error}</Alert></div>}

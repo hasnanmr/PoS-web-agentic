@@ -140,6 +140,7 @@ This backlog breaks down the 61 user stories in [User-Stories-SME-Automation-Pla
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
 | T-066 | Build owner onboarding, outlet settings (including cash drawers), staff management, QRIS upload, menu, add-on, recipe, and price screens. | US-001–US-006, US-017, US-019 | T-010–T-019 | P0 |
+| T-132 | Build menu photo upload (the photo part of T-016, left out of Wave 2): a private Supabase Storage bucket for menu photos, owner-only upload and replacement from the photo box in the menu edit card (wireframe O5) with size and type checks, `photo_path` saved on the item and `has_photo` returned by the API, short-lived signed URLs for previews in the admin app, the required-photo rule enforced before an item can be active or synced to the WhatsApp catalog (FR2.11, US-005), and the photo shown wherever the wireframes show it. Update `docs/architecture/screen-endpoint-map.md` for the new endpoint. | US-005, US-008 | T-014, T-016, T-066, T-079 | P0 |
 | T-067 | Build staff counter order screen with dine-in and takeaway order types, add-ons, table selection, payment, and order submission. | US-034 | T-026–T-030, T-033, T-038, T-039, T-057 | P0 |
 | T-068 | Build order board with payment review, lifecycle actions, cancellation/reversal, and open-bills view. | US-016–US-021 | T-030–T-033, T-037–T-039 | P0 |
 | T-069 | Build stock, stock movement, low-stock, and sold-out screens. | US-006, US-007 | T-020–T-023 | P0 |
@@ -160,7 +161,7 @@ This backlog breaks down the 61 user stories in [User-Stories-SME-Automation-Pla
 | T-122 | Store attendance selfies in a private Supabase Storage bucket: upload from the tablet with size and type checks, short-lived signed URLs for the owner and the staff member only, and a scheduled `attendance_photo_purge` job that deletes photos after 30 days while keeping the records. | US-053, US-054 | T-079, T-104, T-116 | P0 |
 | T-123 | Implement busyness queries for the owner: orders per hour per outlet and period (outlet-local time, opening hours only) with busy (≥ 130% of the hourly average) and quiet (≤ 60%) marking, the day-by-hour average over the last 4 weeks, current crowd per outlet (occupied tables, active orders, Ramai/Normal/Sepi status), and the hour-group filter for dashboard figures. Owner-only at the API. Include tests for time zones, thresholds, and totals. | US-056 | T-007, T-013, T-026, T-030, T-057, T-063 | P1 |
 | T-124 | Build the owner dashboard busyness views (wireframe O2): hour-group filter in the header, day-by-hour busyness map, current crowd per outlet, and orders-per-hour chart with busy and quiet hours marked. | US-056 | T-071, T-123 | P1 |
-| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119, T-124, T-130 | P0 |
+| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119, T-124, T-130, T-132 | P0 |
 
 ## Wave 8 — Membership, compliance, and MVP hardening
 
