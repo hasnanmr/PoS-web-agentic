@@ -105,6 +105,8 @@ describe('O2 Dashboard · Ringkasan', () => {
     expect(hourRanges(BUSY)).toBe('12–14 & 18–20')
     expect(hourRanges(QUIET)).toBe('08–10, 15–17, 21–22')
     expect(hourRanges([23])).toBe('23–00')
+    expect(hourRanges([0, 1, 22, 23])).toBe('22–02')
+    expect(hourRanges([19, 23, 0])).toBe('19–20 & 23–01')
   })
 
   it('shows every card from GET /owner/dashboard', async () => {
@@ -122,8 +124,8 @@ describe('O2 Dashboard · Ringkasan', () => {
     expect(within(map).getByTitle('Sab 12: 9,5 order')).toHaveClass('bg-accent-orange')
 
     const crowd = screen.getByRole('region', { name: 'Keramaian outlet sekarang' })
-    expect(within(crowd).getByText('Pukul 12.40 · dari meja terisi dan order aktif')).toBeInTheDocument()
-    expect(within(crowd).getByText('Bali – Canggu (WITA)')).toBeInTheDocument()
+    expect(within(crowd).getByText('Pukul 12.40 WIB · dari meja terisi dan order aktif')).toBeInTheDocument()
+    expect(within(crowd).getByText('Bali – Canggu (WITA 13.40)')).toBeInTheDocument()
     expect(within(crowd).getByText('10/12 meja · 8 order aktif')).toBeInTheDocument()
     expect(within(crowd).getByText('1 order aktif')).toBeInTheDocument()
     expect(within(crowd).getByText('Ramai')).toBeInTheDocument()
@@ -175,13 +177,14 @@ describe('O2 Dashboard · Ringkasan', () => {
 
   it('shows empty states and a load error', async () => {
     const empty = summary({
-      busyness_map: [], orders_per_hour: [], low_stock: [],
+      busyness_map: [], orders_per_hour: [], low_stock: [], current_crowd: [],
       busy_summary: { hours: [], orders: 0, share_pct: 0 }, quiet_summary: { hours: [], orders: 0, share_pct: 0 },
     })
     renderO2(fakeApi({ 'GET /owner/dashboard?period=today&hours=all': empty }))
     expect(await screen.findByText('Atur jam buka outlet untuk melihat peta keramaian.')).toBeInTheDocument()
     expect(screen.getByText('Belum ada order di periode ini.')).toBeInTheDocument()
     expect(screen.getByText('Semua stok aman.')).toBeInTheDocument()
+    expect(screen.getByText('Belum ada outlet aktif.')).toBeInTheDocument()
   })
 
   it('shows an error when the summary cannot load', async () => {

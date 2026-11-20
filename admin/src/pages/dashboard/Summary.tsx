@@ -5,7 +5,7 @@
 // the header period and hours; "Item terlaris" is its own card (DashboardPage).
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { formatNumber, formatQty, formatRupiah, formatTime, hourRanges, WEEKDAYS, ZONE_LABEL } from '../../lib/format'
+import { circularHours, formatNumber, formatQty, formatRupiah, formatTime, hourRanges, WEEKDAYS, ZONE_LABEL } from '../../lib/format'
 import type { CrowdLevel, DashboardPeriod, DashboardSummary, HourSummary } from '../../lib/types'
 
 const PERIOD_WORD: Record<DashboardPeriod, string> = { today: 'hari ini', week: 'minggu ini', month: 'bulan ini' }
@@ -80,7 +80,7 @@ export function KpiTiles({ data }: { data: DashboardSummary }) {
 
 export function BusynessMap({ data }: { data: DashboardSummary }) {
   const cells = data.busyness_map
-  const hours = [...new Set(cells.map((c) => c.hour))].sort((a, b) => a - b)
+  const hours = circularHours(cells.map((c) => c.hour))
   const value = new Map(cells.map((c) => [`${c.weekday}-${c.hour}`, c.avg_orders]))
   const max = Math.max(0, ...cells.map((c) => c.avg_orders))
   const level = (v: number) => (max === 0 || v === 0 ? 0 : Math.min(4, Math.floor((v / max) * 5)))
@@ -127,10 +127,17 @@ export function BusynessMap({ data }: { data: DashboardSummary }) {
 }
 
 export function CurrentCrowd({ data }: { data: DashboardSummary }) {
-  const tz = data.current_crowd[0]?.timezone ?? 'Asia/Jakarta'
+  const clock = (tz: string) => formatTime(data.as_of, tz).replace(':', '.')
+  const zones = [...new Set(data.current_crowd.map((c) => c.timezone))]
+  // One zone: "Pukul 12.40"; several: the WIB time in the subtitle and each other zone's own
+  // time next to its outlet ("Bali – Canggu (WITA 13.40)").
+  const base = zones.length === 1 ? zones[0] : 'Asia/Jakarta'
   return (
     <Panel id="o2-crowd" title="Keramaian outlet sekarang"
-      subtitle={`Pukul ${formatTime(data.as_of, tz).replace(':', '.')} · dari meja terisi dan order aktif`}>
+      subtitle={`Pukul ${clock(base)}${zones.length > 1 ? ' WIB' : ''} · dari meja terisi dan order aktif`}>
+      {data.current_crowd.length === 0 && (
+        <p className="py-8 text-center text-[13px] text-text-muted">Belum ada outlet aktif.</p>
+      )}
       <ul className="space-y-3.5">
         {data.current_crowd.map((c) => {
           const style = CROWD[c.level]
@@ -140,7 +147,7 @@ export function CurrentCrowd({ data }: { data: DashboardSummary }) {
             <li key={c.outlet_id}>
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-[13px] font-semibold text-text">
-                  {c.name}{zone && zone !== 'WIB' ? ` (${zone})` : ''}
+                  {c.name}{zone && c.timezone !== base ? ` (${zone} ${clock(c.timezone)})` : zone && zone !== 'WIB' ? ` (${zone})` : ''}
                 </p>
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${style.badge}`}>{style.label}</span>
               </div>

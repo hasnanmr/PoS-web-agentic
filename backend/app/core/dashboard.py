@@ -5,16 +5,21 @@ Contract: docs/architecture/screen-endpoint-map.md → O2.
 Periods are outlet-local (glossary §3): "today" at a WIB outlet and at a WITA outlet are each
 outlet's own calendar day, week, month, or year, so an all-outlets figure sums those periods.
 
-What counts:
-- Money (revenue, PB1, delivery fee, payment-method amounts) comes from the ledger, like O9,
-  by outlet-local ``business_date``; refunds of reversed orders are subtracted.
-- Order counts (orders, cash/QRIS split, delivery orders, channel mix, orders per hour, the
-  busyness map) count paid orders (``payment_status = paid``, not cancelled), like "Item
-  terlaris", by the outlet-local time the order was created.
+What counts (one time basis for every card, product owner decision 2026-11-20):
+- Everything follows the outlet-local time the **order was created**. Order counts (orders,
+  cash/QRIS split, delivery orders, channel mix, orders per hour, the busyness map) count paid
+  orders (``payment_status = paid``, not cancelled), like "Item terlaris".
+- Money (revenue, PB1, delivery fee, payment-method amounts and transactions) comes from the
+  ledger, but each row is dated by its order's creation time (an open bill's rows by the time
+  the bill was opened), not by the payment date. A bill opened at 23:30 and paid at 00:20
+  counts on the first day, and a refund lowers the day of the order it refunds. So the
+  dashboard can differ from O9 (which follows the payment date) around midnight.
+- A refund row is the order total given back: menu revenue + PB1 (``pb1_portion``) + the
+  order's delivery fee, each subtracted from its own tile.
 - Busy and quiet hours (T-123): an hour of the day is busy when its orders are at least 130%
-  of the average per opening hour in the period, quiet when at most 60%. The header filter
-  ``hours=busy|quiet`` keeps only those hours (orders by creation hour, money by the hour the
-  ledger entry was posted).
+  of the average per shown hour in the period, quiet when at most 60%. Shown hours are the
+  opening hours plus any hour that had orders; for today, hours that have not started yet
+  are left out. The header filter ``hours=busy|quiet`` keeps only those hours.
 """
 
 from __future__ import annotations
@@ -82,8 +87,8 @@ QUIET_PCT = 60  # and quiet at <= 60%
 CROWD_RAMAI_PCT = 75  # current crowd: tables occupied >= 75% → Ramai
 CROWD_SEPI_PCT = 30  # <= 30% → Sepi; in between → Normal
 MAP_WEEKS = 4  # busyness map: average over the last 4 complete weeks
-# Orders still in progress that make an outlet crowded now. Older ones are left out so an order
-# nobody closed does not keep an outlet "Ramai" for days.
+# Orders still in progress, seated guests, and open bills make an outlet crowded now. Ones older
+# than 12 hours are left out, so a table nobody closed does not keep an outlet "Ramai" for days.
 ACTIVE_STATUSES = ("confirmed", "preparing", "ready", "out_for_delivery")
 ACTIVE_WINDOW = timedelta(hours=12)
 
@@ -125,9 +130,20 @@ def open_hours(rows: Iterable[Mapping[str, Any]]) -> dict[int, set[int]]:
     return out
 
 
+def circular_order(hours: Iterable[int]) -> list[int]:
+    """Hours in day order starting after the longest closed stretch, so an outlet open
+    18:00-02:00 reads 18 … 23, 00, 01 (not 00, 01, 18 …)."""
+    ordered = sorted(set(hours))
+    if len(ordered) < 2:
+        return ordered
+    gaps = [((ordered[(i + 1) % len(ordered)] - h) % 24 or 24, i) for i, h in enumerate(ordered)]
+    start = (max(gaps)[1] + 1) % len(ordered)
+    return ordered[start:] + ordered[:start]
+
+
 def mark_hours(counts: Mapping[int, int], hours: Iterable[int]) -> list[dict[str, Any]]:
     """Orders per hour with busy/quiet marks against the average over the shown hours."""
-    shown = sorted(set(hours))
+    shown = circular_order(hours)
     total = sum(counts.get(h, 0) for h in shown)
     out = []
     for h in shown:
@@ -176,8 +192,10 @@ _RANGES = (
 _PAID = "o.payment_status = 'paid' and o.status <> 'cancelled'"
 _LOCAL_DATE = "(o.created_at at time zone ol.timezone)::date"
 _LOCAL_HOUR = "extract(hour from o.created_at at time zone ol.timezone)::int"
-_LEDGER_HOUR = "extract(hour from l.created_at at time zone ol.timezone)::int"
-_PAYMENT_HOUR = "extract(hour from p.confirmed_at at time zone ol.timezone)::int"
+# Money rows are dated by their order's creation time (an open bill's by when it was opened).
+_ANCHOR = "coalesce(o.created_at, b.opened_at)"
+_ANCHOR_DATE = f"({_ANCHOR} at time zone ol.timezone)::date"
+_ANCHOR_HOUR = f"extract(hour from {_ANCHOR} at time zone ol.timezone)::int"
 
 
 def _range_params(outlets: list[dict[str, Any]], key: str) -> dict[str, Any]:
@@ -210,12 +228,17 @@ async def _load_outlets(conn: AsyncConnection, outlet_id: UUID | None) -> list[d
 
 
 def _hours_in(outlets: list[dict[str, Any]], key: str) -> set[int]:
-    """Every hour any selected outlet is open on any day of its range."""
+    """Every hour any selected outlet is open on any day of its range. On the outlet's today,
+    only hours that have started: future hours have no orders yet and would pull the
+    average down (and all show as quiet)."""
     out: set[int] = set()
     for o in outlets:
         day, end = o[key]
         while day <= end:
-            out |= o["open"].get(day.isoweekday(), set())
+            hours = o["open"].get(day.isoweekday(), set())
+            if day == o["today"]:
+                hours = {h for h in hours if h <= o["now_hour"]}
+            out |= hours
             day += timedelta(days=1)
     return out
 
@@ -236,10 +259,8 @@ async def _orders_per_hour(
         _range_params(outlets, key),
     )
     counts = {r["hour"]: r["orders"] for r in await cur.fetchall()}
-    hours = _hours_in(outlets, key)
-    if not hours:  # no opening hours set: show the hours that had orders
-        hours = set(counts)
-    return mark_hours(counts, hours)
+    # Opening hours plus any hour that had orders, so busy + normal + quiet add up to the KPI.
+    return mark_hours(counts, _hours_in(outlets, key) | set(counts))
 
 
 async def _figures(
@@ -252,13 +273,17 @@ async def _figures(
     await cur.execute(
         f"""
         select coalesce(rv.type, l.type)::text as category, l.payment_method::text as method,
-               sum(l.amount)::bigint as amount, sum(l.pb1_portion)::bigint as pb1_portion
+               sum(l.amount)::bigint as amount, sum(l.pb1_portion)::bigint as pb1_portion,
+               coalesce(sum(o.delivery_fee), 0)::bigint as order_delivery_fee
         from app.ledger_entries l
+        left join app.ledger_entries rv on rv.id = l.reverses_entry_id
+        left join app.orders o on o.id = coalesce(l.order_id, rv.order_id)
+        left join app.bills b on b.id = coalesce(l.bill_id, rv.bill_id)
         join app.outlets ol on ol.id = l.outlet_id
         join {_RANGES} on r.outlet_id = l.outlet_id
-        left join app.ledger_entries rv on rv.id = l.reverses_entry_id
-        where l.business_date between r.d_from and r.d_to
-          and {hour_filter.format(expr=_LEDGER_HOUR)}
+        where coalesce(rv.type, l.type) in ('revenue', 'pb1', 'delivery_fee', 'refund')
+          and {_ANCHOR_DATE} between r.d_from and r.d_to
+          and {hour_filter.format(expr=_ANCHOR_HOUR)}
         group by 1, 2
         """,  # noqa: S608 - constant SQL fragments only
         params,
@@ -269,12 +294,13 @@ async def _figures(
         amount, method = int(r["amount"]), r["method"]
         if r["category"] in ("revenue", "pb1", "delivery_fee"):
             k[r["category"]] += amount
-        elif r["category"] == "refund":
-            # A refund row is revenue + PB1 given back (negative); pb1_portion is the PB1 part.
-            k["pb1"] -= int(r["pb1_portion"])
-            k["revenue"] += amount + int(r["pb1_portion"])
         else:
-            continue
+            # A refund row is the order total given back (negative): menu revenue + PB1
+            # (pb1_portion) + the refunded order's delivery fee.
+            pb1, delivery = int(r["pb1_portion"]), int(r["order_delivery_fee"])
+            k["pb1"] -= pb1
+            k["delivery_fee"] -= delivery
+            k["revenue"] += amount + pb1 + delivery
         if method in ("cash", "qris"):
             method_amount[method] += amount
     await cur.execute(
@@ -305,11 +331,13 @@ async def _figures(
         f"""
         select p.method::text as method, count(*)::int as transactions
         from app.payments p
+        left join app.orders o on o.id = p.order_id
+        left join app.bills b on b.id = p.bill_id
         join app.outlets ol on ol.id = p.outlet_id
         join {_RANGES} on r.outlet_id = p.outlet_id
         where p.method in ('cash', 'qris')
-          and (p.confirmed_at at time zone ol.timezone)::date between r.d_from and r.d_to
-          and {hour_filter.format(expr=_PAYMENT_HOUR)}
+          and {_ANCHOR_DATE} between r.d_from and r.d_to
+          and {hour_filter.format(expr=_ANCHOR_HOUR)}
         group by 1
         """,  # noqa: S608 - constant SQL fragments only
         params,
@@ -337,7 +365,7 @@ async def _busyness_map(
     conn: AsyncConnection, outlets: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """Average paid orders per weekday and local hour over the last 4 complete weeks, in
-    opening hours (summed across the selected outlets)."""
+    opening hours plus any cell that had orders (summed across the selected outlets)."""
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         f"""
@@ -352,12 +380,10 @@ async def _busyness_map(
         _range_params(outlets, "map_range"),
     )
     counts = {(r["weekday"], r["hour"]): r["orders"] for r in await cur.fetchall()}
-    cells: set[tuple[int, int]] = set()
+    cells: set[tuple[int, int]] = set(counts)
     for o in outlets:
         for day, hours in o["open"].items():
             cells |= {(day, h) for h in hours}
-    if not cells:
-        cells = set(counts)
     return [
         {"weekday": d, "hour": h, "avg_orders": round(counts.get((d, h), 0) / MAP_WEEKS, 1)}
         for d, h in sorted(cells)
@@ -376,8 +402,10 @@ async def _current_crowd(
           (select count(distinct t.id) from app.tables t
            where t.outlet_id = ol.id and t.is_active and (
              exists (select 1 from app.reservations rs
-                     where rs.table_id = t.id and rs.status = 'seated')
-             or exists (select 1 from app.bills b where b.table_id = t.id and b.status = 'open')
+                     where rs.table_id = t.id and rs.status = 'seated'
+                       and rs.starts_at > %(since)s)
+             or exists (select 1 from app.bills b where b.table_id = t.id and b.status = 'open'
+                        and b.opened_at > %(since)s)
              or exists (select 1 from app.orders o where o.table_id = t.id
                         and o.status = any(%(active)s::app.order_status[])
                         and o.created_at > %(since)s)))::int as occupied_tables,
@@ -433,16 +461,16 @@ async def _current_crowd(
 
 async def _low_stock(conn: AsyncConnection, outlets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Active stock items that are out or at/below their low threshold, per outlet; sold out
-    first."""
+    first. Only items the outlet carries (an `outlet_stock` row): an item never stocked at an
+    outlet is not "sold out" there."""
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         """
         select si.name as stock_item, ol.id as outlet_id, ol.name as outlet,
-               coalesce(os.on_hand, 0) as on_hand, coalesce(os.low_threshold, 0) as low_threshold,
-               si.unit::text as unit, si.display_unit
-        from app.stock_items si
-        cross join app.outlets ol
-        left join app.outlet_stock os on os.stock_item_id = si.id and os.outlet_id = ol.id
+               os.on_hand, os.low_threshold, si.unit::text as unit, si.display_unit
+        from app.outlet_stock os
+        join app.stock_items si on si.id = os.stock_item_id
+        join app.outlets ol on ol.id = os.outlet_id
         where si.is_active and ol.id = any(%s)
         order by si.name, ol.created_at
         """,
@@ -471,7 +499,9 @@ async def summary(
     if not outlets:
         return _empty_summary(period, hours, now)
     for o in outlets:
-        today = now.astimezone(ZoneInfo(o["timezone"])).date()
+        local = now.astimezone(ZoneInfo(o["timezone"]))
+        today = local.date()
+        o["today"], o["now_hour"] = today, local.hour
         o["range"] = period_range(today, period)
         o["prev_range"] = previous_range(today, period)
         o["map_range"] = (today - timedelta(weeks=MAP_WEEKS), today - timedelta(days=1))

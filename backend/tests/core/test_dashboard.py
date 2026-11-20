@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import date, time
 
 from app.core.dashboard import (
+    circular_order,
     crowd_level,
     hour_summary,
     mark_hours,
@@ -83,3 +84,11 @@ def test_crowd_level_by_tables_then_by_usual_orders() -> None:
     assert crowd_level(0, 0, 1, 3.0) == "sepi"
     assert crowd_level(0, 0, 0, 0) == "sepi"
     assert crowd_level(0, 0, 2, 0) == "normal"
+
+
+def test_hours_after_midnight_follow_the_evening() -> None:
+    assert circular_order([0, 1, 18, 19, 20, 21, 22, 23]) == [18, 19, 20, 21, 22, 23, 0, 1]
+    assert circular_order(range(8, 22)) == list(range(8, 22))
+    assert circular_order([5]) == [5] and circular_order([]) == []
+    marks = mark_hours({23: 10, 0: 10, 19: 1}, [19, 20, 21, 22, 23, 0])
+    assert [m["hour"] for m in marks] == [19, 20, 21, 22, 23, 0]
