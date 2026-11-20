@@ -3,8 +3,8 @@
 Contract: docs/architecture/screen-endpoint-map.md → "Attendance tablet (K0-K4)". The tablet
 authenticates with the device token from `POST /device/pair` (`Authorization: Bearer dev_…`),
 never with a Supabase token, and these are the only endpoints it can use. Errors the tablet
-handles: `pairing_code_invalid` (K0), `device_revoked` / `device_unpaired` (→ back to K0),
-`selfie_required`, `not_assigned`, `open_elsewhere` (K4).
+handles: `pairing_code_invalid` and `tablet_already_paired` (K0), `device_revoked` /
+`device_unpaired` (→ back to K0), `selfie_required`, `not_assigned`, `open_elsewhere` (K4).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from app.api.errors import ApiError
 from app.core import attendance as core
 from app.core import attendance_reports
 from app.core.actor import ActorContext
-from app.core.errors import ValidationFailedError
+from app.core.errors import ConflictError, ValidationFailedError
 
 router = APIRouter(prefix="/api/v1/device", tags=["attendance tablet (K0-K4)"])
 
@@ -122,11 +122,16 @@ class PairOut(BaseModel):
 
 @router.post("/pair", status_code=status.HTTP_201_CREATED)
 async def pair(body: PairIn, request: Request) -> PairOut:
-    """K0 "Hubungkan tablet". `pairing_code_invalid` (400) for a wrong, used, or expired code."""
+    """K0 "Hubungkan tablet". `pairing_code_invalid` (400) for a wrong, used, or expired code;
+    `tablet_already_paired` (409) while the outlet still has an active tablet (one per outlet)."""
     client = _client_key(request)
     attempt = _reserve_attempt(client)
-    async with _pool(request).connection() as conn, conn.transaction():
-        token, device = await core.pair_device(conn, body.code)
+    try:
+        async with _pool(request).connection() as conn, conn.transaction():
+            token, device = await core.pair_device(conn, body.code)
+    except ConflictError:
+        _release_attempt(client, attempt)  # the code was right; the outlet is just occupied
+        raise
     _release_attempt(client, attempt)  # a right code does not count against the client
     return PairOut(
         device_token=token,

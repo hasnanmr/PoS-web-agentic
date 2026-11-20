@@ -1,12 +1,13 @@
 # Product Requirements Document (PRD)
 ## [Product Name TBD] — SME Business Automation Platform (Indonesia)
 
-**Status:** Draft v0.16
+**Status:** Draft v0.17
 **Date:** November 20, 2026
 **Prepared by:** Hasnan
 **Market:** Indonesia (UMKM — restaurants and cafes first; marketplace dropshippers in Phase 3)
 
 **Change log**
+- **v0.17** — An outlet has at most one active attendance tablet. To replace it, the owner first forgets the current tablet ("Lupakan perangkat" in the admin app), then pairs the new one with a fresh code; while a tablet is active, new pairing codes and pairings are refused (FR5.6, AC5.7).
 - **v0.16** — Attendance selfies are kept for 45 days (was 30) before automatic deletion. Staff cannot delete a selfie, not even their own; the owner may delete one earlier (API ready, no screen yet).
 - **v0.15** — Purchase orders move out of Pengeluaran into their own owner Dashboard tab **PO & Supplier** (issue #16): the Pembayaran supplier card, the PO ada selisih list, and the Ringkasan PO report sit at the top, with the PO list, PO detail, supplier list, and Buka PO below (FR3.10–FR3.12). The tab has its own outlet and month filter; the month applies to Ringkasan PO only. Pengeluaran is back to direct expenses only. PO rules are unchanged.
 - **v0.14** — Expenses now include purchase orders (PO) to suppliers, on a new Purchase Order tab next to direct expenses (FR3.5–FR3.12, FR4.10–FR4.11, AC3.6–AC3.14, AC4.9–AC4.10). A PO is opened, the goods that arrive are checked against the PO quantities in the admin app, and the PO is closed when they match. **Pay later** (bayar mundur): once the PO is closed, a payment reminder appears on the owner dashboard until it is paid by the due date (instalments allowed). **Pay in advance** (bayar di muka): as soon as the PO is opened, a payment request appears on the owner dashboard; the goods arrive later, are checked, and the PO is closed. The ledger stays cash-based: an expense is posted only when money is paid, never when a PO is opened, checked, or closed. Staff open POs for their outlets (straight away, no approval), cross-check deliveries, and close a PO when quantities match; a PO with a difference can't be closed by staff, shows on the owner dashboard, and only the owner can close it with a note; payments, cancellation, supplier debt, and dashboard reminders stay with the owner. Received goods add stock through restock movements.  The owner dashboard adds a Ringkasan PO report (open/closed, goods arrived or not, paid or not) and the cashflow report adds supplier debt and goods paid for but not yet received, shown apart from cash out.
@@ -131,7 +132,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 | Handle reservations on the day (seat, no-show, walk-in tables) | ✓ | ✓ |
 | Clock in and out with a selfie on the attendance tablet of an assigned outlet | — | ✓ |
 | View their own attendance history in the admin app | — | ✓ |
-| Pair or revoke an outlet attendance tablet | ✓ | — |
+| Pair or forget (revoke) an outlet's attendance tablet (one per outlet) | ✓ | — |
 | View attendance of all staff and correct attendance records (reason required) | ✓ | — |
 | Edit menu, add-ons, prices, recipes, and recommendations | ✓ | — |
 | Log expenses, manage suppliers, cancel purchase orders, close a PO with a difference (note required), record supplier payments, see supplier debt, payment reminders, and the PO summary, view cashflow and reports | ✓ | — |
@@ -238,7 +239,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **FR5.3** — If a staff member has not clocked out by the outlet's closing time plus a grace period (default 1 hour, set by the owner per outlet), the record is flagged "needs correction". The system does not invent a clock-out time, a flagged record does not count toward worked hours until the owner corrects it, and the staff member can clock in again. *[Deterministic · MVP]*
 - **FR5.4** — The owner views attendance for all staff by outlet, staff member, and date range (hours per day and in total, and flagged records), and can correct a record or fill in a missing clock-out. A reason is required, the original values are kept, and each correction records the owner and the time. Staff see only their own records. Payroll, overtime, and salary calculation are not part of the MVP. *[Deterministic · MVP]*
 - **FR5.5** — System records scheduled staff shifts so they can be compared with attendance. *[Deterministic · Phase 3]*
-- **FR5.6** — The owner pairs a tablet as an outlet's attendance tablet using a one-time pairing code from the admin app. The tablet stays signed in as that outlet with a device session that can only list that outlet's staff and record their clock-ins and clock-outs; it cannot open any other admin screen or data. The owner sees each outlet's paired tablets with their last activity and can revoke one at any time, after which the tablet is rejected on its next request. *[Deterministic · MVP]*
+- **FR5.6** — The owner pairs a tablet as an outlet's attendance tablet using a one-time pairing code from the admin app. The tablet stays signed in as that outlet with a device session that can only list that outlet's staff and record their clock-ins and clock-outs; it cannot open any other admin screen or data. An outlet has at most one active tablet. The owner sees the outlet's tablet with its last activity and can forget (revoke) it at any time, after which the tablet is rejected on its next request; only then can a new tablet be paired. *[Deterministic · MVP]*
 - **FR5.7** — Selfies are stored in private storage. Only the owner (in the attendance report) and the staff member (for their own records) can view them, through short-lived links. They are kept for 45 days and then deleted automatically; the attendance record itself is kept. Staff cannot delete a selfie, not even their own; only the owner may delete one earlier. There is no face recognition in the MVP: the owner checks the photos when reviewing attendance. Staff are told about the selfie and how long it is kept before their first clock-in. *[Deterministic · MVP]*
 
 **Acceptance criteria (MVP attendance)**
@@ -248,7 +249,7 @@ Each requirement is tagged by type — **Deterministic** (rule-based, must be ex
 - **AC5.4** (FR5.4) — **Given** a flagged or wrong record, **when** the owner corrects it without a reason, **then** it is blocked; **when** they correct it with a reason, **then** the corrected values count, the original values remain viewable, and the owner, time, and reason are recorded.
 - **AC5.5** (FR5.4) — **Given** staff at several outlets, **when** the owner opens the report for a week, **then** the hours match the records and each day's boundary follows the outlet's time zone; **when** a staff member opens attendance, **then** they see only their own records, and any other staff member's records, the report, or a correction is refused, including by direct API call.
 - **AC5.6** (FR5.1) — **Given** the tablet camera is unavailable or the staff member cancels the photo, **when** they try to clock in or out, **then** nothing is recorded and the tablet asks them to take the selfie again.
-- **AC5.7** (FR5.6) — **Given** a paired tablet, **when** it tries to open orders, reports, settings, or any other outlet's staff, **then** it is refused; **when** the owner revokes it, **then** its next request is refused and it must be paired again with a new code.
+- **AC5.7** (FR5.6) — **Given** a paired tablet, **when** it tries to open orders, reports, settings, or any other outlet's staff, **then** it is refused; **when** the owner revokes it, **then** its next request is refused and it must be paired again with a new code. **Given** an outlet with an active tablet, **when** the owner requests a new pairing code or another tablet enters an older unused code, **then** it is refused until the owner forgets the current tablet.
 - **AC5.8** (FR5.7) — **Given** a stored selfie, **when** another staff member or the tablet tries to view it, **then** it is refused; **when** the staff member tries to delete their own selfie, **then** it is refused; **when** 45 days have passed, **then** the photo is deleted and the attendance record and its hours remain.
 
 ### 5.6 WhatsApp bot / chatbot

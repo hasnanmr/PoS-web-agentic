@@ -136,6 +136,7 @@ const ERROR_COPY: Record<string, string> = {
   no_table_available: 'Tidak ada meja kosong yang cukup untuk jumlah orang di jam itu.',
   hold_expired: 'Hold 15 menit sudah lewat; booking otomatis no-show.',
   too_early: 'Belum lewat jam booking; no-show belum bisa ditandai.',
+  tablet_already_paired: 'Outlet ini sudah punya tablet absensi. Lupakan perangkat lama dulu untuk pairing tablet baru.',
 }
 
 export function errorMessage(error: unknown): string {

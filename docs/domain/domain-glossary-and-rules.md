@@ -48,7 +48,7 @@ Decisions recorded from the product owner on 2026-11-17:
 | Reservasi | `reservation` | A table booking (or a walk-in occupancy) for a time range. |
 | Kontak WhatsApp | `whatsapp_contact` | A customer identified by phone number within a tenant. |
 | Membership / consent | `customer_consent` | Customer's consent for the tenant to keep their data. |
-| Tablet absensi | `attendance_device` | A tablet paired to one outlet, the only place staff clock in/out. |
+| Tablet absensi | `attendance_device` | A tablet paired to one outlet, the only place staff clock in/out. At most one active tablet per outlet; the owner forgets it ("Lupakan perangkat") before pairing a new one. |
 | Catatan kehadiran | `attendance_record` | One clock-in/clock-out pair with selfies. |
 | Aktor | `actor_type` | Who did an action: `user`, `system`, `agent`, `device`. |
 
