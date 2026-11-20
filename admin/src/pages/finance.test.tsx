@@ -274,6 +274,85 @@ describe('O9b Pengeluaran', () => {
     expect(await screen.findByTestId('where')).toHaveTextContent('/dashboard?tab=po&po=po-12')
   })
 
+  describe('Muat lagi', () => {
+    const Q = '/owner/expenses?from=2026-11-01&to=2026-11-20&limit=20'
+    const PAGE2_ROW = { ...EXPENSES.items[0], id: 99, description: 'Baris halaman 2' }
+
+    function deferred<T>() {
+      let resolve!: (v: T) => void
+      const promise = new Promise<T>((r) => { resolve = r })
+      return { promise, resolve }
+    }
+
+    it('appends the next page and blocks a second click while it loads', async () => {
+      const next = deferred<ExpensePage>()
+      const api = fakeApi({
+        'GET /owner/expenses/summary?': SUMMARY,
+        [`GET ${Q}`]: { items: [PO_ROW], next_cursor: 'c1' },
+        [`GET ${Q}&cursor=c1`]: next.promise,
+      })
+      renderO9b(api)
+      const button = await screen.findByRole('button', { name: 'Muat lagi' })
+      await userEvent.click(button)
+      expect(button).toBeDisabled()
+      await userEvent.click(button)
+      expect(api.calls.filter((c) => c[1] === `${Q}&cursor=c1`)).toHaveLength(1)
+
+      next.resolve({ items: [PAGE2_ROW], next_cursor: null })
+      expect(await screen.findByText('Baris halaman 2')).toBeInTheDocument()
+      expect(screen.getByText('PO-A-0012 · Toko Susu Segar')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Muat lagi' })).not.toBeInTheDocument()
+    })
+
+    it('ignores a page that arrives after the filter changed', async () => {
+      const next = deferred<ExpensePage>()
+      const api = fakeApi({
+        'GET /owner/expenses/summary?': SUMMARY,
+        [`GET ${Q}`]: { items: [EXPENSES.items[0]], next_cursor: 'c1' },
+        [`GET ${Q}&cursor=c1`]: next.promise,
+        [`GET ${Q}&source=po`]: { items: [PO_ROW], next_cursor: null },
+      })
+      renderO9b(api)
+      await userEvent.click(await screen.findByRole('button', { name: 'Muat lagi' }))
+      await userEvent.click(screen.getByRole('button', { name: 'PO supplier (9)' }))
+      expect(await screen.findByText('PO-A-0012 · Toko Susu Segar')).toBeInTheDocument()
+
+      next.resolve({ items: [PAGE2_ROW], next_cursor: 'c2' })
+      await next.promise
+      await waitFor(() => expect(screen.queryByText('Baris halaman 2')).not.toBeInTheDocument())
+      expect(screen.queryByText('Beli es batu & gas')).not.toBeInTheDocument()
+      // The stale cursor must not bring the button back on the PO filter.
+      expect(screen.queryByRole('button', { name: 'Muat lagi' })).not.toBeInTheDocument()
+    })
+
+    it('drops loaded pages when the filter changes and shows them again only after a new load', async () => {
+      const api = fakeApi({
+        'GET /owner/expenses/summary?': SUMMARY,
+        [`GET ${Q}`]: { items: [EXPENSES.items[0]], next_cursor: 'c1' },
+        [`GET ${Q}&cursor=c1`]: { items: [PAGE2_ROW], next_cursor: null },
+        [`GET ${Q}&source=po`]: { items: [PO_ROW], next_cursor: null },
+      })
+      renderO9b(api)
+      await userEvent.click(await screen.findByRole('button', { name: 'Muat lagi' }))
+      expect(await screen.findByText('Baris halaman 2')).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'PO supplier (9)' }))
+      expect(await screen.findByText('PO-A-0012 · Toko Susu Segar')).toBeInTheDocument()
+      expect(screen.queryByText('Baris halaman 2')).not.toBeInTheDocument()
+    })
+
+    it('shows an error when the next page fails', async () => {
+      const api = fakeApi({
+        'GET /owner/expenses/summary?': SUMMARY,
+        [`GET ${Q}`]: { items: [EXPENSES.items[0]], next_cursor: 'c1' },
+        [`GET ${Q}&cursor=c1`]: new Error('Koneksi terputus'),
+      })
+      renderO9b(api)
+      await userEvent.click(await screen.findByRole('button', { name: 'Muat lagi' }))
+      expect(await screen.findByText(/Halaman berikutnya belum bisa dimuat/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Muat lagi' })).toBeEnabled()
+    })
+  })
+
   it('records a direct expense with the same form as O9', async () => {
     const api = fakeApi({
       'GET /owner/expenses/summary?': SUMMARY,
