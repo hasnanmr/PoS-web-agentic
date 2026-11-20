@@ -19,13 +19,13 @@ export class ApiError extends Error {
 export type TokenSource = () => Promise<string | null>
 
 export interface Api {
-  get<T>(path: string): Promise<T>
+  get<T>(path: string, headers?: Record<string, string>): Promise<T>
   post<T>(path: string, body?: unknown, headers?: Record<string, string>): Promise<T>
   put<T>(path: string, body: unknown): Promise<T>
   patch<T>(path: string, body: unknown): Promise<T>
   del<T = void>(path: string): Promise<T>
   /** Raw file download (e.g. O10 "Ekspor CSV", the outlet's QRIS image). */
-  blob(path: string, accept?: string): Promise<Blob>
+  blob(path: string, accept?: string, headers?: Record<string, string>): Promise<Blob>
   /** Raw file upload as the request body (O3 QRIS image). */
   upload<T>(path: string, file: Blob, contentType: string): Promise<T>
 }
@@ -62,12 +62,13 @@ export function createApi(baseUrl: string, token: TokenSource): Api {
   }
 
   return {
-    get: (path) => request('GET', path),
+    get: (path, headers) => request('GET', path, undefined, headers),
     post: (path, body, headers) => request('POST', path, body ?? {}, headers),
     put: (path, body) => request('PUT', path, body),
     patch: (path, body) => request('PATCH', path, body),
     del: (path) => request('DELETE', path),
-    blob: (path, accept = 'text/csv') => request<Blob>('GET', path, undefined, { Accept: accept }, true),
+    blob: (path, accept = 'text/csv', headers) =>
+      request<Blob>('GET', path, undefined, { ...headers, Accept: accept }, true),
     upload: (path, file, contentType) => request('PUT', path, file, { 'Content-Type': contentType }),
   }
 }
@@ -138,6 +139,13 @@ const ERROR_COPY: Record<string, string> = {
   no_table_available: 'Tidak ada meja kosong yang cukup untuk jumlah orang di jam itu.',
   hold_expired: 'Hold 15 menit sudah lewat; booking otomatis no-show.',
   too_early: 'Belum lewat jam booking; no-show belum bisa ditandai.',
+  table_qr_invalid: 'QR ini sudah tidak berlaku. Minta QR baru ke staf.',
+  web_ordering_unavailable: 'Pesan dari HP belum tersedia di outlet ini. Pesan & bayar di kasir.',
+  price_changed: 'Harga berubah. Cek lagi total pesananmu.',
+  order_not_payable: 'Pesanan ini sudah tidak menunggu pembayaran.',
+  order_not_cancellable: 'Pesanan sudah dibayar; minta bantuan staf untuk membatalkan.',
+  too_many_requests: 'Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.',
+  admin_app_url_not_configured: 'Alamat aplikasi (ADMIN_APP_URL) belum diatur di server.',
   tablet_already_paired: 'Outlet ini sudah punya tablet absensi. Lupakan perangkat lama dulu untuk pairing tablet baru.',
 }
 

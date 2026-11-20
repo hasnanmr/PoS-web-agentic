@@ -4,6 +4,8 @@
 // Behavior note (canvas): Tolak → order langsung cancelled, bahan dikembalikan, tidak ada ledger entry,
 // pelanggan dapat pesan WA "hubungi outlet". Paid → ledger dibuat dengan aktor & waktu.
 // "✓ Tandai paid" is enabled only after the merchant-account checkbox.
+// A web order from the table QR page (#44) arrives as `kind: customer_claim`: the customer tapped
+// "Saya sudah bayar" and there is no screenshot, so staff confirm only from the merchant account.
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useSession } from '../app/session'
@@ -59,7 +61,8 @@ export default function PaymentReviewPage() {
                         ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:bg-page'}`}>
                       <div className="font-semibold">{p.order_no} · {where(p)} · {formatRupiah(p.total)}</div>
                       <div className="text-text-muted">
-                        Screenshot masuk {formatTime(p.received_at, p.timezone)} · {timeAgo(p.received_at)}
+                        {p.kind === 'customer_claim' ? 'Pelanggan bilang sudah bayar' : 'Screenshot masuk'}{' '}
+                        {formatTime(p.received_at, p.timezone)} · {timeAgo(p.received_at)}
                       </div>
                     </button>
                   </li>
@@ -114,15 +117,17 @@ function ProofPanel({ proofId, onDone }: { proofId: string; onDone: (text: strin
           className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-md border border-border bg-page text-center text-[12px] text-text-muted">
           {p.image_url
             ? <img src={p.image_url} alt={`Bukti bayar ${p.order_no}`} className="h-full w-full object-cover" />
-            : <span>Screenshot bukti bayar<br />(klik untuk perbesar)</span>}
+            : p.kind === 'customer_claim'
+              ? <span className="px-3">Tanpa screenshot<br />Pelanggan menekan “Saya sudah bayar” di halaman QR meja</span>
+              : <span>Screenshot bukti bayar<br />(klik untuk perbesar)</span>}
         </button>
         <div className="space-y-1 text-[12px]">
-          <p className="text-[13px] font-semibold">{p.order_no} · {p.channel}{p.table ? ` · ${p.table}` : ''}</p>
+          <p className="text-[13px] font-semibold">{p.order_no} · {p.channel === 'web_table' ? 'web' : p.channel}{p.table ? ` · ${p.table}` : ''}</p>
           <p className="text-text-muted">Total yang harus diterima</p>
           <p className="text-[20px] font-bold">{formatRupiah(p.total)}</p>
           <p className="pt-2">Pelanggan: {p.customer_phone_masked ?? '—'}</p>
           <p>
-            Screenshot: {formatTime(p.received_at, p.timezone)} {ZONE_LABEL[p.timezone] ?? ''}
+            {p.kind === 'customer_claim' ? 'Bilang sudah bayar' : 'Screenshot'}: {formatTime(p.received_at, p.timezone)} {ZONE_LABEL[p.timezone] ?? ''}
             {p.timer_stopped ? ' (timer auto-cancel berhenti)' : ''}
           </p>
         </div>
@@ -130,7 +135,7 @@ function ProofPanel({ proofId, onDone }: { proofId: string; onDone: (text: strin
 
       <div className="mt-4 space-y-3">
         <div role="note" className="rounded-md bg-warning-soft px-3 py-2 text-[12px] text-warning">
-          ⚠ Jangan konfirmasi hanya dari screenshot. Cek mutasi di akun merchant QRIS untuk nominal {formatRupiah(p.total)}.
+          ⚠ Jangan konfirmasi hanya dari {p.kind === 'customer_claim' ? 'klaim pelanggan' : 'screenshot'}. Cek mutasi di akun merchant QRIS untuk nominal {formatRupiah(p.total)}.
         </div>
         <label className="flex items-center gap-2 text-[13px]">
           <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
@@ -145,7 +150,7 @@ function ProofPanel({ proofId, onDone }: { proofId: string; onDone: (text: strin
           ✓ Tandai paid
         </Button>
         <hr className="border-border" />
-        <p className="text-[13px] font-semibold">Dana tidak ditemukan?</p>
+        <p id="tolak" className="text-[13px] font-semibold">Dana tidak ditemukan?</p>
         <textarea aria-label="Alasan penolakan" placeholder="Alasan penolakan (wajib)…" value={reason} maxLength={300}
           onChange={(e) => setReason(e.target.value)}
           className="h-16 w-full rounded-md border border-border px-2.5 py-2 text-[13px] focus:border-primary focus:outline-none" />
@@ -158,7 +163,7 @@ function ProofPanel({ proofId, onDone }: { proofId: string; onDone: (text: strin
         </Button>
         <p className="rounded-md bg-page p-3 text-[11px] text-text-muted">
           Tolak → order langsung cancelled, bahan dikembalikan (reversal movement), tidak ada ledger entry, pelanggan
-          dapat pesan WA “hubungi outlet”. Paid → ledger dibuat dengan aktor & waktu.
+          {p.kind === 'customer_claim' ? ' melihat alasannya di halaman QR meja.' : ' dapat pesan WA “hubungi outlet”.'} Paid → ledger dibuat dengan aktor & waktu.
         </p>
       </div>
       {zoom && p.image_url && (

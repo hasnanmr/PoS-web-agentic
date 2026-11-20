@@ -22,7 +22,29 @@ const SETTINGS: ReservationSettings = {
 }
 
 describe('O8 Meja & Aturan Reservasi', () => {
-  it('lists tables, keeps the QR download disabled, and adds a table', async () => {
+  it('replaces a table QR token after confirming and saves the QR target', async () => {
+    const api = fakeApi({
+      'GET /owner/outlets/o-dago/tables': TABLES,
+      'GET /owner/outlets/o-dago/reservation-settings': SETTINGS,
+      'GET /owner/outlets/o-dago/table-qr-settings': { target: 'web_whatsapp', whatsapp_connected: false },
+      'POST /owner/tables/t1/qr-token': { qr_token: 'new', url: 'https://admin.test/t/new' },
+      'PUT /owner/outlets/o-dago/table-qr-settings': { target: 'web', whatsapp_connected: false },
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><TablesPage /></WithSession>)
+    expect(await screen.findByRole('button', { name: /Unduh semua QR \(PDF\)/ })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ganti QR meja M01' }))
+    expect(screen.getByText('Ganti QR M01? QR lama tidak berlaku.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ya, ganti' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/owner/tables/t1/qr-token', {}]))
+    expect(await screen.findByText('QR baru dibuat. Unduh & cetak ulang.')).toBeInTheDocument()
+
+    // Without WhatsApp the WhatsApp options are disabled; "Web saja" can be chosen.
+    expect(await screen.findByLabelText('WhatsApp saja')).toBeDisabled()
+    await userEvent.click(screen.getByLabelText('Web saja'))
+    await waitFor(() => expect(api.calls).toContainEqual(['PUT', '/owner/outlets/o-dago/table-qr-settings', { target: 'web' }]))
+  })
+
+  it('lists tables with their QR download and adds a table', async () => {
     const api = fakeApi({
       'GET /owner/outlets/o-dago/tables': TABLES,
       'GET /owner/outlets/o-dago/reservation-settings': SETTINGS,
@@ -30,7 +52,7 @@ describe('O8 Meja & Aturan Reservasi', () => {
     render(<WithSession session={fakeSession('owner', { api })}><TablesPage /></WithSession>)
     expect(await screen.findByRole('button', { name: 'Ubah meja M09' })).toBeInTheDocument()
     expect(screen.getByText('✕ (tidak via reservasi)')).toBeInTheDocument()
-    for (const qr of screen.getAllByRole('button', { name: '⭳ Unduh' })) expect(qr).toBeDisabled()
+    for (const t of TABLES) expect(screen.getByRole('button', { name: `Unduh QR meja ${t.name}` })).toBeEnabled()
 
     await userEvent.click(screen.getByRole('button', { name: '+ Meja' }))
     await userEvent.type(screen.getByLabelText('Nama meja'), 'VIP')

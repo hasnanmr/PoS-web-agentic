@@ -250,7 +250,7 @@ export type PaymentStatus = 'unpaid' | 'proof_submitted' | 'paid' | 'refunded'
 export interface OrderCard {
   id: string
   order_no: string
-  channel: 'counter' | 'whatsapp_online' | 'whatsapp_table'
+  channel: 'counter' | 'whatsapp_online' | 'whatsapp_table' | 'web_table'
   type: 'dine_in' | 'takeaway' | 'delivery' | 'pickup'
   payment_mode: 'pay_first' | 'open_bill'
   status: OrderStatus
@@ -261,6 +261,12 @@ export interface OrderCard {
   qris_checked: boolean | null
   table: string | null
   customer_name: string | null
+  /** Web orders: "Catatan untuk dapur". */
+  note: string | null
+  /** Pending payment proof to review in S4. */
+  proof_id: string | null
+  /** Web orders: "Pelanggan bilang sudah bayar · 12:44" (no screenshot). */
+  payment_claimed_at: string | null
   item_summary: string
   total: number
   bill_id: string | null
@@ -363,8 +369,12 @@ export interface ShiftClosed {
 }
 
 // S4 Review Pembayaran QRIS -------------------------------------------------------------
+export type ProofKind = 'screenshot' | 'customer_claim'
+
 export interface ProofQueueItem {
   proof_id: string
+  /** customer_claim = "Saya sudah bayar" on the table web page, no screenshot. */
+  kind: ProofKind
   order_id: string
   order_no: string
   channel: OrderCard['channel']
@@ -377,6 +387,7 @@ export interface ProofQueueItem {
 
 export interface ProofDetail {
   proof_id: string
+  kind: ProofKind
   status: 'pending' | 'accepted' | 'rejected'
   image_url: string | null
   order_id: string
@@ -835,4 +846,12 @@ export interface MyAttendanceHistory {
   to: string
   records: AttendanceRecord[]
   total_minutes: number
+}
+
+// O8 · QR meja (T-136) ----------------------------------------------------------------------------
+export type TableQrTarget = 'web_whatsapp' | 'web' | 'whatsapp'
+
+export interface TableQrSettings {
+  target: TableQrTarget
+  whatsapp_connected: boolean
 }
