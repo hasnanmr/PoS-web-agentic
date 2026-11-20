@@ -13,7 +13,9 @@ services:
     # object creator can execute code as the OS user running the database). An existing 16.x
     # volume upgrades in place; no dump/restore. Keep the `postgres-data` volume: never run
     # `docker compose down -v` here, it deletes the local database (schema, seed, test data).
-    image: postgres:16.16
+    # The tag is pinned to Debian bookworm so the glibc (collation) version cannot change under
+    # an existing volume; bump the Debian release deliberately, not by accident.
+    image: postgres:16.16-bookworm
     environment:
       POSTGRES_USER: pos
       POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD}
@@ -39,6 +41,10 @@ services:
     # The `rabbitmq-data` volume is kept as is. Do not delete volumes (no `down -v`): they must
     # persist across image bumps, DB fixes and migrations. Plain `docker compose up -d` or
     # `down` (without -v) is safe.
+    # Fixed hostname: the node name (rabbit@rabbitmq) and its data directory stay the same when
+    # the container is recreated, so the volume persists. The first start after adding this
+    # begins with an empty node (the old rabbit@<container id> directory is left unused).
+    hostname: rabbitmq
     image: rabbitmq:4.3.8-management
     environment:
       RABBITMQ_DEFAULT_USER: guest
