@@ -232,6 +232,24 @@
         "title": "AffectedProduct",
         "type": "object"
       },
+      "AmountCount": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "amount",
+          "count"
+        ],
+        "title": "AmountCount",
+        "type": "object"
+      },
       "AttendanceIn": {
         "properties": {
           "action": {
@@ -1937,6 +1955,31 @@
           "outlet": {
             "$ref": "#/components/schemas/app__api__v1__owner__finance__OutletRef"
           },
+          "payment_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "cash",
+                  "transfer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method"
+          },
+          "purchase_order": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recorded_by": {
             "anyOf": [
               {
@@ -1962,6 +2005,14 @@
           "reversed": {
             "title": "Reversed",
             "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "po",
+              "direct"
+            ],
+            "title": "Source",
+            "type": "string"
           }
         },
         "required": [
@@ -1973,7 +2024,10 @@
           "recorded_by",
           "created_at",
           "reversed",
-          "reversal_reason"
+          "reversal_reason",
+          "source",
+          "payment_method",
+          "purchase_order"
         ],
         "title": "Expense",
         "type": "object"
@@ -2010,6 +2064,77 @@
           "description"
         ],
         "title": "ExpenseIn",
+        "type": "object"
+      },
+      "ExpensePO": {
+        "description": "The purchase order behind a supplier payment (O9b: \"Lihat PO →\", staff who opened it).",
+        "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "owner",
+                  "staff"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Role"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "payment_status": {
+            "enum": [
+              "unpaid",
+              "partially_paid",
+              "paid"
+            ],
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "payment_term": {
+            "enum": [
+              "pay_later",
+              "pay_in_advance"
+            ],
+            "title": "Payment Term",
+            "type": "string"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/SupplierRef"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "supplier",
+          "created_by",
+          "created_by_role",
+          "payment_term",
+          "payment_status"
+        ],
+        "title": "ExpensePO",
         "type": "object"
       },
       "ExpensePage": {
@@ -2052,6 +2177,50 @@
           "reason"
         ],
         "title": "ExpenseReversalIn",
+        "type": "object"
+      },
+      "ExpenseSummary": {
+        "properties": {
+          "by_supplier": {
+            "items": {
+              "$ref": "#/components/schemas/SupplierSpend"
+            },
+            "title": "By Supplier",
+            "type": "array"
+          },
+          "direct": {
+            "$ref": "#/components/schemas/AmountCount"
+          },
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "po": {
+            "$ref": "#/components/schemas/AmountCount"
+          },
+          "po_owed": {
+            "$ref": "#/components/schemas/PoOwed"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/AmountCount"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "total",
+          "po",
+          "direct",
+          "by_supplier",
+          "po_owed"
+        ],
+        "title": "ExpenseSummary",
         "type": "object"
       },
       "Flag": {
@@ -5116,6 +5285,30 @@
         "title": "PoLineIn",
         "type": "object"
       },
+      "PoOwed": {
+        "properties": {
+          "amount": {
+            "description": "Still owed on closed pay-later POs, as of today",
+            "title": "Amount",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "overdue_count": {
+            "title": "Overdue Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "amount",
+          "count",
+          "overdue_count"
+        ],
+        "title": "PoOwed",
+        "type": "object"
+      },
       "PoPage": {
         "properties": {
           "items": {
@@ -7894,6 +8087,47 @@
           "items"
         ],
         "title": "SupplierPayments",
+        "type": "object"
+      },
+      "SupplierRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SupplierRef",
+        "type": "object"
+      },
+      "SupplierSpend": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "supplier": {
+            "$ref": "#/components/schemas/SupplierRef"
+          }
+        },
+        "required": [
+          "supplier",
+          "amount",
+          "count"
+        ],
+        "title": "SupplierSpend",
         "type": "object"
       },
       "TableCreate": {
@@ -12325,6 +12559,26 @@
           },
           {
             "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "po",
+                    "direct"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "in": "query",
             "name": "cursor",
             "required": false,
             "schema": {
@@ -12434,6 +12688,91 @@
           }
         },
         "summary": "Create Expense",
+        "tags": [
+          "owner: finance"
+        ]
+      }
+    },
+    "/api/v1/owner/expenses/summary": {
+      "get": {
+        "description": "O9b KPI cards and supplier bars. `po_owed` is as of today (not the range).",
+        "operationId": "expenses_summary_api_v1_owner_expenses_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Expenses Summary",
         "tags": [
           "owner: finance"
         ]

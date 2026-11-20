@@ -61,7 +61,7 @@ describe('navigation per role (wireframe Sidebar/Owner, Sidebar/Staff)', () => {
     for (const role of ['owner', 'staff'] as const) {
       const items = navItemsFor(role)
       expect(new Set(items.map((i) => i.path)).size).toBe(items.length)
-      for (const item of items) expect(item.screen).toMatch(/^[OS]\d+$/)
+      for (const item of items) expect(item.screen).toMatch(/^[OS]\d+[a-z]?$/)
     }
   })
 

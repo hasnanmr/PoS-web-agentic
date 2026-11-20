@@ -3,7 +3,8 @@
 // POST /owner/expenses (Idempotency-Key), POST /owner/ledger-entries/{id}/reversal.
 // Canvas notes: figures come from the ledger and day boundaries follow each outlet's time zone;
 // PB1 is "titipan pajak, bukan pendapatan"; expenses cannot be edited or deleted — a mistake is
-// corrected with a reversal entry. The sidebar item "Pengeluaran" opens this screen too.
+// corrected with a reversal entry. The sidebar item "Pengeluaran" has its own screen, O9b
+// (ExpensesPage); "Lihat semua" here opens this card's full list in place.
 import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
@@ -29,7 +30,7 @@ const SERIES_TITLE: Record<Granularity, string> = {
   monthly: 'Kas masuk vs kas keluar per bulan',
 }
 
-export default function CashflowPage({ expandExpenses = false }: { expandExpenses?: boolean }) {
+export default function CashflowPage() {
   const { api, me } = useSession()
   const [outletId, setOutletId] = useState('')
   const [granularity, setGranularity] = useState<Granularity>('daily')
@@ -44,8 +45,8 @@ export default function CashflowPage({ expandExpenses = false }: { expandExpense
   const report = useLoad(() => api.get<Cashflow>(`/owner/reports/cashflow?${query}`), query)
   const [expensesVersion, setExpensesVersion] = useState(0)
   // "Lihat semua →" (Pengeluaran terbaru) and "Lihat semua pengeluaran →" (per outlet) open the
-  // same full list the sidebar item Pengeluaran opens.
-  const [allExpenses, setAllExpenses] = useState(expandExpenses)
+  // full list in the Pengeluaran terbaru card.
+  const [allExpenses, setAllExpenses] = useState(false)
   const r = report.data
 
   return (
@@ -299,7 +300,7 @@ function RecentExpenses({ outletId, version, all, onShowAll, onChanged }: {
   )
 }
 
-function ReversalForm({ expense, onCancel, onDone }: { expense: Expense; onCancel: () => void; onDone: () => void }) {
+export function ReversalForm({ expense, onCancel, onDone }: { expense: Expense; onCancel: () => void; onDone: () => void }) {
   const { api } = useSession()
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -328,7 +329,7 @@ function ReversalForm({ expense, onCancel, onDone }: { expense: Expense; onCance
   )
 }
 
-function ExpenseForm({ defaultOutletId, onSaved }: { defaultOutletId: string; onSaved: () => void }) {
+export function ExpenseForm({ defaultOutletId, onSaved }: { defaultOutletId: string; onSaved: () => void }) {
   const { api, me } = useSession()
   const [outletId, setOutletId] = useState('')
   const chosen = outletId || defaultOutletId

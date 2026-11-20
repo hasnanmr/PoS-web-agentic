@@ -76,7 +76,7 @@ export default function DashboardPage() {
   const currentMonth = todayIn(tz).slice(0, 7)
   const [month, setMonth] = useState<string>()
   const [suppliers, setSuppliers] = useState(false)
-  const [focusId, setFocusId] = useState<string>()
+  const [focusId, setFocusId] = useState<string | undefined>(search.get('po') ?? undefined) // ?po=<id>: O9b "Lihat PO →"
 
   const go = (next: Record<string, string>) => setSearch(next)
 

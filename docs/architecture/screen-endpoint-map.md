@@ -103,7 +103,7 @@ Staff calling it → `403` (AC7.7).
 
 ### O9 · Laporan Cashflow & Pengeluaran (T-041, T-042, T-043)
 
-The sidebar item **Pengeluaran** opens this screen with the full expense list until its own detailed wireframe exists (product owner, 2026-11-17); it uses the same endpoints below. Pengeluaran is for expenses only; purchase orders moved to the Dashboard tab **PO & Supplier** (issue #16, O15–O17). "Lihat semua →" (Pengeluaran terbaru) and "Lihat semua pengeluaran →" (Pengeluaran per outlet) open the same full list.
+The sidebar item **Pengeluaran** has its own screen, **O9b** (below). "Lihat semua →" (Pengeluaran terbaru) and "Lihat semua pengeluaran →" (Pengeluaran per outlet) still open the full list inside this screen.
 
 | Card / action | Endpoint | Fields |
 |---|---|---|
@@ -111,6 +111,17 @@ The sidebar item **Pengeluaran** opens this screen with the full expense list un
 | Pengeluaran terbaru / Lihat semua | `GET /owner/expenses?outlet_id=&from=&to=&cursor=&limit=` ✅ | `items:[{id, business_date, outlet:{id, name}, description, amount (positive), recorded_by, created_at, reversed, reversal_reason}]`, `next_cursor`. Newest business date first. |
 | Catat pengeluaran | `POST /owner/expenses` ✅ (`Idempotency-Key`) | `outlet_id, amount (> 0), business_date (not in the future), description (max 120)`. Append-only. |
 | Koreksi ("Buat entry reversal, bukan edit") | `POST /owner/ledger-entries/{id}/reversal` ✅ | `reason*`. Expenses only (`not_reversible` otherwise; sales are reversed from the order, S3); once per entry (`already_reversed`). The reversal row has the opposite amount and the expense's business date, so the corrected period adds up; the expense is then shown as reversed and no longer counted. A blind-count difference (`cash_shortage`/`cash_surplus`) cannot be reversed yet: the count is the physical record, and no screen draws a correction for it (follow-up if needed). |
+
+### O9b · Pengeluaran (sidebar KEUANGAN › Pengeluaran; T-042, T-130) — backend ✅
+
+Owner only. The screen shows every `expense` ledger entry: **supplier payments** on purchase orders (source `po`, highlighted) and **direct expenses** (source `direct`). The link to what staff enter: staff open a PO (S12) and check the goods (S11), which posts nothing; the expense appears here when the owner records a payment on that PO (O15/O17 "Catat pembayaran"), so each PO row names the staff member who opened the PO and how it was paid. Filters (outlet, period) apply to the KPI cards, "per supplier" and the list.
+
+| Card / action | Endpoint | Fields |
+|---|---|---|
+| KPI cards, Pengeluaran PO per supplier | `GET /owner/expenses/summary?outlet_id=&from=&to=` ✅ | Default range month to date. `{from, to, total:{amount,count}, po:{amount,count}, direct:{amount,count}, by_supplier:[{supplier:{id,name}, amount, count}], po_owed:{amount,count,overdue_count}}`. Reversed expenses are left out. `po_owed` = what closed pay-later POs still owe **as of today** (not the period), the same figure as O17 `debt_total`. |
+| Riwayat pengeluaran (chips Semua / PO supplier / Langsung) | `GET /owner/expenses?outlet_id=&from=&to=&source=&cursor=&limit=` ✅ (as O9) | Chip counts come from the summary. A `po` row shows `purchase_order.number · supplier`, "Dibuat {created_by} (staf) · {method} · {lunas/sebagian/di muka}" and **Lihat PO →** (Dashboard › PO & Supplier, `?tab=po&po=<id>`); PO rows cannot be reversed (`not_reversible`). `direct` rows have **Reversal**. |
+| Catat pengeluaran | `POST /owner/expenses` ✅ | As O9; direct expenses only. PO payments are recorded from the PO. |
+| Koreksi | `POST /owner/ledger-entries/{id}/reversal` ✅ | As O9. |
 
 ### O10 · Laporan Cash Count (T-040, T-102)
 

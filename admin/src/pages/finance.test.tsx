@@ -1,12 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { describe, expect, it } from 'vitest'
-import type { CashCount, Cashflow, DrawerCard, ExpensePage, ProofDetail, ProofQueueItem, ShiftClosed } from '../lib/types'
+import type { CashCount, Cashflow, DrawerCard, ExpensePage, ExpenseSummary, ProofDetail, ProofQueueItem, ShiftClosed } from '../lib/types'
 import { fakeApi, fakeSession } from '../test/fakes'
 import { WithSession } from '../test/session'
 import CashCountPage from './CashCountPage'
 import CashflowPage from './CashflowPage'
+import ExpensesPage from './ExpensesPage'
 import PaymentReviewPage from './PaymentReviewPage'
 import ShiftsPage from './ShiftsPage'
 
@@ -119,7 +120,8 @@ const CASHFLOW: Cashflow = {
 
 const EXPENSES: ExpensePage = {
   items: [{ id: 7, business_date: '2026-11-17', outlet: { id: 'o-dago', name: 'Bandung – Dago' }, description: 'Beli es batu & gas',
-    amount: 350000, recorded_by: 'Olga', created_at: '2026-11-17T04:00:00Z', reversed: false, reversal_reason: null }],
+    amount: 350000, recorded_by: 'Olga', created_at: '2026-11-17T04:00:00Z', reversed: false, reversal_reason: null,
+    source: 'direct', payment_method: null, purchase_order: null }],
   next_cursor: null,
 }
 
@@ -211,5 +213,79 @@ describe('O10 Laporan Cash Count', () => {
     expect(screen.getByText('16 Nov · 17:00–23:00')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Drawer' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '⭳ Ekspor CSV' })).toBeInTheDocument()
+  })
+})
+
+const PO_ROW: ExpensePage['items'][number] = {
+  id: 11, business_date: '2026-11-19', outlet: { id: 'o-dago', name: 'Bandung – Dago' }, description: 'PO-A-0012 · Toko Susu Segar',
+  amount: 2900000, recorded_by: 'Olga', created_at: '2026-11-19T04:00:00Z', reversed: false, reversal_reason: null,
+  source: 'po', payment_method: 'transfer',
+  purchase_order: { id: 'po-12', number: 'PO-A-0012', supplier: { id: 'sup1', name: 'Toko Susu Segar' }, created_by: 'Rina',
+    created_by_role: 'staff', payment_term: 'pay_later', payment_status: 'paid' },
+}
+
+const SUMMARY: ExpenseSummary = {
+  from: '2026-11-01', to: '2026-11-20',
+  total: { amount: 24800000, count: 23 }, po: { amount: 15900000, count: 9 }, direct: { amount: 8900000, count: 14 },
+  by_supplier: [{ supplier: { id: 'sup1', name: 'Toko Susu Segar' }, amount: 6600000, count: 3 }],
+  po_owed: { amount: 4200000, count: 3, overdue_count: 1 },
+}
+
+function Where() {
+  const loc = useLocation()
+  return <p data-testid="where">{loc.pathname}{loc.search}</p>
+}
+
+describe('O9b Pengeluaran', () => {
+  function renderO9b(api: ReturnType<typeof fakeApi>) {
+    render(
+      <MemoryRouter initialEntries={['/finance/expenses']}>
+        <WithSession session={fakeSession('owner', { api })}>
+          <Routes>
+            <Route path="/finance/expenses" element={<ExpensesPage />} />
+            <Route path="/dashboard" element={<Where />} />
+          </Routes>
+        </WithSession>
+      </MemoryRouter>,
+    )
+  }
+
+  it('highlights supplier payments on staff-opened POs and links to the PO', async () => {
+    const api = fakeApi({
+      'GET /owner/expenses/summary?': SUMMARY,
+      'GET /owner/expenses?limit=20': { items: [PO_ROW, EXPENSES.items[0]], next_cursor: null },
+      'GET /owner/expenses?limit=20&source=po': { items: [PO_ROW], next_cursor: null },
+    })
+    renderO9b(api)
+    expect(await screen.findByText('Rp 15.900.000')).toBeInTheDocument()
+    expect(screen.getByText('64% dari total · 9 PO')).toBeInTheDocument()
+    expect(screen.getByText('Rp 24.800.000')).toBeInTheDocument()
+    expect(screen.getByText('3 PO · 1 lewat jatuh tempo')).toBeInTheDocument()
+    expect(await screen.findByText('PO-A-0012 · Toko Susu Segar')).toBeInTheDocument()
+    expect(screen.getByText('Dibuat Rina (staf) · Transfer · lunas')).toBeInTheDocument()
+    expect(screen.getByText('Beli es batu & gas')).toBeInTheDocument()
+    // PO rows are not reversed here; direct rows are.
+    expect(screen.getAllByRole('button', { name: 'Reversal' })).toHaveLength(1)
+
+    await userEvent.click(screen.getByRole('button', { name: 'PO supplier (9)' }))
+    await waitFor(() => expect(api.calls.map((c) => c[1])).toContain('/owner/expenses?limit=20&source=po'))
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Lihat PO →' })[0])
+    expect(await screen.findByTestId('where')).toHaveTextContent('/dashboard?tab=po&po=po-12')
+  })
+
+  it('records a direct expense with the same form as O9', async () => {
+    const api = fakeApi({
+      'GET /owner/expenses/summary?': SUMMARY,
+      'GET /owner/expenses?limit=20': EXPENSES,
+      'POST /owner/expenses': EXPENSES.items[0],
+    })
+    renderO9b(api)
+    await userEvent.type(await screen.findByLabelText('Nominal'), '350000')
+    await userEvent.type(screen.getByLabelText('Deskripsi'), 'Beli es batu & gas')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan pengeluaran' }))
+    await waitFor(() => expect(api.calls.find((c) => c[0] === 'POST' && c[1] === '/owner/expenses')?.[2])
+      .toMatchObject({ amount: 350000, description: 'Beli es batu & gas' }))
+    expect(screen.getByText(/pakai “Catat pembayaran” di Dashboard/)).toBeInTheDocument()
   })
 })

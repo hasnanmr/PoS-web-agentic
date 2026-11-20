@@ -396,7 +396,7 @@ export interface ProofDetail {
   rejection_reason: string | null
 }
 
-// O9 Laporan Cashflow & Pengeluaran ------------------------------------------------------
+// O9 Laporan Cashflow & Pengeluaran, O9b Pengeluaran ------------------------------------------------------
 export interface Expense {
   id: number
   business_date: string
@@ -407,6 +407,28 @@ export interface Expense {
   created_at: string
   reversed: boolean
   reversal_reason: string | null
+  /** O9b: "po" = a supplier payment on a purchase order, "direct" = logged by the owner. */
+  source: 'po' | 'direct'
+  payment_method: 'cash' | 'transfer' | null
+  purchase_order: {
+    id: string
+    number: string
+    supplier: { id: string; name: string }
+    created_by: string | null
+    created_by_role: 'owner' | 'staff' | null
+    payment_term: 'pay_later' | 'pay_in_advance'
+    payment_status: 'unpaid' | 'partially_paid' | 'paid'
+  } | null
+}
+
+export interface ExpenseSummary {
+  from: string
+  to: string
+  total: { amount: number; count: number }
+  po: { amount: number; count: number }
+  direct: { amount: number; count: number }
+  by_supplier: { supplier: { id: string; name: string }; amount: number; count: number }[]
+  po_owed: { amount: number; count: number; overdue_count: number }
 }
 
 export interface ExpensePage {
