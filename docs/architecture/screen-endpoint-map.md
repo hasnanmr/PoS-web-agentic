@@ -1,10 +1,10 @@
 # Screen → endpoint map (wireframe contract)
 
-Status: **draft v1 — 2026-11-17**. Source: `design/SME-POS-Wireframe.figcraft` (screens O1–O14, S1–S9, M1–M6, K0–K4) and `design/WIREFRAME-TRACEABILITY.md`.
+Status: **draft v1 — 2026-11-17**. Source: `design/SME-POS-Wireframe.figcraft` (screens O1–O17, S1–S12, M1–M6, K0–K4, Q1–Q5) and `design/WIREFRAME-TRACEABILITY.md`.
 
 **Rule:** every backend endpoint used by the admin app or the attendance tablet must serve exactly what its wireframe screen shows and does: the same fields, filters, actions, and error states. When a screen needs data, add it to the endpoint listed here; when an endpoint is added or changed, update this table in the same change. A screen that is not drawn gets no endpoint until it is designed (or the product owner approves it).
 
-Conventions (from `api-boundaries.md`): base `/api/v1`; `owner/*` = owner only, `ops/*` = owner + staff (assigned outlets only), `device/*` = attendance tablet session. Money in integer rupiah, enums as in T-001, times with offset plus `outlet.timezone`. Mobile screens (M1–M6) use the **same endpoints** as their desktop screens; only the layout changes.
+Conventions (from `api-boundaries.md`): base `/api/v1`; `owner/*` = owner only, `ops/*` = owner + staff (assigned outlets only), `device/*` = attendance tablet session, `public/t/{token}/*` = customer table web page (no login, scoped by the table token; planned, #44). Money in integer rupiah, enums as in T-001, times with offset plus `outlet.timezone`. Mobile screens (M1–M6) use the **same endpoints** as their desktop screens; only the layout changes.
 
 Every list/action response for an order includes **`allowed_actions`**, computed by the server from the order's flow (channel, payment mode, status, payment status). The UI only renders buttons from this list (S2 note: "Tombol aksi hanya menawarkan transisi valid").
 
@@ -93,12 +93,15 @@ Staff calling it → `403` (AC7.7).
 | Tags | `GET /owner/tags`, tags edited on the product (O5) | |
 | Preview menu Rekomendasi per outlet | `GET /owner/outlets/{id}/recommendation-preview` | `picks:[{product, skipped_reason?}]`, `best_sellers:[{product, units_30d, skipped_reason?: sold_out\|duplicate}]`, max 30. Uses the same function as the WhatsApp flow. |
 
-### O8 · Meja & Aturan Reservasi (T-054, T-057)
+### O8 · Meja & Aturan Reservasi (T-054, T-057, T-136)
 
 | Action | Endpoint | Fields |
 |---|---|---|
 | Daftar meja, + Meja | `GET/POST /owner/outlets/{id}/tables` ✅, `PATCH/DELETE /owner/tables/{id}` ✅ | `[{id, name, capacity, area, is_bookable}]` (active tables, by name). `table_name_taken` (409). DELETE deactivates (204); `table_in_use` (409) while the table has an open bill or an upcoming booked/seated reservation. Creating a table with a deactivated table's name brings that row back. PATCH `capacity` below an upcoming booking's party: `table_has_reservations` (409, `details.party_size`). Clicking the table name opens the edit form (with "Hapus meja"). |
-| ⭳ Unduh QR | `GET /owner/tables/{id}/qr.png` (**T-054, not served yet**) | Encodes the outlet's wa.me link with `MEJA {name} · {qr_token}`. The column is shown disabled ("Tersedia setelah WhatsApp outlet aktif") until WhatsApp (pilot) ships (product owner, 2026-11-19). |
+| ⭳ Unduh QR | `GET /owner/tables/{id}/qr.png` (**planned, T-136**) | Encodes the table web page URL `{ADMIN_APP_URL}/t/{qr_token}` (not the wa.me link any more: the page offers WhatsApp itself, FR2.7). Owner only. |
+| ⭳ Unduh semua QR (PDF) | `GET /owner/outlets/{id}/tables/qr.pdf` (**planned, T-136**) | One page per active table: QR + table name + outlet name. |
+| ↻ Ganti (token) | `POST /owner/tables/{id}/qr-token` (**planned, T-136**) | Replaces `qr_token` → `{qr_token}`. The old token stops resolving straight away (`table_qr_invalid` on the customer page). Confirm step in the UI. Audit `table.qr_token_replaced`. |
+| Tujuan QR meja | `GET/PUT /owner/outlets/{id}/table-qr-settings` (**planned, T-136**) | `target: web_whatsapp\|web\|whatsapp`; GET adds `whatsapp_connected` (from `outlets.whatsapp_status`). While WhatsApp isn't connected the UI disables the WhatsApp options and the page always resolves to web; PUT `whatsapp` or `web_whatsapp` is still saved so it takes effect once WhatsApp connects. Audit `table_qr_settings.updated`. |
 | Aturan reservasi | `GET/PUT /owner/outlets/{id}/reservation-settings` ✅ | `is_enabled, bookable_from, bookable_until, default_duration_minutes, booking_window_days, max_party_size, reminder_offset_minutes, cancellation_cutoff_minutes`; GET adds `hold_minutes` (15, fixed, shown read-only). `bookable_until` = last booking start time and must be after `bookable_from` (422, `details.field = "bookable_until"`). The UI shows reminder and cutoff in hours. `is_enabled` is the WhatsApp booking toggle; staff bookings (S6) work either way. Audit `reservation_settings.updated`. |
 
 ### O9 · Laporan Cashflow & Pengeluaran (T-041, T-042, T-043)
@@ -321,6 +324,22 @@ Admin app route `/tablet` (full screen, no sidebar, no Supabase sign-in). The ta
 | K3 Simpan | `POST /device/attendance` ✅ | `user_id, selfie_id` (uploaded by this tablet in the last 10 minutes), `action: clock_in\|clock_out` (what K2/K3 showed). The server refuses a mismatch with its record (`state_changed`, 409: the tablet reloads K1) instead of storing the opposite. **Idempotent per selfie:** the tablet uploads one selfie per K3 screen and reuses it on retry; a selfie already linked returns the stored result. Response: `{action, display_name, at, duration_minutes?, timezone}`. Clock in needs an assignment; clock out works for anyone with an open record here. |
 | K4 errors | error codes | `selfie_required` (422), `device_revoked` / `device_unpaired` (401 → back to K0), `not_assigned` (403), `open_elsewhere` (409: still clocked in at another outlet), `state_changed` (409). Offline is detected client-side; nothing is queued; "Absen belum tercatat…" appears only for a failed save (other screens say there is no connection). |
 
+## Customer table web page (Q0–Q5) — planned (#44, T-133–T-135)
+
+Public route `/t/{token}` in the admin app (separate entry like `/tablet`, no sidebar, no sign-in). Every call carries the table token in the path; the server resolves it to one outlet + table and refuses everything else. Unknown or replaced token → `table_qr_invalid` (404) and the page Q0 "QR ini sudah tidak berlaku. Minta QR baru ke staf." Rate-limited per token and client address (`too_many_requests`, 429). No customer personal data is collected (name is free text, optional). **Web orders are always paid first with the outlet's static QRIS and never join the table's open bill**; there is no table-bill endpoint. Each order is read with the access key returned when it was placed, so a phone sees only its own orders.
+
+| Screen | Endpoint | Fields |
+|---|---|---|
+| Q1 Pilih cara pesan | `GET /public/t/{token}` | `{outlet:{name, timezone}, table:{name, area}, target: web_whatsapp\|web\|whatsapp (effective: web while WhatsApp isn't connected), web_ordering: bool (false when the outlet has no static QRIS), whatsapp_url?}`. `whatsapp_url` = `wa.me/{outlet number}?text=MEJA {name} · {token}` only when WhatsApp is allowed and connected. The page shows Q1 for `web_whatsapp`, goes to Q2 for `web`, and redirects to `whatsapp_url` for `whatsapp`. |
+| Q2 Menu / Q2a pilih add-on | `GET /public/t/{token}/menu` | Same shape as the counter catalog for one outlet: `[{id, name, category, price, photo_url, is_sold_out, addon_groups:[{id, name, is_required, min, max, options:[{id, name, price}]}]}]`, active items only, outlet prices. Category chips come from the items; "Rekomendasi ★" = owner's picks (O7). "+" on an item with add-on groups opens Q2a (required groups must be answered before "Tambah ke pesanan" is enabled; no extra endpoint). When `web_ordering` is false the menu has no add buttons and says "Pesan di kasir". |
+| Q3 Pesan & bayar | `POST /public/t/{token}/orders` | Header `Idempotency-Key` (one per cart). Body `{items:[{menu_item_id, quantity, addon_option_ids[]}], note?, customer_name?}`. Server prices with outlet prices + PB1 and calls the shared order-creation function (channel `web_table`, dine-in, this table, **pay first** whatever the outlet's mode; stock deducted). Response `{order_id, access_key, order_no, status: pending_payment, payment_status: unpaid, items, subtotal, pb1, total, pay_by}`; same key again → the same order. The page stores `order_id` + `access_key` on the phone. Errors: `web_ordering_unavailable` (409: no static QRIS), `item_sold_out` (409, `details.items`), `price_changed` (409, `details.quote`: the page refreshes the cart), `addon_required` (422), `outlet_closed` (409). |
+| Q4 Bayar QRIS | `GET /public/t/{token}/orders/{order_id}/qris` (header `X-Order-Key`) | The outlet's static QRIS image (same source as O3 / S1 popup), `total`, `pay_by` (created_at + the outlet's unpaid-order limit, FR10.4). |
+| Q4 Saya sudah bayar | `POST /public/t/{token}/orders/{order_id}/payment-claim` (header `X-Order-Key`) | No body. `payment_status` → `proof_submitted` with no screenshot (`proof.kind = customer_claim`, `claimed_at`); stops the auto-cancel timer. Idempotent. `order_not_payable` (409) when already cancelled/paid. |
+| Q4 Batalkan pesanan | `POST /public/t/{token}/orders/{order_id}/cancel` (header `X-Order-Key`) | Only while `payment_status = unpaid` (`order_not_cancellable`, 409, after "Saya sudah bayar"). Cancels and returns stock like FR10.4. |
+| Q5 Status pesanan | `GET /public/t/{token}/orders/{order_id}` (header `X-Order-Key`) | `{order_no, created_at, customer_name?, status, payment_status, claimed_at?, items, total, reject_reason?, cancel_reason?, events:[{status, at}]}`. Wrong or missing key → 404 (no data). Readable until 1 hour after the order is completed or cancelled; polled every few seconds. "+ Pesan lagi" goes back to Q2. |
+
+**Staff side (S2 + S4):** `web_table` orders appear in S2's `awaiting_payment` column with `channel = web_table` ("web"), `table`, `customer_name?`, and `payment_claimed_at` ("Pelanggan bilang sudah bayar · 12:44"); `allowed_actions` gains `confirm_payment` / `reject_payment` once claimed. "Cek & konfirmasi lunas" opens the S4 review for that order (no screenshot; it shows "Pelanggan menekan Saya sudah bayar 12:44") and uses the existing proof endpoints: confirm requires `merchant_account_checked: true` → `paid`, the order moves to `confirmed`; reject requires a reason → order cancelled, stock returned (FR11.10). Add `payment_claimed_at` and `customer_name` to the S2 board and S4 queue responses when T-135 ships.
+
 ## Customer screens (W1–W12)
 
 WhatsApp flows, not REST endpoints. They use the same core functions (quote, create order, reservations, consent) through the workers, with message formats from the wireframe. Covered in T-049–T-061 and T-076–T-077.
@@ -334,5 +353,7 @@ Purchase orders (migrations `20261119000100`, `20261119000200`): `payment_method
 Wave 4 (migration `20261118000400`): `payment_proofs.merchant_checked_at` (S4 merchant-account step, required on accepted proofs), one reversal per ledger entry (unique `reverses_entry_id`), and a restrictive policy so only an owner (or the system) can insert `expense`/`reversal` ledger rows (O9).
 
 PoC demo (migration `20261118000500`): `outlet_qris` (O3 static QRIS image per outlet; staff read, owner writes) and `qris_checks` (S2 cross-check of a QRIS payment against the receiving account; one per payment, append-only).
+
+Table QR web page (planned, #44, T-133): `order_channel` value `web_table`; `tables.qr_token` (random, unique, replaceable); `outlets.table_qr_target` (`web_whatsapp` default, `web`, `whatsapp`); `orders.customer_name` (optional, from Q3), an idempotency key and a per-order access key (stored hashed) for public orders, and a customer payment claim on `payment_proofs` (`kind = customer_claim`, no image, `claimed_at`) so `proof_submitted` also covers "Saya sudah bayar".
 
 Still needed later: a WhatsApp template registry table (O12, T-084).
