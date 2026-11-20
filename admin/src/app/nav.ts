@@ -40,7 +40,7 @@ export const ROUTES = {
     icon: '★',
   },
   cashflow: { label: 'Laporan Cashflow', path: '/finance/cashflow', screen: 'O9', icon: '↗' },
-  expenses: { label: 'Pengeluaran', path: '/finance/expenses', screen: 'O9', icon: '−' },
+  expenses: { label: 'Pengeluaran', path: '/finance/expenses', screen: 'O9b', icon: '−' },
   cashCount: { label: 'Laporan Cash Count', path: '/finance/cash-count', screen: 'O10', icon: '≣' },
   auditLog: { label: 'Audit Log', path: '/finance/audit-log', screen: 'O11', icon: '⌕' },
   business: { label: 'Bisnis & Outlet', path: '/settings/business', screen: 'O3', icon: '○' },

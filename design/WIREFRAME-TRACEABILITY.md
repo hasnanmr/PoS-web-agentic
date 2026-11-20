@@ -17,7 +17,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | 03 · WhatsApp Customer | W1–W12 (MVP), A1–A2 (Phase 2) | [03-whatsapp-customer.png](previews/03-whatsapp-customer.png) |
 | 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
 | 05 · Tablet Absensi Outlet | K0–K4 | [05-tablet-absensi.png](previews/05-tablet-absensi.png) |
-| 06 · QR Meja Pelanggan | Q1–Q5 (table QR web page, issue #44) | [06-qr-meja-pelanggan.png](previews/06-qr-meja-pelanggan.png) |
+| 06 · QR Meja Pelanggan | Q0–Q5 (table QR web page, issue #44) | [06-qr-meja-pelanggan.png](previews/06-qr-meja-pelanggan.png) |
 | 99 · Components | `Sidebar/Owner`, `Sidebar/Staff` (with the Thinker logo + name), "Logo Thinker · 2 opsi" (option 1 · Gelembung T chosen) | — |
 
 ## Screen → user story → task
@@ -35,6 +35,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O7 Rekomendasi (owner's picks & tags) | US-028, US-029 | T-073, T-074 |
 | O8 Meja & Aturan Reservasi (+ table QR: unduh / ganti token / tujuan QR web · WhatsApp) | US-013, US-022, US-063 | T-054, T-057, T-136 |
 | O9 Laporan Cashflow & Pengeluaran (biaya saja; PO tidak lagi di sini) | US-030, US-031, US-032 | T-041, T-042, T-043 |
+| O9b Pengeluaran (menu sidebar: pembayaran PO supplier — PO dibuka staf di S12, dibayar owner — disorot + pengeluaran langsung; KPI, per supplier, riwayat dengan chip sumber, Catat pengeluaran) | US-031, US-057, US-058 | T-042, T-130 |
 | O10 Laporan Cash Count | US-018 | T-040, T-102 |
 | O11 Audit Log | US-004, US-016, US-021 | T-031, T-101 |
 | O12 WhatsApp Setup & Template | US-002, US-008, US-015, US-036 | T-045, T-051, T-084, T-100 |
@@ -107,12 +108,14 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 
 | Screen | User stories | Tasks |
 |---|---|---|
+| Q0 QR tidak berlaku (token diganti / tidak dikenal) | US-063 | T-134, T-135 |
 | Q1 Scan QR meja — pilih cara pesan (Pesan di sini / Pesan via WhatsApp / Lihat bill) | US-062, US-013 | T-134, T-135 |
 | Q2 Menu (harga outlet, add-on, item habis) | US-062 | T-134, T-135 |
+| Q2a Pilih add-on (dari "+" di Q2: grup wajib / opsional, jumlah, "Tambah ke pesanan") | US-062 | T-134, T-135 |
 | Q2b Menu saja — outlet pay-first sampai pembayaran online aktif ("Pesan & bayar di kasir") | US-062 | T-134, T-135 |
 | Q3 Pesanan kamu (catatan, nama opsional, PB1, kirim ke bill meja) | US-062 | T-134, T-135 |
 | Q4 Status pesanan (live, termasuk batal + alasan) | US-062 | T-134, T-135 |
-| Q5 Bill meja (live, semua kanal; split #42 dan bayar #43 menyusul) | US-062 | T-134, T-135 |
+| Q5 Bill meja (live, semua kanal; tombol split bill nonaktif "Segera hadir" sampai #42; bayar #43 menyusul) | US-062 | T-134, T-135 |
 
 Role-aware navigation (`Sidebar/Owner`, `Sidebar/Staff`) covers US-003 and US-033 through T-013 and T-072.
 
