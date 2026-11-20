@@ -105,3 +105,10 @@ describe('navigation per role (wireframe Sidebar/Owner, Sidebar/Staff)', () => {
     }
   })
 })
+
+describe('nav icons', () => {
+  it.each(['owner', 'staff'] as const)('every %s menu has its own icon', (role) => {
+    const items = navItemsFor(role)
+    expect(new Set(items.map((item) => item.icon)).size).toBe(items.length)
+  })
+})
