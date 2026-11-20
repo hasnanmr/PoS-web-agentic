@@ -270,7 +270,7 @@ describe('O2b Dashboard · drawer detail Revenue / Order', () => {
     expect(await within(drawer).findByText('Menampilkan 3 dari 109')).toBeInTheDocument() // the loaded page stays
 
     await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument()) // after the slide-out
   })
 
   it('opens the Order tile, a bar of Order per jam, and an Item terlaris row with their filters', async () => {
@@ -292,12 +292,14 @@ describe('O2b Dashboard · drawer detail Revenue / Order', () => {
     expect(within(drawer).getByText(/· Jam ramai$/)).toBeInTheDocument()
     expect(await within(drawer).findByText('revenue excl. PB1')).toBeInTheDocument()
     await userEvent.click(within(drawer).getByRole('button', { name: 'Tutup' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     await userEvent.click(screen.getByRole('button', { name: 'Semua jam' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Lihat order jam 12:00' }))
     drawer = await screen.findByRole('dialog', { name: 'Order · jam 12.00–12.59 · Hari ini' })
     expect(await within(drawer).findByRole('button', { name: 'Semua 14' })).toBeInTheDocument()
     await userEvent.click(within(drawer).getByRole('button', { name: 'Tutup drawer' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     const card = screen.getByRole('region', { name: 'Item terlaris' })
     await userEvent.click(within(card).getByRole('button', { name: 'Bulan ini' }))
