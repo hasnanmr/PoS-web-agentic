@@ -1670,6 +1670,12 @@
             "title": "Current Crowd",
             "type": "array"
           },
+          "from": {
+            "description": "First day used (first selected outlet)",
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
           "hours": {
             "enum": [
               "all",
@@ -1707,17 +1713,26 @@
             "enum": [
               "today",
               "week",
-              "month"
+              "month",
+              "range"
             ],
             "title": "Period",
             "type": "string"
           },
           "quiet_summary": {
             "$ref": "#/components/schemas/HourSummary"
+          },
+          "to": {
+            "description": "Last day used (first selected outlet)",
+            "format": "date",
+            "title": "To",
+            "type": "string"
           }
         },
         "required": [
           "period",
+          "from",
+          "to",
           "hours",
           "as_of",
           "kpis",
@@ -1731,6 +1746,69 @@
           "payment_methods"
         ],
         "title": "Dashboard",
+        "type": "object"
+      },
+      "DashboardOrders": {
+        "properties": {
+          "by_outlet": {
+            "items": {
+              "$ref": "#/components/schemas/DrillOutlet"
+            },
+            "title": "By Outlet",
+            "type": "array"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DrillItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/DrillOrder"
+            },
+            "title": "Orders",
+            "type": "array"
+          },
+          "period": {
+            "enum": [
+              "today",
+              "week",
+              "month",
+              "year",
+              "range"
+            ],
+            "title": "Period",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DrillSummary"
+          }
+        },
+        "required": [
+          "period",
+          "summary",
+          "item",
+          "by_outlet",
+          "orders",
+          "next_cursor"
+        ],
+        "title": "DashboardOrders",
         "type": "object"
       },
       "DeviceOut": {
@@ -1979,6 +2057,213 @@
           "cash_refunds"
         ],
         "title": "DrawerShift",
+        "type": "object"
+      },
+      "DrillItem": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "revenue": {
+            "description": "Sum of the item's line totals incl. add-ons, excl. PB1",
+            "title": "Revenue",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "quantity",
+          "revenue"
+        ],
+        "title": "DrillItem",
+        "type": "object"
+      },
+      "DrillOrder": {
+        "properties": {
+          "channel": {
+            "enum": [
+              "whatsapp_online",
+              "whatsapp_table",
+              "web_table",
+              "counter"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "item_summary": {
+            "title": "Item Summary",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "outlet": {
+            "title": "Outlet",
+            "type": "string"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "payment_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "cash",
+                  "qris"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method"
+          },
+          "revenue_excl_pb1": {
+            "description": "Order subtotal, excl. PB1 and delivery fee",
+            "title": "Revenue Excl Pb1",
+            "type": "integer"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "dine_in",
+              "takeaway",
+              "delivery",
+              "pickup"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_no",
+          "outlet_id",
+          "outlet",
+          "timezone",
+          "created_at",
+          "channel",
+          "type",
+          "table",
+          "customer_name",
+          "payment_method",
+          "item_summary",
+          "revenue_excl_pb1",
+          "total"
+        ],
+        "title": "DrillOrder",
+        "type": "object"
+      },
+      "DrillOutlet": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "revenue_excl_pb1": {
+            "title": "Revenue Excl Pb1",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "name",
+          "orders",
+          "revenue_excl_pb1"
+        ],
+        "title": "DrillOutlet",
+        "type": "object"
+      },
+      "DrillSummary": {
+        "properties": {
+          "cash_count": {
+            "title": "Cash Count",
+            "type": "integer"
+          },
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          },
+          "qris_count": {
+            "title": "Qris Count",
+            "type": "integer"
+          },
+          "revenue_excl_pb1": {
+            "description": "Sum of order subtotals, excl. PB1 and delivery",
+            "title": "Revenue Excl Pb1",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "orders",
+          "revenue_excl_pb1",
+          "cash_count",
+          "qris_count"
+        ],
+        "title": "DrillSummary",
         "type": "object"
       },
       "Expense": {
@@ -8950,6 +9235,11 @@
             "title": "Name",
             "type": "string"
           },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
           "quantity_sold": {
             "title": "Quantity Sold",
             "type": "integer"
@@ -8961,6 +9251,7 @@
           }
         },
         "required": [
+          "product_id",
           "name",
           "quantity_sold",
           "revenue"
@@ -13068,7 +13359,7 @@
     },
     "/api/v1/owner/dashboard": {
       "get": {
-        "description": "O2 tab Ringkasan: KPI tiles, peta keramaian, keramaian outlet sekarang, order per jam,\nstok rendah & sold out, komposisi per kanal, and metode bayar. The busyness map, current\ncrowd, and low stock ignore `period` and `hours`.",
+        "description": "O2 tab Ringkasan: KPI tiles, peta keramaian, keramaian outlet sekarang, order per jam,\nstok rendah & sold out, komposisi per kanal, and metode bayar. The busyness map, current\ncrowd, and low stock ignore `period` and `hours`. `period=range` (\"Rentang\") needs `from`\nand `to` (at most 92 days, `to` not after today).",
         "operationId": "summary_api_v1_owner_dashboard_get",
         "parameters": [
           {
@@ -13097,7 +13388,8 @@
               "enum": [
                 "today",
                 "week",
-                "month"
+                "month",
+                "range"
               ],
               "title": "Period",
               "type": "string"
@@ -13116,6 +13408,40 @@
               ],
               "title": "Hours",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
             }
           }
         ],
@@ -13142,6 +13468,245 @@
           }
         },
         "summary": "Summary",
+        "tags": [
+          "owner: dashboard"
+        ]
+      }
+    },
+    "/api/v1/owner/dashboard/orders": {
+      "get": {
+        "description": "O2b drawer: the paid orders behind the Revenue / Order tile, an Order per jam bar\n(`hour`), or an Item terlaris row (`product_id`). `summary`, `by_outlet`, and `item` ignore\nthe chip (`method`), Kanal (`channel`), and search (`q`); the list applies every filter.",
+        "operationId": "drill_orders_api_v1_owner_dashboard_orders_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "today",
+              "enum": [
+                "today",
+                "week",
+                "month",
+                "year",
+                "range"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hours",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "busy",
+                "quiet"
+              ],
+              "title": "Hours",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hour",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 23,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hour"
+            }
+          },
+          {
+            "in": "query",
+            "name": "product_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Product Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cash",
+                    "qris"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Method"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "counter",
+                    "whatsapp_online",
+                    "whatsapp_table",
+                    "web_table"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOrders"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Drill Orders",
         "tags": [
           "owner: dashboard"
         ]

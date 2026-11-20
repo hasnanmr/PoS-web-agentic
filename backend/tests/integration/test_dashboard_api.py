@@ -1,5 +1,5 @@
 """O2 "Item terlaris" (T-071) against Postgres through RLS: top 5 by quantity sold, paid
-orders only, outlet-local day / month / year, owner only.
+orders only, outlet-local day / month / year, owner only; `product_id` lets a row open O2b.
 """
 
 from __future__ import annotations
@@ -107,6 +107,7 @@ def _order(
 
 
 def test_top_items_today_paid_only_sorted_and_capped(client, ctx) -> None:
+    ids = [p for p, _ in ctx["products"]]
     names = [n for _, n in ctx["products"]]
     _order(ctx, [(0, 3, 75000), (1, 2, 52000)])
     _order(ctx, [(0, 1, 30000), (2, 2, 40000), (3, 1, 20000)])  # 2 vs 2: higher revenue first
@@ -122,11 +123,11 @@ def test_top_items_today_paid_only_sorted_and_capped(client, ctx) -> None:
     body = res.json()
     assert body["period"] == "day"
     assert body["top_items"] == [
-        {"name": names[0], "quantity_sold": 4, "revenue": 105000},
-        {"name": names[1], "quantity_sold": 2, "revenue": 52000},
-        {"name": names[2], "quantity_sold": 2, "revenue": 40000},
-        {"name": names[3], "quantity_sold": 1, "revenue": 20000},
-        {"name": names[4], "quantity_sold": 1, "revenue": 18000},
+        {"product_id": ids[0], "name": names[0], "quantity_sold": 4, "revenue": 105000},
+        {"product_id": ids[1], "name": names[1], "quantity_sold": 2, "revenue": 52000},
+        {"product_id": ids[2], "name": names[2], "quantity_sold": 2, "revenue": 40000},
+        {"product_id": ids[3], "name": names[3], "quantity_sold": 1, "revenue": 20000},
+        {"product_id": ids[4], "name": names[4], "quantity_sold": 1, "revenue": 18000},
     ]
     # All outlets gives the same (one outlet).
     assert client.get(URL, headers=ctx["owner"]).json()["top_items"] == body["top_items"]
@@ -148,7 +149,8 @@ def test_top_items_period_is_outlet_local(client, ctx) -> None:
         return res.json()["top_items"][0]
 
     # Product 5 sold 1 today (first test) and 50 just before midnight.
-    big = {"name": ctx["products"][5][1], "quantity_sold": 51, "revenue": 515000}
+    product, name = ctx["products"][5]
+    big = {"product_id": product, "name": name, "quantity_sold": 51, "revenue": 515000}
     assert first("day") != big
     assert (first("month") == big) is (today.day != 1)
     assert (first("year") == big) is (today.timetuple().tm_yday != 1)
