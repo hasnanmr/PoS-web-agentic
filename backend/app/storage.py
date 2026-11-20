@@ -11,6 +11,7 @@ Endpoints used (Supabase Storage API; verify against the current docs before cha
 
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 import urllib.parse
@@ -62,12 +63,19 @@ class SupabaseStorage:
         try:
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # noqa: S310
                 raw = resp.read()
+            return json.loads(raw) if raw else None
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")[:300]
-            raise StorageError(exc.code, detail) from None
+            try:
+                detail = exc.read().decode(errors="replace")[:300]
+            except OSError:
+                detail = exc.reason
+            raise StorageError(exc.code, str(detail)) from None
         except urllib.error.URLError as exc:
             raise StorageError(0, str(exc.reason)) from None
-        return json.loads(raw) if raw else None
+        # Timeouts and resets while reading (OSError), broken responses, and non-JSON bodies:
+        # callers only handle StorageError, so a flaky Storage never becomes a 500.
+        except (OSError, http.client.HTTPException, ValueError) as exc:
+            raise StorageError(0, f"{type(exc).__name__}: {exc}") from None
 
     def _json(self, method: str, path: str, body: dict[str, Any]) -> Any:
         return self._request(method, path, json.dumps(body).encode(), "application/json", {})
@@ -82,7 +90,7 @@ class SupabaseStorage:
             f"/object/{bucket}/{self._quote(path)}",
             data,
             content_type,
-            {"x-upsert": "false", "cache-control": "3600"},
+            {"x-upsert": "false", "cache-control": "max-age=3600"},
         )
 
     def signed_urls(self, bucket: str, paths: list[str], expires_in: int) -> dict[str, str]:

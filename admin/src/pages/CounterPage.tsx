@@ -12,8 +12,10 @@ import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
 import type { MenuItem, OrderCreated, Quote, ShiftRow, TableRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
+import { usePhotoRefresh } from '../lib/usePhotoRefresh'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Loading, Select, TextInput } from '../ui/kit'
+import { Photo } from '../ui/Photo'
 import { QrisPayPanel } from '../ui/QrisImage'
 
 interface CartLine {
@@ -42,6 +44,7 @@ export default function CounterPage() {
   const { api, me, outlet } = useSession()
   const outletId = outlet?.id ?? ''
   const menu = useLoad(() => api.get<MenuItem[]>(`/ops/outlets/${outletId}/menu`), outletId)
+  usePhotoRefresh(menu.reload)
   const tables = useLoad(() => api.get<TableRow[]>(`/ops/outlets/${outletId}/tables`), outletId)
   const shifts = useLoad(() => api.get<ShiftRow[]>(`/ops/outlets/${outletId}/shifts/current`), outletId)
 
@@ -187,9 +190,7 @@ export default function CounterPage() {
                   aria-label={`Tambah ${m.name}`}
                   onClick={() => (m.addon_groups.length ? setPicking(m) : add(m, []))}
                   className="relative flex flex-col rounded-lg border border-border bg-surface p-3 text-left hover:border-primary disabled:cursor-not-allowed disabled:opacity-70">
-                  {m.photo_url
-                    ? <img src={m.photo_url} alt="" className="mb-2 h-16 w-full rounded object-cover" />
-                    : <span aria-hidden="true" className="mb-2 h-16 rounded bg-page" />}
+                  <Photo src={m.photo_url} className="mb-2 block h-16 w-full rounded" />
                   <span className="text-[13px] font-semibold">{m.name}</span>
                   <span className="text-[12px] text-text-muted">{formatRupiah(m.price)}</span>
                   {m.sold_out ? (

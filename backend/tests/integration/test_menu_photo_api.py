@@ -35,7 +35,9 @@ class FakeStorage:
     def __init__(self) -> None:
         self.objects: dict[tuple[str, str], tuple[bytes, str]] = {}
         self.removed: list[str] = []
+        self.signed: list[str] = []
         self.fail_upload = False
+        self.fail_sign = False
 
     def upload(self, bucket: str, path: str, data: bytes, content_type: str) -> None:
         if self.fail_upload:
@@ -44,7 +46,10 @@ class FakeStorage:
         self.objects[(bucket, path)] = (data, content_type)
 
     def signed_urls(self, bucket: str, paths: list[str], expires_in: int) -> dict[str, str]:
-        assert expires_in == 600
+        assert expires_in == 3600
+        if self.fail_sign:
+            raise StorageError(0, "TimeoutError: timed out")
+        self.signed.extend(paths)
         return {p: f"https://signed.test/{bucket}/{p}?token=t" for p in paths}
 
     def remove(self, bucket: str, paths: list[str]) -> None:
@@ -199,6 +204,54 @@ def test_rejects_bad_files_staff_unknown_items_and_storage_failures(client, ctx,
     assert res.status_code == 502 and res.json()["error"]["code"] == "storage_failed"
     after = admin_sql("select photo_path from app.products where id = %s", (pid,))[0][0]
     assert after == before
+
+
+def test_signed_urls_are_reused_and_storage_failures_degrade(client, ctx, storage) -> None:
+    menu_url = f"/api/v1/ops/outlets/{ctx['outlet']}/menu"
+    first = {
+        m["product_id"]: m["photo_url"] for m in client.get(menu_url, headers=ctx["staff"]).json()
+    }
+    signed = len(storage.signed)
+    again = {
+        m["product_id"]: m["photo_url"] for m in client.get(menu_url, headers=ctx["staff"]).json()
+    }
+    assert again == first and len(storage.signed) == signed  # cached: same URL, no new signing
+
+    # A new photo (new path) must be signed; if Storage fails, the menu still loads.
+    pid = ctx["americano"]
+    storage.fail_sign = True
+    try:
+        res = _put(client, ctx, pid, PNG, "image/png")
+        assert res.status_code == 200 and res.json()["photo_url"] is None
+        menu = client.get(menu_url, headers=ctx["staff"])
+        assert menu.status_code == 200
+        assert next(m for m in menu.json() if m["product_id"] == pid)["photo_url"] is None
+    finally:
+        storage.fail_sign = False
+
+
+def test_chunked_upload_is_cut_off_at_5_mb(client, ctx) -> None:
+    def chunks() -> Iterator[bytes]:
+        yield PNG
+        for _ in range(6):
+            yield b"\x00" * (1024 * 1024)
+
+    res = client.put(
+        f"/api/v1/owner/products/{ctx['americano']}/photo",
+        headers={**ctx["owner"], "Content-Type": "image/png"},
+        content=chunks(),
+    )
+    assert res.status_code == 422 and res.json()["error"]["details"] == {"field": "photo"}
+
+
+def test_deleting_an_unordered_item_removes_its_photo(client, ctx, storage) -> None:
+    res = client.post("/api/v1/owner/products", headers=ctx["owner"], json={"name": "Bolu"})
+    pid = res.json()["id"]
+    url = _put(client, ctx, pid, JPG, "image/jpeg").json()["photo_url"]
+    path = url.split("/menu-photos/")[1].split("?")[0]
+    res = client.delete(f"/api/v1/owner/products/{pid}", headers=ctx["owner"])
+    assert res.json() == {"result": "deleted"}
+    assert path in storage.removed and ("menu-photos", path) not in storage.objects
 
 
 def test_upload_without_storage_configured_is_503(ctx) -> None:

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
@@ -146,7 +146,11 @@ describe('O5 Foto menu (T-132)', () => {
     })
     const { container } = render(<MemoryRouter><WithSession session={fakeSession('owner', { api })}><MenuPage /></WithSession></MemoryRouter>)
     await screen.findByText('Rp 25.000 · Aktif')
-    expect(container.querySelector('img[src="https://signed.test/t.webp"]')).not.toBeNull()
+    const img = container.querySelector('img[src="https://signed.test/t.webp"]')
+    expect(img).not.toBeNull()
+    // An expired signed URL falls back to the grey box, not a broken image.
+    fireEvent.error(img!)
+    expect(container.querySelector('img[src="https://signed.test/t.webp"]')).toBeNull()
   })
 })
 

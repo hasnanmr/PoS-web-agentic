@@ -12,8 +12,10 @@ import { errorMessage } from '../lib/api'
 import { formatDelta, formatRupiah } from '../lib/format'
 import type { AddonGroup, ProductDetail, ProductRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
+import { usePhotoRefresh } from '../lib/usePhotoRefresh'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, FieldRow, LinkButton, Loading, Select, TextInput } from '../ui/kit'
+import { Photo } from '../ui/Photo'
 
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024
@@ -34,6 +36,7 @@ export default function MenuPage() {
     () => api.get<ProductRow[]>(priceOutlet ? `/owner/products?price_outlet_id=${priceOutlet}` : '/owner/products'),
     priceOutlet,
   )
+  usePhotoRefresh(products.reload)
   const all = products.data ?? []
   const categories = [...new Set(all.map((p) => p.category).filter(Boolean))] as string[]
   const rows = all.filter((p) =>
@@ -76,9 +79,7 @@ export default function MenuPage() {
                 <li key={p.id}>
                   <button type="button" onClick={() => setSelected(p.id)}
                     className={`flex w-full items-center gap-3 rounded-md px-2 py-2 text-left ${current === p.id ? 'bg-primary-soft' : 'hover:bg-page'}`}>
-                    {p.photo_url
-                      ? <img src={p.photo_url} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
-                      : <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded bg-page" />}
+                    <Photo src={p.photo_url} className="block h-10 w-10 shrink-0 rounded" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold">
                         {p.name}{p.is_owner_pick ? '  ★' : ''}{p.is_sample ? <span className="font-normal text-text-muted">  · sample</span> : null}
@@ -255,7 +256,7 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
         <label className={`relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-[#B8C2D0] bg-page text-[11px] text-text-muted hover:border-primary ${uploading ? 'opacity-60' : ''}`}>
           {photoUrl ? (
             <>
-              <img src={photoUrl} alt={`Foto ${p.name}`} className="h-full w-full object-cover" />
+              <Photo src={photoUrl} alt={`Foto ${p.name}`} className="block h-full w-full" />
               <span className="absolute inset-x-0 bottom-0 bg-black/50 py-0.5 text-center text-[10px] text-white">Ganti foto ⇪</span>
             </>
           ) : (uploading ? 'Mengunggah…' : 'Foto * ⇪')}

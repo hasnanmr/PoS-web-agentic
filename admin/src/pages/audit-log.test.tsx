@@ -68,6 +68,23 @@ describe('O11 Audit Log', () => {
       .toBe('/owner/audit-log?outlet_id=o-riau&actor_id=rina&kind=reversal%2Cpayment'))
   })
 
+  it('starts from a fresh first page after switching filters back', async () => {
+    const api = fakeApi({
+      'GET /owner/audit-log': PAGE,
+      'GET /owner/audit-log?cursor=c1': { ...PAGE, next_cursor: null, items: [row({ id: 4, order_no: '#A-0998' })] },
+      'GET /owner/audit-log?outlet_id=o-riau': { ...PAGE, next_cursor: null, items: [] },
+    })
+    renderO11(api)
+    await userEvent.click(await screen.findByRole('button', { name: 'Muat lagi' }))
+    expect(await screen.findByText('#A-0998')).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Outlet'), 'o-riau')
+    expect(await screen.findByText('Belum ada perubahan order di periode ini.')).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Outlet'), '')
+    expect(await screen.findByText('#A-1034')).toBeInTheDocument()
+    expect(screen.queryByText('#A-0998')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Muat lagi' })).toBeInTheDocument()
+  })
+
   it('shows an error when the log cannot load', async () => {
     renderO11(fakeApi({ 'GET /owner/audit-log': new Error('boom') }))
     expect(await screen.findByText(/Audit log belum bisa dimuat/)).toBeInTheDocument()

@@ -9,6 +9,7 @@ import pytest
 from app.core.audit_log import change_text
 from app.core.catalog import photo_object_path, validate_photo
 from app.core.errors import ValidationFailedError
+from app.storage import StorageError, SupabaseStorage
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 8
@@ -56,3 +57,44 @@ def test_change_text_matches_the_wireframe() -> None:
     assert change_text(_row("payment_changed", from_payment="unpaid", to_payment="paid")) == (
         "unpaid → paid"
     )
+
+
+class _Resp:
+    def __init__(self, body: bytes = b"", exc: Exception | None = None) -> None:
+        self.body, self.exc = body, exc
+
+    def __enter__(self) -> _Resp:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        if self.exc:
+            raise self.exc
+        return self.body
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [_Resp(exc=TimeoutError("timed out")), _Resp(exc=ConnectionResetError()), _Resp(b"<html>")],
+)
+def test_storage_turns_transport_errors_into_storage_error(monkeypatch, resp) -> None:
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: resp)
+    store = SupabaseStorage("https://x.supabase.co", "key")
+    with pytest.raises(StorageError):
+        store.signed_urls("menu-photos", ["a.png"], 3600)
+
+
+def test_storage_sends_a_valid_cache_control(monkeypatch) -> None:
+    seen = {}
+
+    def fake(req, timeout):
+        seen.update({k.lower(): v for k, v in req.header_items()})
+        return _Resp()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake)
+    SupabaseStorage("https://x.supabase.co", "key").upload(
+        "menu-photos", "t/p/a.png", b"x", "image/png"
+    )
+    assert seen["cache-control"] == "max-age=3600" and seen["x-upsert"] == "false"

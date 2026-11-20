@@ -33,11 +33,21 @@ function actorLabel(a: AuditRow['actor']): string {
 
 export default function AuditLogPage() {
   const { api, me } = useSession()
-  const [outletId, setOutletId] = useState('')
-  const [actorId, setActorId] = useState('')
-  const [kinds, setKinds] = useState<AuditKind[]>(KINDS.map((k) => k.key))
-  const [range, setRange] = useState<{ from: string; to: string }>()
+  const [outletId, setOutletIdRaw] = useState('')
+  const [actorId, setActorIdRaw] = useState('')
+  const [kinds, setKindsRaw] = useState<AuditKind[]>(KINDS.map((k) => k.key))
+  const [range, setRangeRaw] = useState<{ from: string; to: string }>()
   const [more, setMore] = useState<{ key: string; items: AuditRow[]; cursor: string | null }>()
+  // Rows from "Muat lagi" belong to one loaded first page: drop them whenever a filter changes,
+  // so coming back to a filter starts from a fresh page 1 (no duplicates, no stale cursor).
+  const reset = <T,>(set: (v: T) => void) => (v: T) => {
+    setMore(undefined)
+    set(v)
+  }
+  const setOutletId = reset(setOutletIdRaw)
+  const setActorId = reset(setActorIdRaw)
+  const setKinds = reset(setKindsRaw)
+  const setRange = reset(setRangeRaw)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState<string>()
 

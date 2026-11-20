@@ -300,9 +300,12 @@ async def update_product(
     )
 
 
-async def delete_product(conn: AsyncConnection, ctx: ActorContext, product_id: UUID) -> str:
-    """Hard delete when never ordered; otherwise deactivate (orders keep their history)."""
-    await get_product(conn, product_id)
+async def delete_product(
+    conn: AsyncConnection, ctx: ActorContext, product_id: UUID
+) -> tuple[str, str | None]:
+    """Hard delete when never ordered; otherwise deactivate (orders keep their history).
+    Returns the outcome and, for a hard delete, the photo object to remove after commit."""
+    product = await get_product(conn, product_id)
     cur = await conn.execute(
         "select exists (select 1 from app.order_items where product_id = %s)", (product_id,)
     )
@@ -316,7 +319,7 @@ async def delete_product(conn: AsyncConnection, ctx: ActorContext, product_id: U
     await record_audit(
         conn, ctx, action=f"product.{outcome}", entity_type="product", entity_id=product_id
     )
-    return outcome
+    return outcome, product["photo_path"] if outcome == "deleted" else None
 
 
 @dataclass(frozen=True, slots=True)

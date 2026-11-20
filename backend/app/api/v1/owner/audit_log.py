@@ -72,17 +72,15 @@ async def audit_log_list(
     date_from: Annotated[date | None, Query(alias="from")] = None,
     date_to: Annotated[date | None, Query(alias="to")] = None,
     cursor: str | None = Query(default=None, max_length=200),
-    limit: int = Query(default=50, ge=1, le=100),
 ) -> AuditPage:
-    """O11 rows: reversals, status changes, and payment changes of orders, newest first.
-    Default range: month to date in the outlet's zone (WIB for all outlets)."""
+    """O11 rows: reversals, status changes, and payment changes of orders, newest first, 50 per
+    page. Default range: month to date in each outlet's own zone; `date_from`/`date_to` in the
+    response are the outlet's (WIB for all outlets) and only label the range picker."""
     kinds = _kinds(kind)
     async with db.transaction(_pool(request), user.actor()) as conn:
         tz = DEFAULT_TIMEZONE
         if outlet_id:
             tz = (await outlets.require_outlet(conn, outlet_id))["timezone"]
-        start, end = reports.default_range(local_date(datetime.now(UTC), tz))
-        date_from, date_to = date_from or start, date_to or end
         page = await audit_log.list_events(
             conn,
             outlet_id=outlet_id,
@@ -91,6 +89,6 @@ async def audit_log_list(
             date_from=date_from,
             date_to=date_to,
             cursor=cursor,
-            limit=limit,
         )
-    return AuditPage(date_from=date_from, date_to=date_to, **page)
+    start, end = reports.default_range(local_date(datetime.now(UTC), tz))
+    return AuditPage(date_from=date_from or start, date_to=date_to or end, **page)

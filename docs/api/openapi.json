@@ -10288,7 +10288,7 @@
     },
     "/api/v1/owner/audit-log": {
       "get": {
-        "description": "O11 rows: reversals, status changes, and payment changes of orders, newest first.\nDefault range: month to date in the outlet's zone (WIB for all outlets).",
+        "description": "O11 rows: reversals, status changes, and payment changes of orders, newest first, 50 per\npage. Default range: month to date in each outlet's own zone; `date_from`/`date_to` in the\nresponse are the outlet's (WIB for all outlets) and only label the range picker.",
         "operationId": "audit_log_list_api_v1_owner_audit_log_get",
         "parameters": [
           {
@@ -10393,18 +10393,6 @@
                 }
               ],
               "title": "Cursor"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
             }
           }
         ],

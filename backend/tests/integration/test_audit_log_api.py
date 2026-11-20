@@ -190,18 +190,25 @@ def test_filters_by_outlet_staff_kind_and_date(client, ctx, seeded) -> None:
     assert seeded["canggu_1"] not in [r["order_no"] for r in only_today["items"]]
 
 
-def test_cursor_pages_without_gaps(client, ctx, seeded) -> None:
-    today = datetime.now(ZoneInfo("Asia/Jakarta")).date()
-    span = {"from": (today - timedelta(days=1)).isoformat(), "to": today.isoformat()}
-    seen, cursor = [], None
-    while True:
-        params = {**span, "limit": 2, **({"cursor": cursor} if cursor else {})}
-        page = _get(client, ctx, **params)
-        seen += [r["id"] for r in page["items"]]
-        cursor = page["next_cursor"]
-        if not cursor:
-            break
-    assert seen == [r["id"] for r in _get(client, ctx, **span)["items"]] and len(seen) == 6
+def test_cursor_pages_of_50_without_gaps(client, ctx, seeded) -> None:
+    order, _ = _order(ctx, ctx["dago"])
+    day = datetime.now(ZoneInfo("Asia/Jakarta")).date() - timedelta(days=40)
+    admin_sql(
+        "insert into app.order_events (tenant_id, outlet_id, order_id, event, from_status,"
+        " to_status, actor_type, actor_id, created_at)"
+        " select %s, %s, %s, 'status_changed', 'confirmed', 'preparing', 'user', %s,"
+        " (%s::date + time '09:00') at time zone 'Asia/Jakarta' + g * interval '1 minute'"
+        " from generate_series(1, 55) g",
+        (ctx["tenant"], ctx["dago"], order, RINA, day),
+    )
+    span = {"from": day.isoformat(), "to": day.isoformat()}
+    first = _get(client, ctx, **span)
+    assert len(first["items"]) == 50 and first["next_cursor"]
+    second = _get(client, ctx, cursor=first["next_cursor"], **span)
+    assert len(second["items"]) == 5 and second["next_cursor"] is None
+    ids = [r["id"] for r in first["items"] + second["items"]]
+    assert len(set(ids)) == 55 and ids == sorted(ids, reverse=True)
+    assert client.get(URL, headers=ctx["owner"], params={"limit": 2}).json()["items"] != []
 
 
 def test_owner_only_and_validation(client, ctx, seeded) -> None:

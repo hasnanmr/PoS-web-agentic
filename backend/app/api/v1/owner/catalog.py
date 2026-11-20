@@ -261,10 +261,7 @@ async def put_photo(product_id: UUID, request: Request, owner: OwnerOnly) -> Pro
     store = storage(request)
     if store is None:
         raise ApiError(503, "storage_not_configured", "SUPABASE_URL / SERVICE_ROLE_KEY not set")
-    declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > core.PHOTO_MAX_BYTES:
-        raise ValidationFailedError("the photo is larger than 5 MB", {"field": "photo"})
-    data = await request.body()
+    data = await _read_capped(request, core.PHOTO_MAX_BYTES)
     kind = core.validate_photo(request.headers.get("content-type", ""), data)
     bucket = request.app.state.settings.menu_photo_bucket
     ctx = owner.actor()
@@ -288,6 +285,23 @@ async def put_photo(product_id: UUID, request: Request, owner: OwnerOnly) -> Pro
     return await _detail(request, row)
 
 
+async def _read_capped(request: Request, limit: int) -> bytes:
+    """The request body, refused as soon as it passes `limit` bytes, also when the client
+    sends no Content-Length (chunked), so a large upload is never held in memory."""
+    too_big = ValidationFailedError("the photo is larger than 5 MB", {"field": "photo"})
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        raise too_big
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise too_big
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 async def _remove_quietly(store, bucket: str, paths: list[str]) -> None:  # type: ignore[no-untyped-def]
     try:
         await asyncio.to_thread(store.remove, bucket, paths)
@@ -299,7 +313,10 @@ async def _remove_quietly(store, bucket: str, paths: list[str]) -> None:  # type
 async def delete_product(product_id: UUID, request: Request, owner: OwnerOnly) -> dict[str, str]:
     ctx = owner.actor()
     async with db.transaction(_pool(request), ctx) as conn:
-        outcome = await core.delete_product(conn, ctx, product_id)
+        outcome, photo = await core.delete_product(conn, ctx, product_id)
+    store = storage(request)
+    if photo and store is not None:  # nothing points at the object any more
+        await _remove_quietly(store, request.app.state.settings.menu_photo_bucket, [photo])
     return {"result": outcome}
 
 
