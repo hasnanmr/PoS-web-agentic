@@ -14,7 +14,7 @@ import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, Loading, Select, TextInput } from '../ui/kit'
 import { RangePicker } from '../ui/RangePicker'
-import { durationCell, selfieIcons, timeIn, toInstant } from './attendance/util'
+import { durationCell, nextDate, selfieIcons, timeIn, toInstant } from './attendance/util'
 
 function StatusLabel({ status }: { status: AttendanceRecord['status'] }) {
   switch (status) {
@@ -43,7 +43,10 @@ export default function StaffAttendancePage() {
   const report = useLoad(() => api.get<AttendanceReport>(`/owner/attendance${query ? `?${query}` : ''}`), query)
   const staff = useLoad(() => api.get<StaffMember[]>('/owner/staff'), 'staff')
   const r = report.data
-  const selectedId = selected ?? r?.records.find((x) => x.status === 'needs_correction')?.id
+  // A chosen row stays open while it is in the table (also after it was corrected); otherwise the
+  // first flagged record opens.
+  const selectedId = (selected && r?.records.some((x) => x.id === selected) ? selected : undefined)
+    ?? r?.records.find((x) => x.status === 'needs_correction')?.id
 
   async function exportCsv() {
     setExportError(undefined)
@@ -146,7 +149,8 @@ export default function StaffAttendancePage() {
                 </p>
               </Card>
               {selectedId ? (
-                <CorrectionPanel key={selectedId} recordId={selectedId} onSaved={() => void report.reload()} />
+                <CorrectionPanel key={selectedId} recordId={selectedId}
+                  onSaved={() => { setSelected(selectedId); void report.reload() }} />
               ) : (
                 <Card><p className="text-[12px] text-text-muted">Pilih catatan untuk melihat selfie dan mengoreksi.</p></Card>
               )}
@@ -188,7 +192,6 @@ function CorrectionPanel({ recordId, onSaved }: { recordId: string; onSaved: () 
   const { api } = useSession()
   const detail = useLoad(() => api.get<AttendanceDetail>(`/owner/attendance/${recordId}`), recordId)
   const d = detail.data
-  const [clockIn, setClockIn] = useState<string>()
   const [clockOut, setClockOut] = useState<string>()
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string>()
@@ -198,22 +201,21 @@ function CorrectionPanel({ recordId, onSaved }: { recordId: string; onSaved: () 
 
   const tz = d.timezone
   const local = (iso: string | null) => (iso ? formatTime(iso, tz) : '')
-  const inValue = clockIn ?? local(d.clock_in_at)
+  const inValue = local(d.clock_in_at)
   const outValue = clockOut ?? local(d.clock_out_at)
-  const flagged = d.status === 'needs_correction'
-  const changed = (clockIn !== undefined && clockIn !== local(d.clock_in_at))
-    || (clockOut !== undefined && clockOut !== local(d.clock_out_at))
+  const changed = outValue !== local(d.clock_out_at)
+  // A clock-out at or before the clock-in time falls on the next day: say so before saving.
+  const nextDay = outValue !== '' && outValue <= inValue
 
   async function save(record: AttendanceDetail) {
     setBusy(true)
     setError(undefined)
     try {
       const body: Record<string, string> = { reason: reason.trim() }
-      if (clockIn !== undefined && clockIn) body.clock_in_at = toInstant(record.date, clockIn, tz)
-      if (outValue) body.clock_out_at = toInstant(record.date, outValue, tz, inValue)
+      // Only the changed time is sent, so the stored seconds of the other one stay untouched.
+      if (changed) body.clock_out_at = toInstant(record.date, outValue, tz, inValue)
       await api.post(`/owner/attendance/${record.id}/corrections`, body)
       setReason('')
-      setClockIn(undefined)
       setClockOut(undefined)
       await detail.reload()
       onSaved()
@@ -261,23 +263,22 @@ function CorrectionPanel({ recordId, onSaved }: { recordId: string; onSaved: () 
         </div>
         {d.status !== 'open' ? (
           <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (reason.trim()) void save(d) }}>
-            {!flagged && (
-              <label className="flex items-center gap-2">Jam masuk
-                <TextInput type="time" aria-label="Jam masuk" className="h-8 w-28" value={inValue}
-                  onChange={(e) => setClockIn(e.target.value)} />
-              </label>
-            )}
             <label className="flex items-center gap-2">Jam pulang *
               <TextInput type="time" aria-label="Jam pulang" className="h-8 w-28" required value={outValue}
                 onChange={(e) => setClockOut(e.target.value)} />
             </label>
+            {nextDay && (
+              <p className="text-[12px] text-warning" role="status">
+                Jam pulang {outValue} jatuh di hari berikutnya ({formatDay(nextDate(d.date))}), bukan {formatDay(d.date)}.
+              </p>
+            )}
             <label className="block">Alasan koreksi *
               <TextInput aria-label="Alasan koreksi" maxLength={500} placeholder="Lupa clock out, dikonfirmasi via chat"
                 value={reason} onChange={(e) => setReason(e.target.value)} />
             </label>
             {error && <Alert>{error}</Alert>}
             <Button type="submit" variant="action" className="mt-2 h-11 w-full"
-              disabled={busy || !reason.trim() || !outValue || (!flagged && !changed)}>Simpan koreksi</Button>
+              disabled={busy || !reason.trim() || !outValue || !changed}>Simpan koreksi</Button>
           </form>
         ) : (
           <p className="text-[12px] text-text-muted">Staf masih bekerja; catatan bisa dikoreksi setelah clock out.</p>

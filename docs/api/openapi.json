@@ -1498,29 +1498,11 @@
       },
       "CorrectionIn": {
         "properties": {
-          "clock_in_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clock In At"
-          },
           "clock_out_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clock Out At"
+            "description": "O14 \"Jam pulang *\" (the only time the panel corrects)",
+            "format": "date-time",
+            "title": "Clock Out At",
+            "type": "string"
           },
           "reason": {
             "description": "Required (blank → reason_required)",
@@ -1530,6 +1512,7 @@
           }
         },
         "required": [
+          "clock_out_at",
           "reason"
         ],
         "title": "CorrectionIn",
@@ -9044,7 +9027,7 @@
     },
     "/api/v1/ops/me/attendance": {
       "get": {
-        "description": "S9 \"Riwayat saya · minggu ini\" (default: Monday of this week to today, WIB).",
+        "description": "S9 \"Riwayat saya · minggu ini\" (default: Monday of this week to today, counted in WIT, the\neasternmost zone, so today's record at a WITA/WIT outlet is never cut off).",
         "operationId": "history_api_v1_ops_me_attendance_get",
         "parameters": [
           {

@@ -80,7 +80,13 @@ def _pair(client: TestClient, owner: dict[str, str], outlet: str) -> str:
     return res.json()["device_token"]
 
 
-def _tap(client: TestClient, token: str, user: UUID) -> dict[str, Any]:
+def _tap(client: TestClient, token: str, user: UUID, action: str | None = None) -> dict[str, Any]:
+    """Tap the name on K1 (action as K1 shows it, unless given) and save with a new selfie.
+    Adds `record_id` (the person's latest record) for the test."""
+    if action is None:
+        staff = client.get("/api/v1/device/staff", headers=_dev(token)).json()["staff"]
+        person = next(s for s in staff if s["user_id"] == str(user))
+        action = "clock_out" if person["status"] == "working" else "clock_in"
     res = client.post(
         "/api/v1/device/selfies",
         headers={**_dev(token), "Content-Type": "image/jpeg"},
@@ -89,10 +95,15 @@ def _tap(client: TestClient, token: str, user: UUID) -> dict[str, Any]:
     res = client.post(
         "/api/v1/device/attendance",
         headers=_dev(token),
-        json={"user_id": str(user), "selfie_id": res.json()["selfie_id"]},
+        json={"user_id": str(user), "selfie_id": res.json()["selfie_id"], "action": action},
     )
     assert res.status_code == 201, res.text
-    return res.json()
+    latest = admin_sql(
+        "select id::text from app.attendance_records where user_id = %s"
+        " order by updated_at desc limit 1",
+        (user,),
+    )
+    return {**res.json(), "record_id": latest[0][0]}
 
 
 def _move(record_id: str, clock_in: datetime, clock_out: datetime | None = None) -> None:
@@ -453,3 +464,130 @@ def test_only_the_owner_deletes_a_selfie(client: TestClient, ctx: dict[str, Any]
         (rid,),
     )
     assert audit == [("user", "in")]
+
+
+BUDI = UUID("7c200000-0000-0000-0000-0000000000f5")  # Braga (closes after midnight)
+EKO = UUID("7c200000-0000-0000-0000-0000000000f6")  # Dago, clock-in after closing
+WATI = UUID("7c200000-0000-0000-0000-0000000000f7")  # Jayapura (WIT)
+LATE = UUID("7c200000-0000-0000-0000-0000000000f8")  # Dago, works past closing + grace
+WIT = ZoneInfo("Asia/Jayapura")
+
+
+def _flag(client: TestClient, ctx: dict[str, Any], record_id: str) -> dict[str, Any]:
+    client.get(f"/api/v1/owner/attendance?{_range(ctx)}", headers=ctx["owner"])
+    return client.get(f"/api/v1/owner/attendance/{record_id}", headers=ctx["owner"]).json()
+
+
+def test_closing_after_midnight_and_after_closing(client: TestClient, ctx: dict[str, Any]) -> None:
+    res = client.post("/api/v1/owner/outlets", headers=ctx["owner"], json={"name": "Braga"})
+    braga = res.json()["id"]
+    night = [{"weekday": d, "opens_at": "17:00", "closes_at": "02:00"} for d in range(1, 8)]
+    res = client.put(
+        f"/api/v1/owner/outlets/{braga}/opening-hours", headers=ctx["owner"], json=night
+    )
+    assert res.status_code in (200, 204), res.text
+    _add_staff(ctx["tenant"], BUDI, "Budi", braga)
+    _add_staff(ctx["tenant"], EKO, "Eko", ctx["dago"])
+    tab = _pair(client, ctx["owner"], braga)
+    y = ctx["yesterday"]
+
+    # 00:30 after the previous evening's opening: the shift closes at 02:00 that night, not the
+    # next night (the reviewer's 17-hour shift).
+    rid = _tap(client, tab, BUDI, "clock_in")["record_id"]
+    _move(rid, datetime(y.year, y.month, y.day, 0, 30, tzinfo=WIB))
+    detail = _flag(client, ctx, rid)
+    assert detail["status"] == "needs_correction"
+    assert datetime.fromisoformat(detail["flag"]["at"]) == datetime(
+        y.year, y.month, y.day, 3, 0, tzinfo=WIB
+    )
+    assert detail["flag"]["closes_at"] == "02:00"
+
+    # Clock-in after closing (22:30 at Dago, closes 22:00): flagged grace after the clock-in,
+    # and O14 does not name a closing time the outlet does not have.
+    rid = _tap(client, ctx["dago_tab"], EKO, "clock_in")["record_id"]
+    _move(rid, datetime(y.year, y.month, y.day, 22, 30, tzinfo=WIB))
+    detail = _flag(client, ctx, rid)
+    assert datetime.fromisoformat(detail["flag"]["at"]) == datetime(
+        y.year, y.month, y.day, 23, 30, tzinfo=WIB
+    )
+    assert detail["flag"]["closes_at"] is None
+
+
+def test_flag_after_worker_downtime_uses_the_due_time(
+    client: TestClient, ctx: dict[str, Any]
+) -> None:
+    # Nobody looked for three days (no worker ran): the flag still records closing + grace of
+    # the clock-in day, not the moment the check finally ran.
+    _add_staff(ctx["tenant"], LATE, "Lina", ctx["dago"])
+    rid = _tap(client, ctx["dago_tab"], LATE, "clock_in")["record_id"]
+    d = datetime.now(WIB).date() - timedelta(days=3)
+    _move(rid, datetime(d.year, d.month, d.day, 9, 0, tzinfo=WIB))
+    client.get(f"/api/v1/owner/attendance?from={d}&to={d}", headers=ctx["owner"])
+    detail = client.get(f"/api/v1/owner/attendance/{rid}", headers=ctx["owner"]).json()
+    assert datetime.fromisoformat(detail["flag"]["at"]) == datetime(
+        d.year, d.month, d.day, 23, 0, tzinfo=WIB
+    )
+
+
+def test_working_past_closing_still_clocks_out(client: TestClient, ctx: dict[str, Any]) -> None:
+    # K1 showed "Bekerja" (loaded before the due instant); the check flags the record just
+    # before the tap. The tap closes that record instead of starting a new shift.
+    rec = _tap(client, ctx["dago_tab"], LATE, "clock_in")
+    admin_sql(
+        "update app.attendance_records set clock_in_at = now() - interval '10 hours',"
+        " status = 'needs_correction', flagged_at = now() - interval '5 minutes' where id = %s",
+        (rec["record_id"],),
+    )
+    res = _tap(client, ctx["dago_tab"], LATE, "clock_out")
+    assert res["action"] == "clock_out" and res["record_id"] == rec["record_id"]
+    assert res["duration_minutes"] == 600
+    assert admin_sql(
+        "select status::text, count(*) over () from app.attendance_records"
+        " where user_id = %s and clock_in_at > now() - interval '1 day'",
+        (LATE,),
+    ) == [("closed", 1)]
+
+
+def test_correction_longer_than_24_hours_is_refused(
+    client: TestClient, ctx: dict[str, Any]
+) -> None:
+    rid = ctx["maya_closed"]
+    y = ctx["yesterday"]
+    res = client.post(
+        f"/api/v1/owner/attendance/{rid}/corrections",
+        headers=ctx["owner"],
+        json={
+            "clock_out_at": (
+                datetime(y.year, y.month, y.day, 9, 30, tzinfo=WITA) + timedelta(days=1)
+            ).isoformat(),
+            "reason": "salah ketik",
+        },
+    )
+    assert res.status_code == 422
+    assert res.json()["error"]["details"]["max_hours"] == 24
+
+
+def test_wit_day_boundary(client: TestClient, ctx: dict[str, Any]) -> None:
+    res = client.post(
+        "/api/v1/owner/outlets",
+        headers=ctx["owner"],
+        json={"name": "Jayapura", "timezone": "Asia/Jayapura"},
+    )
+    jayapura = res.json()["id"]
+    _add_staff(ctx["tenant"], WATI, "Wati", jayapura)
+    tab = _pair(client, ctx["owner"], jayapura)
+    y = ctx["yesterday"]
+    rid = _tap(client, tab, WATI, "clock_in")["record_id"]
+    _tap(client, tab, WATI, "clock_out")
+    # 00:15 WIT is still the previous day in WIB (22:15).
+    _move(
+        rid,
+        datetime(y.year, y.month, y.day, 0, 15, tzinfo=WIT),
+        datetime(y.year, y.month, y.day, 0, 45, tzinfo=WIT),
+    )
+    res = client.get(f"/api/v1/owner/attendance?from={y}&to={y}", headers=ctx["owner"])
+    row = next(r for r in res.json()["records"] if r["id"] == rid)
+    assert row["date"] == y.isoformat() and row["timezone"] == "Asia/Jayapura"
+    prev = y - timedelta(days=1)
+    res = client.get(f"/api/v1/owner/attendance?from={prev}&to={prev}", headers=ctx["owner"])
+    assert rid not in {r["id"] for r in res.json()["records"]}

@@ -19,7 +19,9 @@ from app.api.v1.owner.attendance import RecordOut
 from app.auth.deps import TenantUser
 from app.core import attendance_reports as reports
 from app.core.errors import ValidationFailedError
-from app.core.localtime import DEFAULT_TIMEZONE, local_date
+from app.core.localtime import local_date
+
+LATEST_TIMEZONE = "Asia/Jayapura"  # WIT: the first zone to reach a new day
 
 router = APIRouter(prefix="/api/v1/ops/me/attendance", tags=["ops: my attendance"])
 
@@ -73,10 +75,10 @@ async def history(
     date_from: Annotated[date | None, Query(alias="from")] = None,
     date_to: Annotated[date | None, Query(alias="to")] = None,
 ) -> History:
-    """S9 "Riwayat saya · minggu ini" (default: Monday of this week to today, WIB)."""
+    """S9 "Riwayat saya · minggu ini" (default: Monday of this week to today, counted in WIT, the
+    easternmost zone, so today's record at a WITA/WIT outlet is never cut off)."""
     assert user.tenant_id is not None  # noqa: S101
-    today_wib = local_date(datetime.now(UTC), DEFAULT_TIMEZONE)
-    end = date_to or today_wib
+    end = date_to or local_date(datetime.now(UTC), LATEST_TIMEZONE)
     start = date_from or end - timedelta(days=end.isoweekday() - 1)
     if start > end or (end - start).days > 92:
         raise ValidationFailedError("choose a range of at most 3 months", {"field": "from"})

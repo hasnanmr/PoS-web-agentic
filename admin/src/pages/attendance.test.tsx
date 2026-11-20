@@ -67,7 +67,12 @@ describe('O14 Kehadiran Staf', () => {
     expect(screen.queryByLabelText('Jam masuk')).not.toBeInTheDocument()
 
     const save = screen.getByRole('button', { name: 'Simpan koreksi' })
+    // A time before the clock-in falls on the next day, and the panel says so.
+    await userEvent.type(screen.getByLabelText('Jam pulang'), '02:15')
+    expect(screen.getByText('Jam pulang 02:15 jatuh di hari berikutnya (17 Nov), bukan 16 Nov.')).toBeInTheDocument()
+    await userEvent.clear(screen.getByLabelText('Jam pulang'))
     await userEvent.type(screen.getByLabelText('Jam pulang'), '22:15')
+    expect(screen.queryByText(/jatuh di hari berikutnya/)).not.toBeInTheDocument()
     expect(save).toBeDisabled() // reason required
     await userEvent.type(screen.getByLabelText('Alasan koreksi'), 'Lupa clock out, dikonfirmasi via chat')
     await userEvent.click(save)
@@ -90,7 +95,9 @@ describe('O14 Kehadiran Staf', () => {
     await waitFor(() => expect(api.calls.some(([m, p]) => m === 'GET' && p === '/owner/attendance?outlet_id=o-riau')).toBe(true))
     await userEvent.click(await screen.findByRole('button', { name: 'Buka catatan Maya 16 Nov' }))
     expect(await screen.findByText('Koreksi catatan · Maya, 16 Nov')).toBeInTheDocument()
-    expect(screen.getByLabelText('Jam masuk')).toHaveValue('09:00')
+    expect(screen.queryByLabelText('Jam masuk')).not.toBeInTheDocument() // O14 shows only Jam pulang
+    expect(screen.getByLabelText('Jam pulang')).toHaveValue('17:10')
+    expect(screen.getByRole('button', { name: 'Simpan koreksi' })).toBeDisabled() // nothing changed
     expect(screen.getByText(/pulang — → 17:10/)).toBeInTheDocument()
     expect(screen.getByText(/oleh Olga · 17 Nov 10:12 · “lupa clock out”/)).toBeInTheDocument()
   })

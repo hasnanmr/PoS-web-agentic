@@ -19,7 +19,7 @@ export function selfieIcons(r: AttendanceRecord): string {
   return [r.has_selfie_in, r.has_selfie_out].filter(Boolean).map(() => '▣').join(' ') || '—'
 }
 
-function nextDay(day: string): string {
+export function nextDate(day: string): string {
   const d = new Date(`${day}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + 1)
   return d.toISOString().slice(0, 10)
@@ -27,7 +27,7 @@ function nextDay(day: string): string {
 
 /** "HH:MM" on the record's local day, or the next day for a clock-out at or before the clock-in. */
 export function toInstant(day: string, time: string, tz: string, after?: string): string {
-  const date = after && time <= after ? nextDay(day) : day
+  const date = after && time <= after ? nextDate(day) : day
   return `${date}T${time}:00${offsetAt(tz, date, time)}`
 }
 

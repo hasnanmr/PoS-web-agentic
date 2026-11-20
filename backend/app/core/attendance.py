@@ -326,6 +326,21 @@ async def record_attendance(
     open_record = await cur.fetchone()
     if open_record is None and (replay := await _replay(cur, user_id, selfie_id)):
         return replay  # a concurrent duplicate committed while this one waited
+    if open_record is None and action == "clock_out":
+        # Worked past closing + grace: the missing clock-out check flagged the record just before
+        # this tap (or earlier today). The person is clocking out now, so close it here instead
+        # of starting a new shift; the flag stays in the history.
+        await cur.execute(
+            """
+            select id, clock_in_at from app.attendance_records
+            where user_id = %s and outlet_id = app.current_device_outlet()
+              and status = 'needs_correction' and clock_out_at is null
+              and clock_in_at > now() - interval '24 hours'
+            order by clock_in_at desc limit 1 for update
+            """,
+            (user_id,),
+        )
+        open_record = await cur.fetchone()
     if (open_record is not None) != (action == "clock_out"):
         raise _state_changed()
 

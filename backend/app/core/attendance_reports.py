@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -35,28 +35,46 @@ from app.core.localtime import to_local, zone_label
 
 SELFIE_RETENTION_DAYS = 45  # product owner, 2026-11-20 (was 30)
 COUNTED = ("closed", "corrected")
+MAX_SHIFT = timedelta(hours=24)  # a corrected shift longer than this is a typo
 
-# T-118: due instant per open record. closes_at <= opens_at means the outlet closes after
+# T-118: due instant per open record = the closing time that applies to the clock-in (outlet-local)
+# + grace. A clock-in after midnight but before the previous day's after-midnight closing (hours
+# 17:00-02:00, clock in 00:30) uses that closing; closes_at <= opens_at means closing after
 # midnight; a day without opening hours counts as closing at local midnight; a clock-in after
-# closing is flagged `grace` after the clock-in.
+# closing is flagged `grace` after the clock-in. `closes_label` is the real closing time shown on
+# O14 ("tutup 22:00"), null in the last two cases.
 _FLAG_DUE = """
 with o as (
   select r.id, r.clock_in_at, ou.attendance_grace_minutes as grace, ou.timezone,
-         (r.clock_in_at at time zone ou.timezone)::date as day, oh.opens_at, oh.closes_at
+         (r.clock_in_at at time zone ou.timezone) as local_in,
+         (r.clock_in_at at time zone ou.timezone)::date as day,
+         t.opens_at, t.closes_at, p.opens_at as prev_opens, p.closes_at as prev_closes
   from app.attendance_records r
   join app.outlets ou on ou.id = r.outlet_id
-  left join app.outlet_opening_hours oh
-    on oh.outlet_id = r.outlet_id
-   and oh.weekday = extract(isodow from (r.clock_in_at at time zone ou.timezone))
+  left join app.outlet_opening_hours t
+    on t.outlet_id = r.outlet_id
+   and t.weekday = extract(isodow from (r.clock_in_at at time zone ou.timezone))
+  left join app.outlet_opening_hours p
+    on p.outlet_id = r.outlet_id
+   and p.weekday = extract(isodow from (r.clock_in_at at time zone ou.timezone) - interval '1 day')
   where r.status = 'open'
-), d as (
-  select id, grace, timezone, closes_at,
-         greatest(
-           (case when closes_at is null then (day + 1)::timestamp
-                 when closes_at <= opens_at then (day + 1) + closes_at
-                 else day + closes_at end) at time zone timezone,
-           clock_in_at) as closes_instant
+), c as (
+  select id, clock_in_at, grace, timezone, day,
+         case when prev_closes is not null and prev_closes <= prev_opens
+                   and local_in::time < prev_closes then prev_closes
+              else closes_at end as close_time,
+         case when prev_closes is not null and prev_closes <= prev_opens
+                   and local_in::time < prev_closes then day + prev_closes
+              when closes_at is null then (day + 1)::timestamp
+              when closes_at <= opens_at then (day + 1) + closes_at
+              else day + closes_at end as close_local
   from o
+), d as (
+  select id, grace, timezone,
+         greatest(close_local at time zone timezone, clock_in_at) as closes_instant,
+         case when close_time is null or close_local at time zone timezone <= clock_in_at then null
+              else close_time end as closes_label
+  from c
 )
 update app.attendance_records r
    set status = 'needs_correction',
@@ -64,7 +82,7 @@ update app.attendance_records r
   from d
  where r.id = d.id and r.status = 'open'
    and d.closes_instant + make_interval(mins => d.grace) <= now()
-returning r.id, r.flagged_at, d.closes_instant, d.grace, d.timezone
+returning r.id, r.flagged_at, d.closes_label, d.grace
 """
 
 
@@ -83,7 +101,7 @@ async def run_due_checks(pool: AsyncConnectionPool, tenant_id: UUID) -> dict[str
                 "flag",
                 {
                     "due_at": r["flagged_at"].isoformat(),
-                    "closes_at": to_local(r["closes_instant"], r["timezone"]).strftime("%H:%M"),
+                    "closes_at": r["closes_label"].strftime("%H:%M") if r["closes_label"] else None,
                     "grace_minutes": r["grace"],
                 },
             )
@@ -320,8 +338,7 @@ async def correct_record(
     ctx: ActorContext,
     record_id: UUID,
     *,
-    clock_in_at: datetime | None,
-    clock_out_at: datetime | None,
+    clock_out_at: datetime,
 ) -> dict[str, Any]:
     """O14 "Simpan koreksi": `ctx.reason` is required (ActorContext.with_reason)."""
     if not ctx.reason:
@@ -337,20 +354,21 @@ async def correct_record(
         raise NotFoundError("attendance record")
     if row["status"] == "open":
         raise ConflictError("record_open", "the staff member is still working; nothing to correct")
-    new_in = clock_in_at or row["clock_in_at"]
-    new_out = clock_out_at or row["clock_out_at"]
-    if new_out is None:
-        raise ValidationFailedError("the clock-out time is required", {"field": "clock_out_at"})
+    new_in = row["clock_in_at"]
+    new_out = clock_out_at
     if new_out <= new_in:
         raise ValidationFailedError("clock-out must be after clock-in", {"field": "clock_out_at"})
-    if new_out > row["now"] or new_in > row["now"]:
+    if new_out - new_in > MAX_SHIFT:
+        raise ValidationFailedError(
+            "a shift cannot be longer than 24 hours", {"field": "clock_out_at", "max_hours": 24}
+        )
+    if new_out > row["now"]:
         raise ValidationFailedError("times cannot be in the future", {"field": "clock_out_at"})
-    if new_in == row["clock_in_at"] and new_out == row["clock_out_at"]:
+    if new_out == row["clock_out_at"]:
         raise ValidationFailedError("nothing changed", {"field": "clock_out_at"})
     await cur.execute(
-        "update app.attendance_records set clock_in_at = %s, clock_out_at = %s,"
-        " status = 'corrected' where id = %s",
-        (new_in, new_out, record_id),
+        "update app.attendance_records set clock_out_at = %s, status = 'corrected' where id = %s",
+        (new_out, record_id),
     )
 
     def iso(v: datetime | None) -> str | None:

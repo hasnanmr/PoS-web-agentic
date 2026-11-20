@@ -19,7 +19,9 @@ from app.core import attendance as core
 from app.core import attendance_reports as reports
 from app.core import outlets
 from app.core.errors import ValidationFailedError
-from app.core.localtime import DEFAULT_TIMEZONE, local_date
+from app.core.localtime import local_date
+
+LATEST_TIMEZONE = "Asia/Jayapura"  # WIT: the first zone to reach a new day
 
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: attendance"])
 
@@ -144,17 +146,19 @@ class RecordDetail(RecordOut):
 
 
 class CorrectionIn(BaseModel):
-    clock_in_at: datetime | None = None
-    clock_out_at: datetime | None = None
+    clock_out_at: datetime = Field(
+        description='O14 "Jam pulang *" (the only time the panel corrects)'
+    )
     reason: str = Field(max_length=500, description="Required (blank → reason_required)")
 
 
 async def _report_range(
     conn: Any, outlet_id: UUID | None, date_from: date | None, date_to: date | None
 ) -> tuple[date, date]:
-    """Default: the last 7 days up to today in the outlet's zone (WIB for all outlets)."""
+    """Default: the last 7 days up to today in the outlet's zone; for all outlets, up to today in
+    the easternmost zone (WIT), so a record dated today at any outlet is included."""
     tz = (await outlets.require_outlet(conn, outlet_id))["timezone"] if outlet_id else None
-    today = local_date(datetime.now(UTC), tz or DEFAULT_TIMEZONE)
+    today = local_date(datetime.now(UTC), tz or LATEST_TIMEZONE)
     end = date_to or today
     start = date_from or end - timedelta(days=6)
     if start > end:
@@ -208,9 +212,7 @@ async def correct_attendance(
     """O14 "Simpan koreksi": the original values stay in the append-only history."""
     ctx = owner.actor().with_reason(body.reason)
     async with db.transaction(_pool(request), ctx) as conn:
-        row = await reports.correct_record(
-            conn, ctx, record_id, clock_in_at=body.clock_in_at, clock_out_at=body.clock_out_at
-        )
+        row = await reports.correct_record(conn, ctx, record_id, clock_out_at=body.clock_out_at)
     return RecordDetail(**row)
 
 

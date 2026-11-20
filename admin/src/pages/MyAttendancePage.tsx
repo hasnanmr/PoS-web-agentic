@@ -25,6 +25,7 @@ export default function MyAttendancePage() {
   const today = useLoad(() => api.get<MyAttendanceToday>('/ops/me/attendance/today'), 'today')
   const history = useLoad(() => api.get<MyAttendanceHistory>('/ops/me/attendance'), 'history')
   usePolling(today, 60_000)
+  usePolling(history, 60_000) // the table and total follow a clock out on the tablet
   const [open, setOpen] = useState<string>()
   const now = useNow()
   const t = today.data

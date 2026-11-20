@@ -170,6 +170,9 @@ export function errorMessage(error: unknown): string {
     if (error.code === 'validation_failed' && error.details.field === 'bookable_until') {
       return 'Jam akhir booking harus setelah jam mulai.'
     }
+    if (error.code === 'validation_failed' && typeof error.details.max_hours === 'number') {
+      return `Shift maksimal ${error.details.max_hours} jam. Periksa jam pulang.`
+    }
     if (error.code === 'item_sold_out' && typeof error.details.name === 'string') {
       return `${error.details.name} habis. Hapus atau ganti item ini.`
     }
