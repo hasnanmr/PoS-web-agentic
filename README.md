@@ -190,9 +190,11 @@ file timestamps; the chain is forward-only.
   Alembic run, `app.tools.migrate` stamps the newest version found in
   `supabase_migrations.schema_migrations`, then applies only later revisions.
 - Alembic keeps its version in schema `alembic` (not exposed by the Data API).
-The WhatsApp worker is the Railway service `worker`: the backend image, configured by
-`backend/railway.worker.toml` and deployed by the `deploy-worker` job (variables referenced
-from `backend`, plus `WHATSAPP_ACCESS_TOKEN` and optional `WHATSAPP_GRAPH_VERSION`; without
-the token it stays on standby). It is not in the smoke test or the rollback. Connect an
+The WhatsApp worker is the Railway service `worker`, deployed by the `deploy-worker` job from
+the same build context as the API. Its start command (`python -m app.worker.main`), restart
+policy and region are service settings (it does not read `backend/railway.toml`). Variables
+are referenced from `backend`, plus `WHATSAPP_ACCESS_TOKEN` and optional
+`WHATSAPP_GRAPH_VERSION`; without the token it stays on standby. It is not in the smoke test
+or the rollback. Connect an
 outlet to its Meta number with `uv run python -m app.cli whatsapp-connect --outlet <uuid>
 --phone-number-id <id>`, then register `https://<backend>/webhooks/whatsapp` in the Meta app.
