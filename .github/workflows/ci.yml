@@ -2,8 +2,8 @@
 # API contract check, and the admin app build. Runs on every push and pull request.
 #
 # CD: on every push to main (each merged PR), once CI is green, pending Alembic migrations
-# (backend/migrations) are applied to the hosted database, then BOTH services are redeployed
-# to Railway (backend/ -> "backend", admin/ -> "admin"). Needs the repository secrets
+# (backend/migrations) are applied to the hosted database, then the services are redeployed
+# to Railway (backend/ -> "backend" and "worker", admin/ -> "admin"). Needs the repository secrets
 # RAILWAY_TOKEN (project token of the Railway environment) and SUPABASE_DB_URL (session
 # pooler connection string of the hosted project, owner role `postgres`, with the database
 # password); see README "Deployment".
@@ -244,6 +244,27 @@ jobs:
         run: echo "$GITHUB_SHA" > admin/public/version.txt
       - name: Deploy
         run: railway up admin --path-as-root --service admin --ci --message "$GITHUB_SHA"
+
+  # The WhatsApp worker has no HTTP endpoint, so it is not part of the smoke test or the
+  # rollback: a failed worker deploy leaves the previous worker running and the run red.
+  deploy-worker:
+    name: Deploy WhatsApp worker to Railway
+    needs: [migrate]
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g "$RAILWAY_CLI"
+      # `railway up` reads railway.toml from the uploaded root: swap in the worker's config.
+      - name: Prepare the worker build context
+        run: |
+          cp -R backend "$RUNNER_TEMP/worker"
+          mv "$RUNNER_TEMP/worker/railway.worker.toml" "$RUNNER_TEMP/worker/railway.toml"
+          echo "$GITHUB_SHA" > "$RUNNER_TEMP/worker/app/BUILD_SHA"
+      - name: Deploy
+        run: railway up "$RUNNER_TEMP/worker" --path-as-root --service worker --ci --message "$GITHUB_SHA"
 
   smoke:
     name: Smoke test production

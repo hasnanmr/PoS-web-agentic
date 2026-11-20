@@ -1,0 +1,17 @@
+# Railway config for the WhatsApp worker service (`worker`): same image as the API, its own
+# process, no public domain and no healthcheck. The deploy workflow (.github/workflows/ci.yml)
+# uploads a copy of backend/ with this file renamed to railway.toml, because a `railway up`
+# upload always uses the railway.toml at its root.
+#
+# Variables (referenced from the backend service): APP_ENV, DATABASE_URL, RABBITMQ_URL,
+# SUPABASE_URL, SUPABASE_JWKS_URL, SUPABASE_JWT_ISSUER, CORS_ORIGINS, DEFAULT_TIMEZONE.
+# Plus WHATSAPP_ACCESS_TOKEN (Meta system user token): without it the worker idles on standby.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python -m app.worker.main"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

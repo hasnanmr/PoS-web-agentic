@@ -3,8 +3,9 @@
 Run locally:  uv run python -m app.worker.main
 
 Consumes `wa.inbound.q` (conversation flows, T-046 to T-050) and `wa.outbound.q` (Cloud API
-sender, T-047). Needs DATABASE_URL, RABBITMQ_URL, and WHATSAPP_ACCESS_TOKEN; refuses to start
-without them. Declares the RabbitMQ topology on start (T-110). Stops cleanly on SIGTERM.
+sender, T-047). Refuses to start without DATABASE_URL and RABBITMQ_URL; without
+WHATSAPP_ACCESS_TOKEN it stays on standby (consumes nothing) until restarted with it.
+Declares the RabbitMQ topology on start (T-110). Stops cleanly on SIGTERM.
 """
 
 from __future__ import annotations
@@ -61,7 +62,8 @@ def main() -> int:
         print(exc, file=sys.stderr)
         return 1
     missing = worker_problems(settings)
-    if missing:
+    infra = [name for name in missing if name != "WHATSAPP_ACCESS_TOKEN"]
+    if infra:
         print(f"WhatsApp worker requires these variables: {', '.join(missing)}", file=sys.stderr)
         return 1
 
@@ -72,6 +74,12 @@ def main() -> int:
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, stop.set)
+        if missing:
+            # Deployed before the Meta app exists: idle instead of crash-looping. Railway
+            # redeploys the service when WHATSAPP_ACCESS_TOKEN is set.
+            logger.warning("whatsapp worker on standby: WHATSAPP_ACCESS_TOKEN is not set")
+            await stop.wait()
+            return
         await run(settings, stop)
 
     asyncio.run(_main())

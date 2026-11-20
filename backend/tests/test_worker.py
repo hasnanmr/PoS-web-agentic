@@ -29,6 +29,26 @@ def test_worker_fails_fast_on_invalid_config(
     assert "requires these variables" in capsys.readouterr().err
 
 
+def test_worker_stands_by_without_the_whatsapp_token(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://app_backend@localhost:5432/pos")
+    monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+    started: list[Settings] = []
+
+    async def fake_run(settings: Settings, stop: asyncio.Event) -> None:
+        started.append(settings)
+
+    async def stopped(self: asyncio.Event) -> bool:
+        return True
+
+    monkeypatch.setattr(worker, "run", fake_run)
+    monkeypatch.setattr(asyncio.Event, "wait", stopped)
+    assert worker.main() == 0
+    assert not started
+    assert "standby" in capsys.readouterr().out  # JSON log lines go to stdout
+
+
 def test_worker_runs_with_a_complete_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql://app_backend@localhost:5432/pos")
     monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
