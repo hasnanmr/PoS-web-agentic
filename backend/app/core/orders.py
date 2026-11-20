@@ -727,7 +727,12 @@ async def _payment_methods(
 
 
 def _summary(items: list[dict[str, Any]]) -> str:
-    return ", ".join(f"{i['quantity']}× {i['name']}" for i in items)  # noqa: RUF001 - S2 copy
+    """S2 card line: "2x Es Kopi Susu (kurang manis), 1x Roti Bakar". The kitchen note is per
+    item (Q2a/Q3 "Catatan untuk dapur"), so it follows the item it belongs to."""
+    return ", ".join(
+        f"{i['quantity']}× {i['name']}" + (f" ({i['note']})" if i.get("note") else "")  # noqa: RUF001
+        for i in items
+    )
 
 
 async def detail(conn: AsyncConnection, order_id: UUID) -> dict[str, Any]:

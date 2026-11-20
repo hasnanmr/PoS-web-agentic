@@ -44,7 +44,7 @@ function status(over: Partial<WebOrderStatus> = {}): WebOrderStatus {
   return {
     id: 'ord-1', order_no: '#A-1050', created_at: '2026-11-20T05:41:00Z', customer_name: 'Rina', note: null,
     status: 'pending_payment', payment_status: 'unpaid', claimed_at: null, pay_by: '2026-11-20T05:56:00Z',
-    items: [{ name: 'Americano', quantity: 2, addons: [], line_total: 44000 }],
+    items: [{ name: 'Americano', quantity: 2, addons: [], note: null, line_total: 44000 }],
     subtotal: 44000, pb1_amount: 4400, total: 48400, reject_reason: null, cancel_reason: null,
     events: [{ status: 'pending_payment', at: '2026-11-20T05:41:00Z' }], timezone: 'Asia/Jakarta',
     ...over,
@@ -100,6 +100,7 @@ describe('Q2 Menu / Q2a add-on', () => {
     const add = screen.getByRole('button', { name: /Tambah ke pesanan · Rp 25.000/ })
     expect(add).toBeDisabled()
     await userEvent.click(screen.getByLabelText(/Oat milk/))
+    await userEvent.type(screen.getByPlaceholderText('mis. kurang manis'), 'es sedikit')
     await userEvent.click(screen.getByRole('button', { name: 'Tambah Es Kopi Susu' })) // quantity 2
     await userEvent.click(screen.getByRole('button', { name: /Tambah ke pesanan · Rp 60.000/ }))
     expect(await screen.findByText(/2 item · Rp 60.000/)).toBeInTheDocument()
@@ -142,12 +143,16 @@ describe('Q3 → Q4 → Q5', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Tambah Americano' }))
     await userEvent.click(screen.getByRole('button', { name: /Lihat pesanan/ }))
     expect(await screen.findByText('Rp 4.400')).toBeInTheDocument() // PB1 from the server quote
+    await userEvent.click(screen.getByRole('button', { name: '✎ + Catatan' }))
+    await userEvent.type(screen.getByLabelText('Catatan Americano'), 'tanpa gula')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+    expect(screen.getByRole('button', { name: '✎ tanpa gula' })).toBeInTheDocument()
     await userEvent.type(screen.getByPlaceholderText(/mis. Rina/), 'Rina')
     await userEvent.click(screen.getByRole('button', { name: /Pesan & bayar · Rp 48.400/ }))
 
     const order = api.calls.find(([m, p]) => m === 'POST' && p === `${BASE}/orders`)!
     expect(order[2]).toMatchObject({
-      items: [{ product_id: 'p-americano', quantity: 2, addon_option_ids: [] }],
+      items: [{ product_id: 'p-americano', quantity: 2, addon_option_ids: [], note: 'tanpa gula' }],
       customer_name: 'Rina', expected_total: 48400,
     })
     expect(vi.mocked(api.post).mock.calls.find(([p]) => p === `${BASE}/orders`)![2])
@@ -163,7 +168,9 @@ describe('Q3 → Q4 → Q5', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Saya sudah bayar' }))
     expect(await screen.findByText('◷ Menunggu konfirmasi staf')).toBeInTheDocument()
-    expect(screen.getByText(/Kamu bilang sudah bayar 12:44/)).toBeInTheDocument()
+    expect(screen.getByText(/Terima kasih atas pembayarannya. Staf akan konfirmasi ke kamu setelah ini./)).toBeInTheDocument()
+    expect(screen.getByLabelText('Pembayaran dikirim: sedang berjalan')).toBeInTheDocument()
+    expect(screen.getByLabelText('Dikonfirmasi staf: belum')).toBeInTheDocument()
   })
 
   it('shows the staff rejection reason', async () => {

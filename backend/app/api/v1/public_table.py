@@ -138,6 +138,7 @@ class StatusItem(BaseModel):
     name: str
     quantity: int
     addons: list[str]
+    note: str | None = Field(description='Per-item "Catatan untuk dapur"')
     line_total: int
 
 
