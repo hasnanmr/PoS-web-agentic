@@ -56,7 +56,8 @@ async def list_devices(outlet_id: UUID, request: Request, owner: OwnerOnly) -> l
 async def create_pairing_code(
     outlet_id: UUID, request: Request, owner: OwnerOnly
 ) -> PairingCodeOut:
-    """O3 "+ Pairing tablet baru → kode 6 digit"; the tablet enters it on K0."""
+    """O3 "+ Pairing tablet baru → kode 6 digit"; the tablet enters it on K0.
+    `tablet_already_paired` (409) while the outlet has an active tablet: forget it first."""
     ctx = owner.actor()
     async with db.transaction(_pool(request), ctx) as conn:
         await outlets.require_outlet(conn, outlet_id)
@@ -66,7 +67,8 @@ async def create_pairing_code(
 
 @router.post("/attendance-devices/{device_id}/revoke")
 async def revoke_device(device_id: UUID, request: Request, owner: OwnerOnly) -> DeviceOut:
-    """O3 "Cabut": the tablet is refused on its next request and goes back to K0."""
+    """O3 "Lupakan perangkat": the tablet is refused on its next request and goes back to K0;
+    the outlet can then pair a new tablet (one active tablet per outlet)."""
     ctx = owner.actor()
     async with db.transaction(_pool(request), ctx) as conn:
         row = await core.revoke_device(conn, ctx, device_id)

@@ -70,6 +70,8 @@ export function tabletErrorMessage(error: unknown, context: 'save' | 'other' = '
         return 'Tablet ini tidak lagi terhubung ke outlet. Minta kode pairing baru dari owner.'
       case 'pairing_code_invalid':
         return 'Kode salah, sudah dipakai, atau kedaluwarsa. Minta kode baru dari owner.'
+      case 'tablet_already_paired':
+        return 'Outlet ini sudah punya tablet absensi. Minta owner tap "Lupakan perangkat" di tablet lama, lalu buat kode baru.'
       case 'too_many_attempts':
         return 'Terlalu banyak kode salah. Tunggu beberapa menit lalu coba lagi.'
       case 'selfie_required':

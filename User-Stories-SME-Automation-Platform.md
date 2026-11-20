@@ -773,8 +773,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 - **Acceptance criteria:**
   - Owner membuat kode pairing sekali pakai per outlet di admin app; tablet yang memasukkan kode itu tetap login sebagai outlet tersebut.
   - Sesi tablet hanya bisa menampilkan staf outlet itu dan mencatat clock in/out; order, laporan, pengaturan, dan data outlet lain ditolak.
-  - Owner melihat daftar tablet per outlet beserta aktivitas terakhirnya dan dapat mencabut tablet kapan saja; tablet yang dicabut langsung ditolak dan harus di-pairing ulang dengan kode baru.
-  - Satu outlet boleh punya lebih dari satu tablet.
+  - Owner melihat tablet outlet beserta aktivitas terakhirnya dan dapat melupakannya ("Lupakan perangkat", dengan konfirmasi) kapan saja; tablet yang dilupakan langsung ditolak dan harus di-pairing ulang dengan kode baru.
+  - Satu outlet hanya boleh punya satu tablet aktif. Selama masih ada tablet aktif, owner tidak bisa membuat kode pairing baru dan pairing tablet lain ditolak; untuk ganti tablet, owner melupakan tablet lama dulu lalu pairing tablet baru.
 - **Traceability:** FR5.6, AC5.7
 
 ### US-056 — Melihat jam ramai, jam sepi, dan keramaian outlet

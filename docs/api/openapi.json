@@ -8712,7 +8712,7 @@
     },
     "/api/v1/device/pair": {
       "post": {
-        "description": "K0 \"Hubungkan tablet\". `pairing_code_invalid` (400) for a wrong, used, or expired code.",
+        "description": "K0 \"Hubungkan tablet\". `pairing_code_invalid` (400) for a wrong, used, or expired code;\n`tablet_already_paired` (409) while the outlet still has an active tablet (one per outlet).",
         "operationId": "pair_api_v1_device_pair_post",
         "requestBody": {
           "content": {
@@ -11590,7 +11590,7 @@
     },
     "/api/v1/owner/attendance-devices/{device_id}/revoke": {
       "post": {
-        "description": "O3 \"Cabut\": the tablet is refused on its next request and goes back to K0.",
+        "description": "O3 \"Lupakan perangkat\": the tablet is refused on its next request and goes back to K0;\nthe outlet can then pair a new tablet (one active tablet per outlet).",
         "operationId": "revoke_device_api_v1_owner_attendance_devices__device_id__revoke_post",
         "parameters": [
           {
@@ -12741,7 +12741,7 @@
     },
     "/api/v1/owner/outlets/{outlet_id}/attendance-pairing-codes": {
       "post": {
-        "description": "O3 \"+ Pairing tablet baru → kode 6 digit\"; the tablet enters it on K0.",
+        "description": "O3 \"+ Pairing tablet baru → kode 6 digit\"; the tablet enters it on K0.\n`tablet_already_paired` (409) while the outlet has an active tablet: forget it first.",
         "operationId": "create_pairing_code_api_v1_owner_outlets__outlet_id__attendance_pairing_codes_post",
         "parameters": [
           {

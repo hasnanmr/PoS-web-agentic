@@ -1,7 +1,8 @@
 """Wave 7c attendance tablet tests (T-116, T-120, T-121, T-122) against Postgres through RLS:
 O3 pairing codes and device list, K0 pairing (one-time, expiring), K1 staff list scoped to the
 outlet, K2/K3 selfie upload and the required selfie, clock in / clock out decided by the server,
-one open record per staff member, revocation, and what a tablet or staff session cannot reach.
+one open record per staff member, one active tablet per outlet ("Lupakan perangkat" before a new
+pairing), revocation, and what a tablet or staff session cannot reach.
 """
 
 from __future__ import annotations
@@ -100,7 +101,21 @@ def ctx(client: TestClient) -> dict[str, Any]:
     }
 
 
+def _forget_all(client: TestClient, ctx: dict[str, Any], outlet: str) -> None:
+    """O3 "Lupakan perangkat" for every active tablet of the outlet."""
+    res = client.get(f"/api/v1/owner/outlets/{outlet}/attendance-devices", headers=ctx["owner"])
+    assert res.status_code == 200, res.text
+    for d in res.json():
+        if d["revoked_at"] is None:
+            res = client.post(
+                f"/api/v1/owner/attendance-devices/{d['id']}/revoke", headers=ctx["owner"]
+            )
+            assert res.status_code == 200, res.text
+
+
 def _pair(client: TestClient, ctx: dict[str, Any], outlet: str) -> tuple[str, dict[str, Any]]:
+    """Pair a new tablet to the outlet, forgetting its current one first (one per outlet)."""
+    _forget_all(client, ctx, outlet)
     res = client.post(
         f"/api/v1/owner/outlets/{outlet}/attendance-pairing-codes", headers=ctx["owner"]
     )
@@ -135,6 +150,7 @@ def _tap(client: TestClient, token: str, user: UUID, action: str, selfie: str | 
 
 
 def test_pairing_code_is_owner_only_and_one_time(client: TestClient, ctx: dict[str, Any]) -> None:
+    _forget_all(client, ctx, ctx["dago"])
     res = client.post(
         f"/api/v1/owner/outlets/{ctx['dago']}/attendance-pairing-codes", headers=ctx["rina"]
     )
@@ -171,6 +187,7 @@ def test_pairing_code_is_owner_only_and_one_time(client: TestClient, ctx: dict[s
 
 
 def test_expired_code_is_refused(client: TestClient, ctx: dict[str, Any]) -> None:
+    _forget_all(client, ctx, ctx["dago"])
     res = client.post(
         f"/api/v1/owner/outlets/{ctx['dago']}/attendance-pairing-codes", headers=ctx["owner"]
     )
@@ -183,6 +200,76 @@ def test_expired_code_is_refused(client: TestClient, ctx: dict[str, Any]) -> Non
     res = client.post("/api/v1/device/pair", json={"code": code})
     assert res.status_code == 400
     assert res.json()["error"]["code"] == "pairing_code_invalid"
+
+
+def test_one_active_tablet_per_outlet(client: TestClient, ctx: dict[str, Any]) -> None:
+    old, _ = _pair(client, ctx, ctx["dago"])
+    url = f"/api/v1/owner/outlets/{ctx['dago']}/attendance-pairing-codes"
+    # While Dago has a tablet, no new code (O3 hides "+ Pairing tablet baru").
+    res = client.post(url, headers=ctx["owner"])
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "tablet_already_paired"
+    # Another outlet is not affected.
+    _forget_all(client, ctx, ctx["riau"])
+    assert (
+        client.post(
+            f"/api/v1/owner/outlets/{ctx['riau']}/attendance-pairing-codes", headers=ctx["owner"]
+        ).status_code
+        == 201
+    )
+
+    # "Lupakan perangkat" → the old tablet is refused and a new one can pair.
+    _forget_all(client, ctx, ctx["dago"])
+    res = client.get("/api/v1/device/staff", headers=_dev(old))
+    assert res.status_code == 401 and res.json()["error"]["code"] == "device_revoked"
+    new, _ = _pair(client, ctx, ctx["dago"])
+    assert client.get("/api/v1/device/staff", headers=_dev(new)).status_code == 200
+    active = [
+        d
+        for d in client.get(
+            f"/api/v1/owner/outlets/{ctx['dago']}/attendance-devices", headers=ctx["owner"]
+        ).json()
+        if d["revoked_at"] is None
+    ]
+    assert len(active) == 1
+
+
+def test_second_code_cannot_pair_a_second_tablet(client: TestClient, ctx: dict[str, Any]) -> None:
+    _forget_all(client, ctx, ctx["dago"])
+    url = f"/api/v1/owner/outlets/{ctx['dago']}/attendance-pairing-codes"
+    first = client.post(url, headers=ctx["owner"]).json()["code"]
+    second = client.post(url, headers=ctx["owner"]).json()["code"]
+    assert client.post("/api/v1/device/pair", json={"code": first}).status_code == 201
+    res = client.post("/api/v1/device/pair", json={"code": second})
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "tablet_already_paired"
+    # A right code does not count against the rate limit, and it stays usable (10 minutes).
+    assert not device_api._attempts
+    _forget_all(client, ctx, ctx["dago"])
+    assert client.post("/api/v1/device/pair", json={"code": second}).status_code == 201
+
+
+def test_outlet_with_several_old_tablets_keeps_them(
+    client: TestClient, ctx: dict[str, Any]
+) -> None:
+    # Tablets paired before the one-tablet rule keep working; pairing waits until all are gone.
+    token, paired = _pair(client, ctx, ctx["dago"])
+    admin_sql(
+        "insert into app.attendance_devices (tenant_id, outlet_id, name, paired_by)"
+        " values (%s, %s, 'Tablet lama', %s)",
+        (ctx["tenant"], ctx["dago"], OWNER),
+    )
+    assert client.get("/api/v1/device/staff", headers=_dev(token)).status_code == 200
+    url = f"/api/v1/owner/outlets/{ctx['dago']}/attendance-pairing-codes"
+    devices = client.get(
+        f"/api/v1/owner/outlets/{ctx['dago']}/attendance-devices", headers=ctx["owner"]
+    ).json()
+    mine = next(d["id"] for d in devices if d["name"] == paired["device_name"])
+    client.post(f"/api/v1/owner/attendance-devices/{mine}/revoke", headers=ctx["owner"])
+    res = client.post(url, headers=ctx["owner"])
+    assert res.status_code == 409 and res.json()["error"]["code"] == "tablet_already_paired"
+    _forget_all(client, ctx, ctx["dago"])
+    assert client.post(url, headers=ctx["owner"]).status_code == 201
 
 
 def test_wrong_codes_are_rate_limited(client: TestClient, ctx: dict[str, Any]) -> None:
@@ -383,8 +470,8 @@ def test_unassigned_while_working_can_still_clock_out(
 
 def test_selfie_from_another_tablet_is_refused(client: TestClient, ctx: dict[str, Any]) -> None:
     one, _ = _pair(client, ctx, ctx["dago"])
-    two, _ = _pair(client, ctx, ctx["dago"])
     selfie = _selfie(client, one)
+    two, _ = _pair(client, ctx, ctx["dago"])  # forgets tablet one (one tablet per outlet)
     res = _tap(client, two, RINA, "clock_in", selfie)
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "selfie_required"

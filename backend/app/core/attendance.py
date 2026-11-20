@@ -1,7 +1,9 @@
 """Staff attendance on the outlet tablet (T-116, T-121, T-122) — screens K0-K4 and O3.
 
 - O3 "Tablet absensi": the owner creates a one-time 6-digit pairing code (10 minutes), sees the
-  paired tablets with their last activity, and revokes ("Cabut") a tablet.
+  paired tablet with its last activity, and forgets ("Lupakan perangkat") it. An outlet has at
+  most one active tablet: a new code or pairing is refused (`tablet_already_paired`) until the
+  current one is forgotten.
 - K0: the tablet trades the code for a device token. Only a SHA-256 hash of the code and of the
   token is stored. Every tablet request resolves the token (`resolve_device`) and then runs as
   actor ``device`` scoped to its outlet; RLS lets that actor touch attendance tables only.
@@ -34,6 +36,7 @@ SELFIE_MAX_BYTES = 2 * 1024 * 1024
 # A selfie must be linked to a clock in/out soon after it was taken (K2 → K3 → Simpan).
 SELFIE_MAX_AGE = timedelta(minutes=10)
 TOKEN_PREFIX = "dev_"  # noqa: S105 - a prefix, not a secret
+ONE_TABLET_CONSTRAINT = "attendance_devices_one_active_per_outlet"
 
 
 class DeviceForbiddenError(DomainError):
@@ -42,6 +45,17 @@ class DeviceForbiddenError(DomainError):
 
 class SelfieRequiredError(DomainError):
     status_code = 422
+
+
+def _tablet_already_paired() -> ConflictError:
+    return ConflictError(
+        "tablet_already_paired",
+        "this outlet already has an attendance tablet; forget it before pairing a new one",
+    )
+
+
+def _is_one_tablet_violation(exc: errors.UniqueViolation) -> bool:
+    return getattr(exc.diag, "constraint_name", None) == ONE_TABLET_CONSTRAINT
 
 
 def hash_secret(value: str) -> str:
@@ -62,17 +76,23 @@ def new_device_token() -> str:
 async def create_pairing_code(
     conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID
 ) -> dict[str, Any]:
-    """`{code, expires_at}`. The code is shown once and only its hash is stored."""
+    """`{code, expires_at}`. The code is shown once and only its hash is stored.
+    `tablet_already_paired` (409) while the outlet still has an active tablet."""
     cur = await conn.execute("select now()")
     row = await cur.fetchone()
     assert row is not None  # noqa: S101
     expires_at = row[0] + PAIRING_CODE_TTL
     for _ in range(20):
         code = new_pairing_code()
-        cur = await conn.execute(
-            "select app.create_attendance_pairing_code(%s, %s, %s)",
-            (outlet_id, hash_secret(code), expires_at),
-        )
+        try:
+            cur = await conn.execute(
+                "select app.create_attendance_pairing_code(%s, %s, %s)",
+                (outlet_id, hash_secret(code), expires_at),
+            )
+        except errors.UniqueViolation as exc:
+            if _is_one_tablet_violation(exc):
+                raise _tablet_already_paired() from exc
+            raise
         created = await cur.fetchone()
         if created and created[0]:
             await record_audit(
@@ -103,7 +123,8 @@ async def list_devices(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str,
 async def revoke_device(
     conn: AsyncConnection, ctx: ActorContext, device_id: UUID
 ) -> dict[str, Any]:
-    """O3 "Cabut": the tablet is refused on its next request (`device_revoked`)."""
+    """O3 "Lupakan perangkat": the tablet is refused on its next request (`device_revoked`) and
+    the outlet can pair a new one."""
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         """
@@ -150,12 +171,19 @@ class Device:
 
 
 async def pair_device(conn: AsyncConnection, code: str) -> tuple[str, Device]:
-    """Trade a pairing code for `(device_token, device)`; `pairing_code_invalid` otherwise."""
+    """Trade a pairing code for `(device_token, device)`; `pairing_code_invalid` otherwise, and
+    `tablet_already_paired` when the outlet still has an active tablet (the code stays unused)."""
     token = new_device_token()
     cur = conn.cursor(row_factory=dict_row)
-    await cur.execute(
-        "select * from app.pair_attendance_device(%s, %s)", (hash_secret(code), hash_secret(token))
-    )
+    try:
+        await cur.execute(
+            "select * from app.pair_attendance_device(%s, %s)",
+            (hash_secret(code), hash_secret(token)),
+        )
+    except errors.UniqueViolation as exc:
+        if _is_one_tablet_violation(exc):
+            raise _tablet_already_paired() from exc
+        raise
     row = await cur.fetchone()
     if row is None:
         raise DomainError("pairing_code_invalid", "the code is wrong, used, or expired")

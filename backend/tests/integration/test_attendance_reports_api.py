@@ -74,6 +74,11 @@ def _add_staff(tenant: str, user: UUID, name: str, outlet: str) -> None:
 
 
 def _pair(client: TestClient, owner: dict[str, str], outlet: str) -> str:
+    """Pair a tablet, forgetting the outlet's current one first (one active tablet per outlet)."""
+    res = client.get(f"/api/v1/owner/outlets/{outlet}/attendance-devices", headers=owner)
+    for d in res.json():
+        if d["revoked_at"] is None:
+            client.post(f"/api/v1/owner/attendance-devices/{d['id']}/revoke", headers=owner)
     res = client.post(f"/api/v1/owner/outlets/{outlet}/attendance-pairing-codes", headers=owner)
     res = client.post("/api/v1/device/pair", json={"code": res.json()["code"]})
     assert res.status_code == 201, res.text

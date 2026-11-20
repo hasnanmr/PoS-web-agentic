@@ -72,6 +72,14 @@ describe('K0 Pairing tablet ke outlet', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hubungkan tablet' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Kode salah, sudah dipakai, atau kedaluwarsa')
   })
+
+  it('explains that the outlet already has a tablet (one per outlet)', async () => {
+    const api = fakeApi({ 'POST /device/pair': new ApiError(409, 'tablet_already_paired', 'busy') })
+    render(<Tablet api={api} pairing={null} onPairing={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText('Digit 1'), '482913')
+    await userEvent.click(screen.getByRole('button', { name: 'Hubungkan tablet' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Outlet ini sudah punya tablet absensi')
+  })
 })
 
 describe('K0 digit boxes', () => {

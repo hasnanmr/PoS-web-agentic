@@ -3,7 +3,8 @@
 // PUT /owner/outlets/{id}/opening-hours, drawers under /owner/outlets/{id}/drawers.
 // QRIS statis card (T-014, PoC demo): PUT/GET /owner/outlets/{id}/qris, image from
 // GET /ops/outlets/{id}/qris/image. Tablet absensi (T-121): GET /owner/outlets/{id}/attendance-devices,
-// POST /owner/outlets/{id}/attendance-pairing-codes, POST /owner/attendance-devices/{id}/revoke.
+// POST /owner/outlets/{id}/attendance-pairing-codes, POST /owner/attendance-devices/{id}/revoke
+// ("Lupakan perangkat"). One active tablet per outlet: pairing is offered only when none is left.
 import { useEffect, useState, type ReactNode } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
@@ -416,12 +417,15 @@ function AttendanceTablets({ outletId }: { outletId: string }) {
   const { api } = useSession()
   const devices = useLoad(() => api.get<AttendanceDevice[]>(`/owner/outlets/${outletId}/attendance-devices`), outletId)
   const [code, setCode] = useState<PairingCode & { outletId: string; createdAt: number }>()
+  const [forgetting, setForgetting] = useState<string>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const active = (devices.data ?? []).filter((d) => !d.revoked_at)
   // The one-time code disappears once a tablet used it (a device paired after it was created)
-  // or when it expires, so "+ Pairing tablet baru" is offered again for the next tablet.
+  // or when it expires. An outlet has at most one active tablet (server: `tablet_already_paired`),
+  // so "+ Pairing tablet baru" is offered only when no tablet is left: to replace a tablet the
+  // owner first taps "Lupakan perangkat".
   const used = code !== undefined && active.some((d) => new Date(d.paired_at).getTime() >= code.createdAt - 5000)
   const live = code !== undefined && new Date(code.expires_at).getTime() > now
   const shownCode = code?.outletId === outletId && live && !used ? code : undefined
@@ -440,6 +444,7 @@ function AttendanceTablets({ outletId }: { outletId: string }) {
       await devices.reload()
     } catch (e) {
       setError(errorMessage(e))
+      await devices.reload()
     } finally {
       setBusy(false)
     }
@@ -452,13 +457,35 @@ function AttendanceTablets({ outletId }: { outletId: string }) {
       )}
       <ul className="space-y-1.5">
         {active.map((d) => (
-          <li key={d.id} className="flex items-center gap-3">
-            <span>
-              <span className={d.last_seen_at ? 'text-success' : 'text-text-muted'}>●</span> {d.name}
-              {' · '}{d.last_seen_at ? `aktif ${timeAgo(d.last_seen_at)}` : 'belum aktif'}
-            </span>
-            <LinkButton className="text-danger" disabled={busy}
-              onClick={() => void run(() => api.post(`/owner/attendance-devices/${d.id}/revoke`))}>Cabut</LinkButton>
+          <li key={d.id}>
+            <div className="flex items-center gap-3">
+              <span>
+                <span className={d.last_seen_at ? 'text-success' : 'text-text-muted'}>●</span> {d.name}
+                {' · '}{d.last_seen_at ? `aktif ${timeAgo(d.last_seen_at)}` : 'belum aktif'}
+              </span>
+              {forgetting !== d.id && (
+                <LinkButton className="text-danger" disabled={busy} onClick={() => setForgetting(d.id)}>
+                  Lupakan perangkat
+                </LinkButton>
+              )}
+            </div>
+            {forgetting === d.id && (
+              <div role="group" aria-label={`Lupakan ${d.name}`}
+                className="mt-1 rounded-md border border-border bg-danger-soft px-3 py-2 text-[12px]">
+                <p>
+                  Lupakan {d.name}? Tablet ini langsung keluar dan staf tidak bisa absen di outlet ini
+                  sampai tablet baru dipairing.
+                </p>
+                <div className="mt-1.5 flex items-center gap-3">
+                  <LinkButton className="font-semibold text-danger" disabled={busy}
+                    onClick={() => void run(async () => {
+                      await api.post(`/owner/attendance-devices/${d.id}/revoke`)
+                      setForgetting(undefined)
+                    })}>Ya, lupakan</LinkButton>
+                  <LinkButton disabled={busy} onClick={() => setForgetting(undefined)}>Batal</LinkButton>
+                </div>
+              </div>
+            )}
           </li>
         ))}
       </ul>
@@ -473,13 +500,19 @@ function AttendanceTablets({ outletId }: { outletId: string }) {
               { hour: '2-digit', minute: '2-digit' })}.
           </div>
         </div>
+      ) : active.length === 0 ? (
+        !devices.loading && (
+          <LinkButton disabled={busy} onClick={() => void run(async () => {
+            const created = await api.post<PairingCode>(`/owner/outlets/${outletId}/attendance-pairing-codes`)
+            const at = Date.now()
+            setNow(at)
+            setCode({ ...created, outletId, createdAt: at })
+          })}>+ Pairing tablet baru → kode 6 digit</LinkButton>
+        )
       ) : (
-        <LinkButton disabled={busy} onClick={() => void run(async () => {
-          const created = await api.post<PairingCode>(`/owner/outlets/${outletId}/attendance-pairing-codes`)
-          const at = Date.now()
-          setNow(at)
-          setCode({ ...created, outletId, createdAt: at })
-        })}>+ Pairing tablet baru → kode 6 digit</LinkButton>
+        <p className="text-[11px] text-text-muted">
+          Satu outlet hanya bisa 1 tablet absensi. Ganti tablet? Lupakan perangkat di atas, lalu pairing tablet baru.
+        </p>
       )}
       {error && <Alert>{error}</Alert>}
     </div>
