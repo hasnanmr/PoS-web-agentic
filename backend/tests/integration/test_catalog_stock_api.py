@@ -405,3 +405,57 @@ def test_stock_items_and_new_outlet_gets_prices(client, ctx) -> None:
         client.get(f"/api/v1/ops/outlets/{outlet['id']}/stock", headers=ctx["staff"]).status_code
         == 404
     )
+
+
+def test_stock_item_rename_unit_lock_and_archive(client, ctx) -> None:
+    owner, staff = ctx["owner"], ctx["staff"]
+    base = "/api/v1/owner/stock-items"
+
+    def create(name: str, unit: str = "g") -> str:
+        res = client.post(base, headers=owner, json={"name": name, "unit": unit})
+        assert res.status_code == 201, res.text
+        return res.json()["id"]
+
+    # Mistyped item: rename and switch base unit while nothing uses it.
+    typo = create("Gula pasri")
+    assert client.patch(f"{base}/{typo}", headers=staff, json={"name": "x"}).status_code == 403
+    assert (
+        client.patch(
+            f"{base}/{typo}", headers=owner, json={"name": "Gula pasir", "unit": "ml"}
+        ).status_code
+        == 204
+    )
+    listed = {i["id"]: i for i in client.get(base, headers=owner).json()}
+    assert listed[typo]["name"] == "Gula pasir" and listed[typo]["unit"] == "ml"
+    assert listed[typo]["display_unit"] is None  # reset: the old display unit may not fit
+
+    # Renaming onto an existing active name is a conflict.
+    other = create("Gula halus")
+    res = client.patch(f"{base}/{other}", headers=owner, json={"name": "Gula pasir"})
+    assert res.status_code == 409
+
+    # An item with stock and a recipe keeps its base unit, can still be renamed.
+    matcha = _stock(client, ctx, "Bubuk matcha")["stock_item_id"]
+    res = client.patch(f"{base}/{matcha}", headers=owner, json={"unit": "pcs"})
+    assert res.status_code == 409 and res.json()["error"]["code"] == "stock_item_unit_locked"
+    assert (
+        client.patch(f"{base}/{matcha}", headers=owner, json={"name": "Matcha bubuk"}).status_code
+        == 204
+    )
+
+    # Delete: refused while a recipe uses it, allowed (archived) otherwise, and the name is free.
+    res = client.delete(f"{base}/{matcha}", headers=owner)
+    assert res.status_code == 409 and res.json()["error"]["code"] == "stock_item_in_recipe"
+    assert client.delete(f"{base}/{typo}", headers=staff).status_code == 403
+    assert client.delete(f"{base}/{typo}", headers=owner).status_code == 204
+    assert client.delete(f"{base}/{typo}", headers=owner).status_code == 404
+    assert typo not in {i["id"] for i in client.get(base, headers=owner).json()}
+    create("Gula pasir")
+    # An archived ingredient cannot be put into a recipe.
+    croissant = _product(client, ctx, "Croissant Butter")
+    res = client.put(
+        f"/api/v1/owner/products/{croissant['id']}/recipe",
+        headers=owner,
+        json=[{"stock_item_id": typo, "quantity": "1"}],
+    )
+    assert res.status_code == 422

@@ -82,7 +82,7 @@ Staff calling it → `403` (AC7.7).
 | Resep (1 porsi) | `GET/PUT /owner/products/{id}/recipe` ✅ | `[{stock_item_id, quantity}]`, min 1 line; unit from stock item. |
 | Delta resep dari add-on | `GET/PUT /owner/addon-options/{id}/recipe` ✅ | `[{stock_item_id, quantity (±)}]`. |
 | Simulasi ketersediaan per outlet | `GET /owner/products/{id}/availability` ✅ | `[{outlet_id, portions_available, sold_out, limiting_stock_item}]`. |
-| Daftar bahan | `GET/POST /owner/stock-items`, `PATCH /owner/stock-items/{id}` ✅ | `name, unit: g\|ml\|pcs`. |
+| Daftar bahan | `GET/POST /owner/stock-items`, `PATCH /owner/stock-items/{id}`, `DELETE /owner/stock-items/{id}` ✅ | `name, unit: g\|ml\|pcs, display_unit`. Per-row **Edit** (dialog: nama, satuan dasar) and **Hapus** (confirm dialog); owner only. `PATCH` may change `name`, `unit`, `display_unit`; changing `unit` is `409 stock_item_unit_locked` once the item has stock movements, recipe lines or PO lines (a changed unit resets `display_unit`). `DELETE` archives (`is_active=false`, `204`): `409 stock_item_in_recipe` while any menu/add-on recipe uses it, `404` when already archived. Archived items disappear from lists, S7/M5, PO pickers and recipe pickers; history and audit keep them. Name is unique among active items only (migration `20261120000200`). Name clash → `409 stock_item_name_taken`. Not drawn in the wireframe — requested as an enhancement (owner only; staff unchanged). |
 | Threshold per outlet | `PUT /owner/stock-items/{id}/thresholds` ✅ | `[{outlet_id, low_threshold}]`. |
 
 ### O7 · Rekomendasi (T-073, T-074)

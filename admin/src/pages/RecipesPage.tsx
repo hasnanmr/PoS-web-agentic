@@ -1,7 +1,7 @@
 // Wireframe O6 — Resep & Bahan (T-019, T-021, T-022, T-066).
 // Tabs: Resep menu (GET/PUT /owner/products/{id}/recipe, add-on deltas via
 // /owner/addon-options/{id}/recipe, GET /owner/products/{id}/availability),
-// Daftar bahan (GET/POST/PATCH /owner/stock-items), Threshold per outlet
+// Daftar bahan (GET/POST/PATCH/DELETE /owner/stock-items; Edit nama + satuan dasar, Hapus = arsip), Threshold per outlet
 // (PUT /owner/stock-items/{id}/thresholds).
 import { useState } from 'react'
 import { useSession } from '../app/session'
@@ -10,7 +10,8 @@ import { displayFactor, formatDelta, plainQuantity } from '../lib/format'
 import type { AddonOption, Availability, DisplayUnit, ProductDetail, ProductRow, RecipeLine, StockItem, Unit } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
-import { Alert, Button, Card, LinkButton, Loading, Select, TextInput } from '../ui/kit'
+import { Dialog } from './po/ui'
+import { Alert, Button, Card, Field, LinkButton, Loading, Select, TextInput } from '../ui/kit'
 
 type Tab = 'recipe' | 'items' | 'thresholds'
 
@@ -223,6 +224,8 @@ function ItemsTab({ items, reload }: { items?: StockItem[]; reload: () => Promis
   const { api } = useSession()
   const [name, setName] = useState('')
   const [unit, setUnit] = useState<Unit>('g')
+  const [editing, setEditing] = useState<StockItem>()
+  const [deleting, setDeleting] = useState<StockItem>()
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string }>()
   async function run(action: () => Promise<unknown>, text: string) {
     try {
@@ -238,7 +241,7 @@ function ItemsTab({ items, reload }: { items?: StockItem[]; reload: () => Promis
     <Card title="Daftar bahan">
       <table className="w-full text-left text-[12px]">
         <thead className="text-[11px] tracking-wide text-text-muted uppercase">
-          <tr><th className="pb-2 font-medium">Bahan</th><th className="pb-2 font-medium">Satuan dasar</th><th className="pb-2 font-medium">Tampilan</th></tr>
+          <tr><th className="pb-2 font-medium">Bahan</th><th className="pb-2 font-medium">Satuan dasar</th><th className="pb-2 font-medium">Tampilan</th><th className="pb-2" /></tr>
         </thead>
         <tbody>
           {items.map((i) => (
@@ -250,6 +253,10 @@ function ItemsTab({ items, reload }: { items?: StockItem[]; reload: () => Promis
                   onChange={(e) => void run(() => api.patch(`/owner/stock-items/${i.id}`, { display_unit: e.target.value }), 'Satuan tampilan disimpan.')}>
                   {DISPLAY_OPTIONS[i.unit].map((u) => <option key={u} value={u}>{u}</option>)}
                 </Select>
+              </td>
+              <td className="py-2 text-right whitespace-nowrap">
+                <LinkButton aria-label={`Edit ${i.name}`} onClick={() => setEditing(i)}>Edit</LinkButton>
+                <LinkButton aria-label={`Hapus ${i.name}`} className="ml-3 text-danger" onClick={() => setDeleting(i)}>Hapus</LinkButton>
               </td>
             </tr>
           ))}
@@ -270,7 +277,76 @@ function ItemsTab({ items, reload }: { items?: StockItem[]; reload: () => Promis
         <Button type="submit" className="h-8" disabled={!name.trim()}>+ Tambah bahan</Button>
       </form>
       {message && <div className="mt-3"><Alert tone={message.tone}>{message.text}</Alert></div>}
+      {editing && (
+        <EditItemDialog item={editing} onClose={() => setEditing(undefined)}
+          onSave={async (patch) => {
+            await api.patch(`/owner/stock-items/${editing.id}`, patch)
+            setEditing(undefined)
+            setMessage({ tone: 'success', text: 'Bahan diperbarui.' })
+            await reload()
+          }} />
+      )}
+      {deleting && (
+        <Dialog label="Hapus bahan" onClose={() => setDeleting(undefined)}>
+          <h3 className="text-[16px] font-semibold">Hapus &quot;{deleting.name}&quot;?</h3>
+          <p className="mt-2 text-[12px] text-text-muted">
+            Bahan hilang dari daftar, stok, dan pilihan resep/PO. Riwayat stok dan PO lama tetap tersimpan. Bahan yang masih dipakai di resep tidak bisa dihapus.
+          </p>
+          <div className="mt-4 flex gap-3">
+            <Button variant="danger" className="h-8" onClick={() => {
+              const target = deleting
+              setDeleting(undefined)
+              void run(() => api.del(`/owner/stock-items/${target.id}`), `${target.name} dihapus.`)
+            }}>Ya, hapus</Button>
+            <LinkButton onClick={() => setDeleting(undefined)}>Batal</LinkButton>
+          </div>
+        </Dialog>
+      )}
     </Card>
+  )
+}
+
+function EditItemDialog({ item, onClose, onSave }: {
+  item: StockItem
+  onClose: () => void
+  onSave: (patch: { name?: string; unit?: Unit }) => Promise<void>
+}) {
+  const [name, setName] = useState(item.name)
+  const [unit, setUnit] = useState<Unit>(item.unit)
+  const [error, setError] = useState<string>()
+  const changed = name.trim() !== item.name || unit !== item.unit
+  async function submit() {
+    const patch: { name?: string; unit?: Unit } = {}
+    if (name.trim() !== item.name) patch.name = name.trim()
+    if (unit !== item.unit) patch.unit = unit
+    try {
+      await onSave(patch)
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+  return (
+    <Dialog label="Edit bahan" onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); void submit() }}>
+        <h3 className="text-[16px] font-semibold">Edit bahan</h3>
+        <div className="mt-3 flex flex-col gap-3">
+          <Field label="Nama bahan" htmlFor="edit-item-name">
+            <TextInput id="edit-item-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Satuan dasar" htmlFor="edit-item-unit"
+            hint="Satuan dasar hanya bisa diubah jika bahan belum punya stok, resep, atau PO.">
+            <Select id="edit-item-unit" value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
+              <option value="g">g</option><option value="ml">ml</option><option value="pcs">pcs</option>
+            </Select>
+          </Field>
+        </div>
+        {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+        <div className="mt-4 flex gap-3">
+          <Button type="submit" className="h-8" disabled={!name.trim() || !changed}>Simpan</Button>
+          <LinkButton type="button" onClick={onClose}>Batal</LinkButton>
+        </div>
+      </form>
+    </Dialog>
   )
 }
 
