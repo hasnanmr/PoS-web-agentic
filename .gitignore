@@ -35,3 +35,6 @@ pnpm-debug.log*
 
 # Supabase CLI local cache (linked project, pooler URL)
 supabase/.temp/
+
+# Internal business notes (pricing, packages): not for the repo
+docs/business/
