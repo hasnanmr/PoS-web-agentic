@@ -205,3 +205,26 @@ describe('refresh on the order page', () => {
     expect(await screen.findByText('◷ Menunggu konfirmasi staf')).toBeInTheDocument()
   })
 })
+
+describe('Q3 per-item note', () => {
+  it('sends a note that is still being typed when the customer taps "Pesan & bayar"', async () => {
+    const api = fakeApi({
+      [`GET ${BASE}`]: PAGE,
+      [`GET ${BASE}/menu`]: MENU,
+      [`POST ${BASE}/quote`]: QUOTE,
+      [`POST ${BASE}/orders`]: { order_id: 'ord-2', access_key: 'key-2', order_no: '#A-1051', total: 48400, pay_by: status().pay_by },
+      [`GET ${BASE}/orders/ord-2`]: status({ id: 'ord-2', order_no: '#A-1051' }),
+    })
+    render(<TableScreens api={api} token={TOKEN} redirect={vi.fn()} location={{ read: () => '', write: vi.fn() }} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Americano' }))
+    await userEvent.click(screen.getByRole('button', { name: /Lihat pesanan/ }))
+    await screen.findByText('Rp 4.400')
+    await userEvent.click(screen.getByRole('button', { name: '✎ + Catatan' }))
+    await userEvent.type(screen.getByLabelText('Catatan Americano'), 'tanpa es')
+    await userEvent.click(screen.getByRole('button', { name: /Pesan & bayar/ })) // no "Simpan"
+    await waitFor(() => {
+      const order = api.calls.find(([m, p]) => m === 'POST' && p === `${BASE}/orders`)
+      expect(order?.[2]).toMatchObject({ items: [{ product_id: 'p-americano', quantity: 1, note: 'tanpa es' }] })
+    })
+  })
+})

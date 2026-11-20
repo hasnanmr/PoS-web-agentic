@@ -567,11 +567,20 @@ function CartScreen({ api, base, page, cart, onQuantity, onNote, onBack, onStale
 
   async function submit() {
     if (!quote) return
+    // A note still being typed counts too: the customer may tap "Pesan & bayar" without "Simpan".
+    const draft = editing
+    const body = draft
+      ? items.map((it, n) => (cart[n]?.key === draft.key ? { ...it, note: draft.text.trim() || null } : it))
+      : items
+    if (draft) {
+      onNote(draft.key, draft.text)
+      setEditing(undefined)
+    }
     setBusy(true)
     setError(undefined)
     try {
       const created = await api.post<OrderCreated>(`${base}/orders`, {
-        items, customer_name: name.trim() || null, expected_total: quote.total,
+        items: body, customer_name: name.trim() || null, expected_total: quote.total,
       }, { 'Idempotency-Key': idempotencyKey.current })
       onPlaced(created)
     } catch (e) {
@@ -607,8 +616,10 @@ function CartScreen({ api, base, page, cart, onQuantity, onNote, onBack, onStale
                     <div className="mt-1 flex gap-2 pl-4">
                       <input autoFocus aria-label={`Catatan ${l.name}`} maxLength={200} placeholder="mis. kurang manis"
                         className="h-8 min-w-0 flex-1 rounded-md border border-border px-2 text-[12px]" value={editing.text}
-                        onChange={(e) => setEditing({ key: l.key, text: e.target.value })} />
+                        onChange={(e) => setEditing({ key: l.key, text: e.target.value })}
+                        onBlur={(e) => { onNote(l.key, e.target.value); setEditing(undefined) }} />
                       <button type="button" className="text-[12px] font-semibold text-primary"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => { onNote(l.key, editing.text); setEditing(undefined) }}>Simpan</button>
                     </div>
                   ) : (
