@@ -53,6 +53,7 @@ function status(over: Partial<WebOrderStatus> = {}): WebOrderStatus {
 
 beforeEach(() => {
   localStorage.clear()
+  window.history.replaceState(null, '', '/')
   URL.createObjectURL = vi.fn(() => 'blob:qris')
   URL.revokeObjectURL = vi.fn()
 })
@@ -180,8 +181,27 @@ describe('Q3 → Q4 → Q5', () => {
     renderPage({
       [`GET ${BASE}/orders/ord-1`]: status({ status: 'cancelled', reject_reason: 'Pembayaran tidak ditemukan' }),
     })
-    await userEvent.click(await screen.findByRole('button', { name: '#A-1050 →' }))
+    await userEvent.click(await screen.findByRole('tab', { name: /Pesanan saya/ }))
     expect(await screen.findByText('✕ Pembayaran ditolak')).toBeInTheDocument()
     expect(screen.getByText('Pembayaran tidak ditemukan')).toBeInTheDocument()
+  })
+})
+
+describe('refresh on the order page', () => {
+  it('comes back to the same order from the URL fragment, even without saved site data', async () => {
+    const location = { read: () => '#order=ord-1&key=key-1&no=%23A-1050', write: vi.fn() }
+    const api = fakeApi({
+      [`GET ${BASE}`]: PAGE,
+      [`GET ${BASE}/menu`]: MENU,
+      [`GET ${BASE}/orders/ord-1`]: status({ payment_status: 'proof_submitted', claimed_at: '2026-11-20T05:44:00Z' }),
+    })
+    render(<TableScreens api={api} token={TOKEN} redirect={vi.fn()} location={location} />)
+    expect(await screen.findByText('◷ Menunggu konfirmasi staf')).toBeInTheDocument()
+    expect(loadOrders(TOKEN).map((o) => o.order_id)).toEqual(['ord-1'])
+    await userEvent.click(screen.getByRole('button', { name: '+ Pesan lagi' }))
+    expect(location.write).toHaveBeenLastCalledWith('')
+    expect(await screen.findByRole('tab', { name: 'Menu', selected: true })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: /Pesanan saya/ }))
+    expect(await screen.findByText('◷ Menunggu konfirmasi staf')).toBeInTheDocument()
   })
 })

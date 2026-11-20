@@ -18,7 +18,7 @@ import { useLoad } from '../lib/useLoad'
 import { usePolling } from '../lib/usePolling'
 import { PRODUCT_NAME } from '../ui/Brand'
 import { Photo } from '../ui/Photo'
-import { forgetOrder, loadOrders, rememberOrder, type SavedOrder } from './storage'
+import { forgetOrder, loadOrders, orderFromHash, orderHash, rememberOrder, type SavedOrder } from './storage'
 
 interface TablePage {
   outlet: { name: string; timezone: string }
@@ -79,12 +79,24 @@ type View =
 
 const POLL_MS = 5000
 
+export interface HashLocation {
+  read: () => string
+  write: (hash: string) => void
+}
+
+const windowHash: HashLocation = {
+  read: () => window.location.hash,
+  write: (hash) => window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`),
+}
+
 export function TableApp({ apiBaseUrl, token }: { apiBaseUrl: string; token: string }) {
   const [api] = useState(() => createApi(apiBaseUrl, async () => null))
   return <TableScreens api={api} token={token} redirect={(url) => window.location.replace(url)} />
 }
 
-export function TableScreens({ api, token, redirect }: { api: Api; token: string; redirect: (url: string) => void }) {
+export function TableScreens({ api, token, redirect, location = windowHash }: {
+  api: Api; token: string; redirect: (url: string) => void; location?: HashLocation
+}) {
   const base = `/public/t/${encodeURIComponent(token)}`
   const [page, setPage] = useState<TablePage>()
   const [menu, setMenu] = useState<MenuItem[]>()
@@ -106,14 +118,23 @@ export function TableScreens({ api, token, redirect }: { api: Api; token: string
         return
       }
       await loadMenu()
-      if (!cancelled) setView(p.target === 'web_whatsapp' ? { name: 'choose' } : { name: 'menu' })
+      if (cancelled) return
+      // A refresh on Q4/Q5 comes back to the same order (fragment), not to the menu.
+      const fromUrl = orderFromHash(location.read())
+      if (fromUrl) {
+        const known = loadOrders(token).find((o) => o.order_id === fromUrl.order_id)
+        if (!known) setSaved(rememberOrder(token, fromUrl))
+        setView({ name: 'order', saved: known ?? fromUrl })
+        return
+      }
+      setView(p.target === 'web_whatsapp' ? { name: 'choose' } : { name: 'menu' })
     }).catch((e: unknown) => {
       if (cancelled) return
       if (e instanceof ApiError && e.code === 'table_qr_invalid') setView({ name: 'invalid' })
       else setView({ name: 'error', message: errorMessage(e) })
     })
     return () => { cancelled = true }
-  }, [api, base, loadMenu, redirect])
+  }, [api, base, loadMenu, redirect, location, token])
 
   function addToCart(item: MenuItem, optionIds: string[], quantity: number, note = '') {
     const options = item.addon_groups.flatMap((g) => g.options).filter((o) => optionIds.includes(o.id))
@@ -144,7 +165,13 @@ export function TableScreens({ api, token, redirect }: { api: Api; token: string
     setCart((lines) => (quantity <= 0 ? lines.filter((l) => l.key !== key) : lines.map((l) => (l.key === key ? { ...l, quantity } : l))))
   }
 
+  function closeOrder() {
+    location.write('')
+    setView({ name: 'menu' })
+  }
+
   function openOrder(order: SavedOrder) {
+    location.write(orderHash(order))
     setView({ name: 'order', saved: order })
   }
 
@@ -153,8 +180,11 @@ export function TableScreens({ api, token, redirect }: { api: Api; token: string
   if (view.name === 'error') return <Shell><div className="p-6"><Notice tone="danger">{view.message}</Notice></div></Shell>
   if (!page || !menu) return null
 
-  const myOrders = saved.length > 0 && (view.name === 'choose' || view.name === 'menu') && (
-    <MyOrders orders={saved} onOpen={openOrder} />
+  const myOrders = saved.length > 0 && view.name === 'choose' && <MyOrders orders={saved} onOpen={openOrder} />
+  // "Menu | Pesanan saya": always reachable once this phone has an order (menu and order screens).
+  const tabs = saved.length > 0 && (view.name === 'menu' || view.name === 'order') && (
+    <OrderTabs orders={saved} active={view.name === 'order' ? view.saved.order_id : null}
+      onMenu={closeOrder} onOrder={openOrder} />
   )
 
   switch (view.name) {
@@ -162,7 +192,7 @@ export function TableScreens({ api, token, redirect }: { api: Api; token: string
       return <ChooseScreen page={page} myOrders={myOrders} onWeb={() => setView({ name: 'menu' })} />
     case 'menu':
       return (
-        <MenuScreen page={page} menu={menu} cart={cart} myOrders={myOrders}
+        <MenuScreen page={page} menu={menu} cart={cart} myOrders={tabs}
           onAdd={(item) => (item.addon_groups.length ? setView({ name: 'addon', item }) : addToCart(item, [], 1))}
           onQuantity={setQuantity} onCart={() => setView({ name: 'cart' })} />
       )
@@ -186,9 +216,9 @@ export function TableScreens({ api, token, redirect }: { api: Api; token: string
       )
     case 'order':
       return (
-        <OrderScreen api={api} base={base} page={page} saved={view.saved}
-          onGone={() => { setSaved(forgetOrder(token, view.saved.order_id)); setView({ name: 'menu' }) }}
-          onMore={() => { void loadMenu(); setView({ name: 'menu' }) }} />
+        <OrderScreen key={view.saved.order_id} api={api} base={base} page={page} saved={view.saved} tabs={tabs}
+          onGone={() => { setSaved(forgetOrder(token, view.saved.order_id)); closeOrder() }}
+          onMore={() => { void loadMenu(); closeOrder() }} />
       )
   }
 }
@@ -239,15 +269,48 @@ function time(iso: string, timeZone: string): string {
   return formatTime(iso, timeZone)
 }
 
+function OrderTabs({ orders, active, onMenu, onOrder }: {
+  orders: SavedOrder[]
+  active: string | null
+  onMenu: () => void
+  onOrder: (o: SavedOrder) => void
+}) {
+  const tab = (selected: boolean) =>
+    `flex-1 border-b-2 py-3 text-center text-[13px] font-semibold ${selected ? 'border-primary text-primary' : 'border-transparent text-text-muted'}`
+  return (
+    <nav aria-label="Navigasi pesanan" className="sticky top-0 z-10 bg-surface shadow-[0_1px_0_var(--color-border)]">
+      <div role="tablist" className="flex">
+        <button type="button" role="tab" aria-selected={active === null} className={tab(active === null)} onClick={onMenu}>
+          Menu
+        </button>
+        <button type="button" role="tab" aria-selected={active !== null} className={tab(active !== null)}
+          onClick={() => onOrder(orders.find((o) => o.order_id === active) ?? orders[0])}>
+          Pesanan saya <span className="ml-1 rounded-full bg-primary-soft px-1.5 text-[11px] text-primary">{orders.length}</span>
+        </button>
+      </div>
+      {active !== null && orders.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto px-3 pb-2 text-[12px]" aria-label="Pilih pesanan">
+          {orders.map((o) => (
+            <button key={o.order_id} type="button" aria-pressed={o.order_id === active} onClick={() => onOrder(o)}
+              className={`shrink-0 rounded-full border px-2.5 py-1 font-semibold ${o.order_id === active ? 'border-primary bg-primary-soft text-primary' : 'border-border text-text-muted'}`}>
+              {o.order_no}
+            </button>
+          ))}
+        </div>
+      )}
+    </nav>
+  )
+}
+
 function MyOrders({ orders, onOpen }: { orders: SavedOrder[]; onOpen: (o: SavedOrder) => void }) {
   return (
-    <div className="mx-3 mt-3 rounded-lg border border-border bg-surface px-3 py-2 text-[12px]">
-      <span className="font-semibold">Pesanan dari HP ini: </span>
-      {orders.map((o, i) => (
-        <span key={o.order_id}>
-          {i > 0 && ', '}
-          <button type="button" className="font-semibold text-primary hover:underline" onClick={() => onOpen(o)}>{o.order_no} →</button>
-        </span>
+    <div className="mx-3 mt-3 space-y-2">
+      {orders.map((o) => (
+        <button key={o.order_id} type="button" onClick={() => onOpen(o)}
+          className="flex w-full items-center justify-between rounded-lg border border-primary bg-primary-soft px-3 py-2.5 text-left text-[13px] font-semibold text-primary">
+          <span>Lihat status pesanan {o.order_no}</span>
+          <span aria-hidden="true">→</span>
+        </button>
       ))}
     </div>
   )
@@ -333,6 +396,7 @@ function MenuScreen({ page, menu, cart, myOrders, onAdd, onQuantity, onCart }: {
     ...(hasPicks ? [{ value: '★', label: 'Rekomendasi ★' }] : [])]
   return (
     <Shell>
+      {myOrders}
       <Header title={`Meja ${page.table.name} · ${page.outlet.name}`}
         subtitle={page.web_ordering ? 'Dine-in · bayar dulu via QRIS' : 'Dine-in · pesan & bayar di kasir'}>
         <div className="mt-2 flex gap-2 overflow-x-auto text-[11px] font-semibold" role="tablist" aria-label="Kategori">
@@ -344,7 +408,6 @@ function MenuScreen({ page, menu, cart, myOrders, onAdd, onQuantity, onCart }: {
           ))}
         </div>
       </Header>
-      {myOrders}
       <ul className="flex-1 space-y-2 p-3">
         {!page.web_ordering && (
           <li><Notice tone="warning"><b>Pesan di kasir.</b> Pesan dari HP belum tersedia di outlet ini.</Notice></li>
@@ -587,8 +650,8 @@ function CartScreen({ api, base, page, cart, onQuantity, onNote, onBack, onStale
 
 // Q4 · Bayar QRIS  /  Q5 · Status pesanan ----------------------------------------------------------------
 
-function OrderScreen({ api, base, page, saved, onGone, onMore }: {
-  api: Api; base: string; page: TablePage; saved: SavedOrder; onGone: () => void; onMore: () => void
+function OrderScreen({ api, base, page, saved, tabs, onGone, onMore }: {
+  api: Api; base: string; page: TablePage; saved: SavedOrder; tabs: ReactNode; onGone: () => void; onMore: () => void
 }) {
   const headers = useMemo(() => ({ 'X-Order-Key': saved.access_key }), [saved.access_key])
   const url = `${base}/orders/${saved.order_id}`
@@ -612,13 +675,13 @@ function OrderScreen({ api, base, page, saved, onGone, onMore }: {
     return <Shell>{error ? <div className="p-6"><Notice tone="danger">{error}</Notice></div> : <p className="p-6 text-center text-[13px] text-text-muted">Memuat…</p>}</Shell>
   }
   if (status.status === 'pending_payment' && status.payment_status === 'unpaid') {
-    return <PayScreen api={api} url={url} headers={headers} page={page} status={status} onChanged={() => loaded.reload()} />
+    return <PayScreen api={api} url={url} headers={headers} page={page} status={status} tabs={tabs} onChanged={() => loaded.reload()} />
   }
-  return <StatusScreen status={status} error={error} onMore={onMore} />
+  return <StatusScreen status={status} error={error} tabs={tabs} onMore={onMore} />
 }
 
-function PayScreen({ api, url, headers, page, status, onChanged }: {
-  api: Api; url: string; headers: Record<string, string>; page: TablePage; status: WebOrderStatus
+function PayScreen({ api, url, headers, page, status, tabs, onChanged }: {
+  api: Api; url: string; headers: Record<string, string>; page: TablePage; status: WebOrderStatus; tabs: ReactNode
   onChanged: () => Promise<void>
 }) {
   const [qris, setQris] = useState<string>()
@@ -654,6 +717,7 @@ function PayScreen({ api, url, headers, page, status, onChanged }: {
 
   return (
     <Shell>
+      {tabs}
       <Header title={`Bayar pesanan ${status.order_no}`}
         subtitle={`Meja ${page.table.name} · ${page.outlet.name}${status.customer_name ? ` · ${status.customer_name}` : ''}`} />
       <div className="flex-1 space-y-2.5 p-3">
@@ -750,7 +814,9 @@ function Progress({ status }: { status: WebOrderStatus }) {
   )
 }
 
-function StatusScreen({ status, error, onMore }: { status: WebOrderStatus; error?: string; onMore: () => void }) {
+function StatusScreen({ status, error, tabs, onMore }: {
+  status: WebOrderStatus; error?: string; tabs: ReactNode; onMore: () => void
+}) {
   const tz = status.timezone
   const cancelled = status.status === 'cancelled'
   const waiting = status.payment_status === 'proof_submitted'
@@ -763,6 +829,7 @@ function StatusScreen({ status, error, onMore }: { status: WebOrderStatus; error
         : <Notice tone="success"><b className="text-[15px]">✓ Pembayaran diterima</b><br />Pesananmu sedang diproses dapur.</Notice>
   return (
     <Shell>
+      {tabs}
       <Header title={`Pesanan ${status.order_no}`}
         subtitle={`dipesan ${time(status.created_at, tz)}${status.customer_name ? ` · ${status.customer_name}` : ''}`} />
       <div className="flex-1 space-y-2.5 p-3">
