@@ -176,7 +176,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Halaman menampilkan outlet dan nomor meja dari QR tanpa login; bila outlet memakai web + WhatsApp, layar pertama menawarkan "Pesan di sini" dan "Pesan via WhatsApp".
   - Menu menampilkan foto, harga outlet, dan add-on; item habis tidak bisa ditambah; add-on wajib harus dipilih sebelum kirim.
   - "Kirim pesanan" membuat order dine-in channel `web_table` untuk meja itu lewat fungsi order yang sama (stok, PB1, lifecycle); harga dihitung ulang di server; kirim dua kali tidak membuat order ganda.
-  - Outlet open bill: order masuk ke open bill meja yang sama dengan order WhatsApp dan kasir. Outlet pay-first: order menunggu pembayaran.
+  - Outlet open bill: order masuk ke open bill meja yang sama dengan order WhatsApp dan kasir. Outlet pay-first: pesan di web nonaktif sampai pembayaran online (#43) aktif; QR ke WhatsApp bila terhubung, kalau tidak halaman hanya menampilkan menu dengan "Pesan & bayar di kasir".
   - Setelah kirim, halaman menampilkan status pesanan yang diperbarui sendiri, termasuk pembatalan beserta alasannya.
   - Halaman bill meja menampilkan semua order di open bill meja itu dari semua kanal, dengan PB1 dan total, dan tidak pernah menampilkan bill meja lain atau tamu sebelumnya.
   - Order dari web tampil di Order Board dan Open Bills dengan label kanal web dan nama pemesan bila diisi.
