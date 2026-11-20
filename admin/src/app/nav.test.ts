@@ -6,6 +6,7 @@ import {
   MOBILE_NAV,
   NAV,
   navItemsFor,
+  ownAreaPath,
   rolePath,
   STAFF_SIDEBAR_NOTE,
 } from './nav'
@@ -77,6 +78,15 @@ describe('navigation per role (wireframe Sidebar/Owner, Sidebar/Staff)', () => {
     expect(areaForPath('/admin/counter')).toBe('staff')
     expect(areaForPath('/administrator')).toBe('owner')
     expect(areaForPath('/orders')).toBe('owner')
+  })
+
+  it('sends an account in the wrong area to the same page in its own area, else its home', () => {
+    expect(ownAreaPath('staff', '/orders')).toBe('/admin/orders')
+    expect(ownAreaPath('staff', '/dashboard')).toBe('/admin/orders')
+    expect(ownAreaPath('staff', '/')).toBe('/admin/orders')
+    expect(ownAreaPath('owner', '/admin/stock')).toBe('/stock')
+    expect(ownAreaPath('owner', '/admin/my-attendance')).toBe('/dashboard')
+    expect(ownAreaPath('owner', '/admin')).toBe('/dashboard')
   })
 
   it('every route path is unique per role and every item names a wireframe screen', () => {

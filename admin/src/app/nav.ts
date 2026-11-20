@@ -137,6 +137,16 @@ export function navItemsFor(role: Role): NavItem[] {
   return NAV[role].flatMap((group) => group.items)
 }
 
+/**
+ * Where to send an account that opened the other role's area: the same page in its own area
+ * when that role has it (e.g. a staff account at `/orders` → `/admin/orders`), else its home.
+ */
+export function ownAreaPath(role: Role, pathname: string): string {
+  const relative = pathname.replace(/^\/admin(?=\/|$)/, '') || '/'
+  const target = rolePath(role, relative)
+  return canAccess(role, target) ? target : HOME_PATH[role]
+}
+
 /** `path` is a full URL path (area prefix included). */
 export function canAccess(role: Role, path: string): boolean {
   return navItemsFor(role).some((item) => rolePath(role, item.path) === path)

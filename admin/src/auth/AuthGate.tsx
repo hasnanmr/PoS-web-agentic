@@ -13,7 +13,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, createApi, errorMessage, type Api } from '../lib/api'
 import type { Me } from '../lib/types'
-import { AREA_BASE, HOME_PATH, type Role } from '../app/nav'
+import { AREA_BASE, ownAreaPath, type Role } from '../app/nav'
 import { OUTLET_STORAGE_KEY, pickOutlet, SessionContext, type Session } from '../app/session'
 import { Button, Loading } from '../ui/kit'
 import { LoginCard } from './LoginCard'
@@ -150,7 +150,12 @@ export function AuthGate({ supabase, apiBaseUrl, area = 'owner', children }: {
       if (session && session.role !== area) {
         return (
           <AuthLayout>
-            <WrongAreaCard role={session.role} email={session.me.user.email ?? session.me.user.display_name ?? ''} onSignOut={signOut} />
+            <WrongAreaCard
+              role={session.role}
+              email={session.me.user.email ?? session.me.user.display_name ?? ''}
+              supabase={supabase}
+              onSignedOut={() => setState({ kind: 'signed_out' })}
+            />
           </AuthLayout>
         )
       }
@@ -158,23 +163,43 @@ export function AuthGate({ supabase, apiBaseUrl, area = 'owner', children }: {
   }
 }
 
-/** Signed in with an account of the other area: send it to its own URL (`/` or `/admin`). */
-function WrongAreaCard({ role, email, onSignOut }: { role: Role; email: string; onSignOut: () => void }) {
+/**
+ * Signed in with an account of the other area: send it to its own URL (`/` or `/admin`).
+ *
+ * The sign-in landed in this area's storage key, so both buttons first sign out locally: the
+ * wrong-role session must not stay here and block the rightful user of this area, and a local
+ * sign-out leaves the account's session in its own area (if any) untouched. The account signs in
+ * again in its own area, which has a separate storage key.
+ */
+function WrongAreaCard({ role, email, supabase, onSignedOut }: {
+  role: Role
+  email: string
+  supabase: SupabaseClient
+  onSignedOut: () => void
+}) {
   const isStaff = role === 'staff'
+  const label = isStaff ? 'staf' : 'owner'
+  const target = ownAreaPath(role, window.location.pathname)
+  const [busy, setBusy] = useState(false)
+
+  const leave = async (goToOwnArea: boolean) => {
+    setBusy(true)
+    await supabase.auth.signOut({ scope: 'local' })
+    if (goToOwnArea) window.location.assign(target)
+    else onSignedOut()
+  }
+
   return (
     <div className="rounded-xl border border-border bg-surface p-6">
       <h1 className="text-[18px] font-semibold">{isStaff ? 'Ini akun staf' : 'Ini akun owner'}</h1>
       <p className="mt-2 text-[13px] text-text-muted">
-        {email} masuk lewat halaman {isStaff ? 'staf' : 'owner'}:{' '}
+        Akun {email} terdaftar sebagai {label}. Silakan buka halaman {label}:{' '}
         <span className="font-medium text-text">{window.location.origin}{AREA_BASE[role] || '/'}</span>
       </p>
-      <a
-        href={HOME_PATH[role]}
-        className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-white hover:opacity-90"
-      >
-        Buka halaman {isStaff ? 'staf' : 'owner'} →
-      </a>
-      <Button variant="ghost" className="mt-2 h-9 w-full" onClick={onSignOut}>
+      <Button className="mt-4 h-9 w-full" disabled={busy} onClick={() => void leave(true)}>
+        Buka halaman {label} →
+      </Button>
+      <Button variant="ghost" className="mt-2 h-9 w-full" disabled={busy} onClick={() => void leave(false)}>
         Keluar
       </Button>
     </div>
