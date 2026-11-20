@@ -3,8 +3,8 @@
 Run locally:  uv run python -m app.worker.main
 
 Consumes `wa.inbound.q` (conversation flows, T-046 to T-050) and `wa.outbound.q` (Cloud API
-sender, T-047). Refuses to start without DATABASE_URL and RABBITMQ_URL; without
-WHATSAPP_ACCESS_TOKEN it stays on standby (consumes nothing) until restarted with it.
+sender, T-047). Refuses to start without DATABASE_URL; without RABBITMQ_URL or
+WHATSAPP_ACCESS_TOKEN it stays on standby (consumes nothing) until restarted with them.
 Declares the RabbitMQ topology on start (T-110). Stops cleanly on SIGTERM.
 """
 
@@ -62,8 +62,7 @@ def main() -> int:
         print(exc, file=sys.stderr)
         return 1
     missing = worker_problems(settings)
-    infra = [name for name in missing if name != "WHATSAPP_ACCESS_TOKEN"]
-    if infra:
+    if "DATABASE_URL" in missing:
         print(f"WhatsApp worker requires these variables: {', '.join(missing)}", file=sys.stderr)
         return 1
 
@@ -75,9 +74,13 @@ def main() -> int:
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, stop.set)
         if missing:
-            # Deployed before the Meta app exists: idle instead of crash-looping. Railway
-            # redeploys the service when WHATSAPP_ACCESS_TOKEN is set.
-            logger.warning("whatsapp worker on standby: WHATSAPP_ACCESS_TOKEN is not set")
+            # Deployed before RabbitMQ or the Meta app is set up: idle instead of
+            # crash-looping. Railway redeploys the service when its variables change.
+            logger.warning(
+                "whatsapp worker on standby: %s not set",
+                ", ".join(missing),
+                extra={"missing": missing},
+            )
             await stop.wait()
             return
         await run(settings, stop)

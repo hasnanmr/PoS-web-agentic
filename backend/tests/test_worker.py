@@ -29,11 +29,22 @@ def test_worker_fails_fast_on_invalid_config(
     assert "requires these variables" in capsys.readouterr().err
 
 
-def test_worker_stands_by_without_the_whatsapp_token(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("env", "missing"),
+    [
+        ({"RABBITMQ_URL": "amqp://guest:guest@localhost:5672/"}, "WHATSAPP_ACCESS_TOKEN"),
+        ({"WHATSAPP_ACCESS_TOKEN": "token"}, "RABBITMQ_URL"),
+    ],
+)
+def test_worker_stands_by_without_rabbitmq_or_the_whatsapp_token(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    env: dict[str, str],
+    missing: str,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql://app_backend@localhost:5432/pos")
-    monkeypatch.setenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
     started: list[Settings] = []
 
     async def fake_run(settings: Settings, stop: asyncio.Event) -> None:
@@ -46,7 +57,8 @@ def test_worker_stands_by_without_the_whatsapp_token(
     monkeypatch.setattr(asyncio.Event, "wait", stopped)
     assert worker.main() == 0
     assert not started
-    assert "standby" in capsys.readouterr().out  # JSON log lines go to stdout
+    out = capsys.readouterr().out  # JSON log lines go to stdout
+    assert "standby" in out and missing in out
 
 
 def test_worker_runs_with_a_complete_config(monkeypatch: pytest.MonkeyPatch) -> None:

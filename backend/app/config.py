@@ -208,8 +208,8 @@ def whatsapp_webhook_ready(settings: Settings) -> bool:
 
 
 def worker_problems(settings: Settings) -> list[str]:
-    """Variables the WhatsApp worker cannot work without (missing DATABASE_URL or RABBITMQ_URL:
-    it refuses to start; missing WHATSAPP_ACCESS_TOKEN: it idles on standby)."""
+    """Variables the WhatsApp worker cannot work without (missing DATABASE_URL: it refuses to
+    start; missing RABBITMQ_URL or WHATSAPP_ACCESS_TOKEN: it idles on standby)."""
     needed = {
         "DATABASE_URL": settings.database_url,
         "RABBITMQ_URL": settings.rabbitmq_url,

@@ -94,8 +94,8 @@ Configuration comes from environment variables or `backend/.env` (template:
 [`backend/.env.example`](backend/.env.example)). `APP_ENV` is one of `local`, `demo`,
 `staging`, `production`. Outside `local`, `DATABASE_URL`, `SUPABASE_URL`,
 `SUPABASE_JWKS_URL` and `SUPABASE_JWT_ISSUER` are required (`RABBITMQ_URL` and `WHATSAPP_*`
-are optional for the API; the WhatsApp worker requires `DATABASE_URL` and `RABBITMQ_URL`, and
-idles without `WHATSAPP_ACCESS_TOKEN`); the process exits with a list of problems if the configuration is invalid. Default time zone is
+are optional for the API; the WhatsApp worker requires `DATABASE_URL` and
+idles without `RABBITMQ_URL` or `WHATSAPP_ACCESS_TOKEN`); the process exits with a list of problems if the configuration is invalid. Default time zone is
 `Asia/Jakarta` (WIB). Logs are JSON lines on stdout.
 
 ### Admin web app
@@ -194,7 +194,7 @@ The WhatsApp worker is the Railway service `worker`, deployed by the `deploy-wor
 the same build context as the API. Its start command (`python -m app.worker.main`), restart
 policy and region are service settings (it does not read `backend/railway.toml`). Variables
 are referenced from `backend`, plus `WHATSAPP_ACCESS_TOKEN` and optional
-`WHATSAPP_GRAPH_VERSION`; without the token it stays on standby. It is not in the smoke test
+`WHATSAPP_GRAPH_VERSION`; without RabbitMQ or the token it stays on standby. It is not in the smoke test
 or the rollback. Connect an
 outlet to its Meta number with `uv run python -m app.cli whatsapp-connect --outlet <uuid>
 --phone-number-id <id>`, then register `https://<backend>/webhooks/whatsapp` in the Meta app.
