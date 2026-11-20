@@ -174,8 +174,14 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
   const every = Math.max(1, Math.ceil(series.length / 9))
   const label = (d: string) => granularity === 'daily' ? String(Number(d.slice(8))) : formatDay(d)
   const peakIn = series.reduce((best, p, i) => (p.cash_in > (series[best]?.cash_in ?? 0) ? i : best), 0)
+  // Hover / focus / tap a slot to see its figures; the slot is the whole column, so tiny bars are easy to hit.
+  const [active, setActive] = useState<number | null>(null)
+  const hit = active === null ? undefined : series[active]
+  const tipLeft = active === null ? 0 : (center(active) / W) * 100
+  const longDate = (d: string) => granularity === 'monthly' ? `${MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`
+    : granularity === 'weekly' ? `Minggu ${formatDay(d)}` : formatDay(d)
   return (
-    <div>
+    <div className="relative" onMouseLeave={() => setActive(null)}>
       <div className="mb-1 flex gap-4 text-[11px]">
         <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary" />Kas masuk</span>
         <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent-orange" />Kas keluar</span>
@@ -189,15 +195,20 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
         ))}
         {series.map((p, i) => (
           <g key={p.date} data-testid="series-bar">
+            {active === i && (
+              <rect x={pad.l + slot * i} y={pad.t} width={slot} height={H - pad.t - pad.b} fill="var(--pos-primary-soft)" />
+            )}
             <rect x={center(i) - bar} y={y(p.cash_in)} width={bar} height={y(0) - y(p.cash_in)} rx="2" fill="var(--pos-primary)">
-              <title>{`${label(p.date)} · Kas masuk ${formatRupiah(p.cash_in)}`}</title>
             </rect>
             <rect x={center(i)} y={y(p.cash_out)} width={bar} height={y(0) - y(p.cash_out)} rx="2" fill="var(--pos-accent-orange)">
-              <title>{`${label(p.date)} · Kas keluar ${formatRupiah(p.cash_out)}`}</title>
             </rect>
             {i % every === 0 && (
               <text x={center(i)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--pos-text-muted)">{label(p.date)}</text>
             )}
+            <rect x={pad.l + slot * i} y={pad.t} width={slot} height={H - pad.t - pad.b} fill="transparent" tabIndex={0}
+              role="img" aria-label={`${longDate(p.date)}: kas masuk ${formatRupiah(p.cash_in)}, kas keluar ${formatRupiah(p.cash_out)}`}
+              onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)} onBlur={() => setActive(null)}
+              onClick={() => setActive(active === i ? null : i)} style={{ cursor: 'pointer', outline: 'none' }} />
           </g>
         ))}
         {series[peakIn]?.cash_in > 0 && (
@@ -205,6 +216,16 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
             fontWeight="600" fill="var(--pos-text)">{juta(series[peakIn].cash_in)}</text>
         )}
       </svg>
+      {hit && (
+        <div role="tooltip" className="pointer-events-none absolute top-6 z-10 min-w-[150px] rounded-md bg-text px-2.5 py-1.5 text-[11px] text-white shadow-lg"
+          style={{ left: `${tipLeft}%`, transform: `translateX(${tipLeft > 60 ? '-105%' : '5%'})` }}>
+          <p className="font-semibold">{longDate(hit.date)}</p>
+          <p className="flex justify-between gap-3"><span>Kas masuk</span><span>{formatRupiah(hit.cash_in)}</span></p>
+          <p className="flex justify-between gap-3"><span>Kas keluar</span><span>{formatRupiah(hit.cash_out)}</span></p>
+          <p className="mt-0.5 flex justify-between gap-3 border-t border-white/30 pt-0.5 font-semibold">
+            <span>Selisih</span><span>{formatRupiah(hit.cash_in - hit.cash_out)}</span></p>
+        </div>
+      )}
     </div>
   )
 }
