@@ -5,13 +5,17 @@
  * set a password first ("Pertama kali? Buka link undangan di email untuk atur password.").
  * Invited owner without a business (`onboarding_required`) → "Buat profil bisnis".
  * Owner/staff of a business → the admin shell.
+ *
+ * The gate serves one URL area (owner: root, staff: `/admin`). A signed-in account whose role
+ * belongs to the other area is pointed there instead of being let in.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, createApi, errorMessage, type Api } from '../lib/api'
 import type { Me } from '../lib/types'
+import { AREA_BASE, HOME_PATH, type Role } from '../app/nav'
 import { OUTLET_STORAGE_KEY, pickOutlet, SessionContext, type Session } from '../app/session'
-import { Loading } from '../ui/kit'
+import { Button, Loading } from '../ui/kit'
 import { LoginCard } from './LoginCard'
 import { OnboardingCard } from './OnboardingCard'
 import { SetPasswordCard } from './SetPasswordCard'
@@ -27,22 +31,24 @@ type State =
 const ARRIVED_FROM_INVITE =
   typeof window !== 'undefined' && /type=(invite|recovery)/.test(window.location.hash)
 
-function readStoredOutlet(): string | null {
+function readStoredOutlet(area: Role): string | null {
   try {
-    return window.localStorage.getItem(OUTLET_STORAGE_KEY)
+    return window.localStorage.getItem(OUTLET_STORAGE_KEY[area])
   } catch {
     return null
   }
 }
 
-export function AuthGate({ supabase, apiBaseUrl, children }: {
+export function AuthGate({ supabase, apiBaseUrl, area = 'owner', children }: {
   supabase: SupabaseClient
   apiBaseUrl: string
+  /** URL area this app instance serves (root = owner, `/admin` = staff). */
+  area?: Role
   children: ReactNode
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [needsPassword, setNeedsPassword] = useState(ARRIVED_FROM_INVITE)
-  const [outletId, setOutletIdState] = useState<string | null>(readStoredOutlet)
+  const [outletId, setOutletIdState] = useState<string | null>(() => readStoredOutlet(area))
 
   const api: Api = useMemo(
     () =>
@@ -91,11 +97,11 @@ export function AuthGate({ supabase, apiBaseUrl, children }: {
   const setOutletId = useCallback((id: string) => {
     setOutletIdState(id)
     try {
-      window.localStorage.setItem(OUTLET_STORAGE_KEY, id)
+      window.localStorage.setItem(OUTLET_STORAGE_KEY[area], id)
     } catch {
       // storage unavailable; the choice lasts for this tab only
     }
-  }, [])
+  }, [area])
 
   const session: Session | null = useMemo(() => {
     if (state.kind !== 'ready' || state.me.role === 'owner_pending') return null
@@ -141,8 +147,38 @@ export function AuthGate({ supabase, apiBaseUrl, children }: {
         </AuthLayout>
       )
     case 'ready':
+      if (session && session.role !== area) {
+        return (
+          <AuthLayout>
+            <WrongAreaCard role={session.role} email={session.me.user.email ?? session.me.user.display_name ?? ''} onSignOut={signOut} />
+          </AuthLayout>
+        )
+      }
       return session ? <SessionContext.Provider value={session}>{children}</SessionContext.Provider> : null
   }
+}
+
+/** Signed in with an account of the other area: send it to its own URL (`/` or `/admin`). */
+function WrongAreaCard({ role, email, onSignOut }: { role: Role; email: string; onSignOut: () => void }) {
+  const isStaff = role === 'staff'
+  return (
+    <div className="rounded-xl border border-border bg-surface p-6">
+      <h1 className="text-[18px] font-semibold">{isStaff ? 'Ini akun staf' : 'Ini akun owner'}</h1>
+      <p className="mt-2 text-[13px] text-text-muted">
+        {email} masuk lewat halaman {isStaff ? 'staf' : 'owner'}:{' '}
+        <span className="font-medium text-text">{window.location.origin}{AREA_BASE[role] || '/'}</span>
+      </p>
+      <a
+        href={HOME_PATH[role]}
+        className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-white hover:opacity-90"
+      >
+        Buka halaman {isStaff ? 'staf' : 'owner'} →
+      </a>
+      <Button variant="ghost" className="mt-2 h-9 w-full" onClick={onSignOut}>
+        Keluar
+      </Button>
+    </div>
+  )
 }
 
 function AuthLayout({ children }: { children: ReactNode }) {

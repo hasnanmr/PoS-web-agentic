@@ -60,8 +60,9 @@ def _auth_admin(request: Request) -> AuthAdmin:
 
 
 def _redirect(request: Request) -> str | None:
+    # Staff sign in on the staff area of the admin app (`/admin`); the root is the owner area.
     url = request.app.state.settings.admin_app_url
-    return str(url) if url else None
+    return str(url).rstrip("/") + "/admin" if url else None
 
 
 async def _staff_list(request: Request, owner: OwnerOnly) -> list[StaffMember]:

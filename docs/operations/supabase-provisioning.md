@@ -18,7 +18,8 @@ The `app_backend` role password and transaction-pooler URL are in the ignored lo
 | 8 | Storage → create private buckets `menu-photos`, `qris-images`, `payment-proofs`, `attendance-selfies` with the size/MIME limits in `config.toml` | T-014, T-036, T-122 |
 | 9 | API → exposed schemas stay `public`, `graphql_public` (never `app`) | Appendix B.4 |
 | 10 | Pilot/production only: Pro plan, daily backups / PITR, and ADR 0001 accepted first | NFR1, T-114 |
-| 11 | Platform admin: run `uv run python -m app.cli invite-owner --email … --invited-by …` for each new owner (needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`) | T-006 owner invitations |
+| 11 | Auth → URL Configuration → Redirect URLs: add both the admin root (`<ADMIN_APP_URL>`, owner invites) and `<ADMIN_APP_URL>/admin` (staff invites); a URL not on the list falls back to the Site URL (owner area) | `backend/app/api/v1/owner/staff.py` `_redirect` |
+| 12 | Platform admin: run `uv run python -m app.cli invite-owner --email … --invited-by …` for each new owner (needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`) | T-006 owner invitations |
 
 Secrets never go into the repository. The service role (secret) key is used only for the Supabase Auth admin API, namely owner invitations (platform-admin CLI) and banning deactivated staff (API, T-012), and for private Storage objects: menu photo upload, signed URLs and removal (API, T-132). It is never used to read or write tenant table data, and lives in Railway secrets / the operator's machine.
 

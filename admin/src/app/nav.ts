@@ -109,15 +109,35 @@ export const MOBILE_NAV: { label: string; item: NavItem }[] = [
   { label: 'Stok', item: R.stock },
 ]
 
+/**
+ * Each role has its own URL area so owner and staff can be signed in on the same device at once
+ * (one tab each): the owner app lives at the root, the staff app under `/admin`. `ROUTES` paths
+ * are area-relative; always resolve them with `rolePath` before linking or routing.
+ */
+export const AREA_BASE: Record<Role, string> = {
+  owner: '',
+  staff: '/admin',
+}
+
+/** The role whose app owns this URL: `/admin` and below is staff, everything else owner. */
+export function areaForPath(pathname: string): Role {
+  return /^\/admin(\/|$)/.test(pathname) ? 'staff' : 'owner'
+}
+
+export function rolePath(role: Role, path: string): string {
+  return AREA_BASE[role] + path
+}
+
 export const HOME_PATH: Record<Role, string> = {
-  owner: R.dashboard.path,
-  staff: R.orderBoard.path,
+  owner: rolePath('owner', R.dashboard.path),
+  staff: rolePath('staff', R.orderBoard.path),
 }
 
 export function navItemsFor(role: Role): NavItem[] {
   return NAV[role].flatMap((group) => group.items)
 }
 
+/** `path` is a full URL path (area prefix included). */
 export function canAccess(role: Role, path: string): boolean {
-  return navItemsFor(role).some((item) => item.path === path)
+  return navItemsFor(role).some((item) => rolePath(role, item.path) === path)
 }
