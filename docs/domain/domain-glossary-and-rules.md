@@ -62,7 +62,8 @@ Decisions recorded from the product owner on 2026-11-17:
 - **PB1 calculation:** `pb1 = round_half_up(subtotal × rate_bps / 10000)`, computed with integer arithmetic. The base is the subtotal including add-ons and excluding the delivery fee (FR11.5, US-019). Rounding to the nearest whole rupiah is only needed because a percentage of an integer can produce a fraction; it is not cash rounding.
 - **Totals:** `total = subtotal + pb1 + delivery_fee`.
 - **PB1 snapshot:** the rate used is stored on each order (and bill) so later setting changes never change past orders.
-- **Open question (still TBD in PRD §13):** on open bills, is PB1 calculated per order and summed, or once on the bill subtotal at close? The schema stores PB1 on both orders and bills so either rule can be implemented. **Proposed default until decided:** once on the bill subtotal at close (one rounding, matches what the customer sees on the bill).
+- **PB1 on open bills (decided, PRD v0.19):** once on the bill subtotal (one rounding, matches what the customer sees on the bill).
+- **Split bill per item (FR10.9):** a part's PB1 = `round_half_up((subtotal already paid + part subtotal) × rate_bps / 10000) − PB1 already paid`. It is never negative, and all parts add up to the bill's PB1 and total exactly. Each part is one payment with its own ledger entries; a portion of an order item is paid by at most one active part.
 - **Ledger posting** (only when payment is confirmed): separate entries for menu revenue, PB1, and delivery fee, each tagged with outlet and payment method (AC3.2).
 
 ## 3. Time and time zones
