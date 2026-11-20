@@ -33,6 +33,7 @@ from app.api.v1.owner import (
     onboarding,
     outlets,
     purchase_orders,
+    recommendations,
     staff,
     stock,
     tables,
@@ -137,6 +138,7 @@ def create_app(
     app.include_router(outlets.router)
     app.include_router(staff.router)
     app.include_router(catalog.router)
+    app.include_router(recommendations.router)
     app.include_router(ops_stock.router)
     app.include_router(stock.router)
     app.include_router(ops_orders.router)
