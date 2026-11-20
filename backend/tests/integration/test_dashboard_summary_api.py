@@ -76,7 +76,10 @@ def ctx(client: TestClient) -> dict[str, Any]:
     res = client.post("/api/v1/owner/outlets", headers=owner, json={"name": "Riau"})
     assert res.status_code == 201, res.text
     riau = res.json()["id"]
-    for outlet in (dago, riau):
+    res = client.post("/api/v1/owner/outlets", headers=owner, json={"name": "Kemang"})
+    assert res.status_code == 201, res.text
+    kemang = res.json()["id"]  # money tests only
+    for outlet in (dago, riau, kemang):
         _opening_hours(tenant, outlet)
     admin_sql("insert into auth.users (id, email) values (%s, %s)", (STAFF, f"rina@{DOMAIN}"))
     admin_sql(
@@ -96,6 +99,7 @@ def ctx(client: TestClient) -> dict[str, Any]:
         "tenant": tenant,
         "dago": dago,
         "riau": riau,
+        "kemang": kemang,
         "owner": owner,
         "staff": staff,
         "americano": americano,
@@ -126,14 +130,35 @@ def _insert_orders(ctx: dict[str, Any], outlet: str, n: int, at: str, **cols: st
     )
 
 
-def _ledger(ctx: dict[str, Any], outlet: str, kind: str, amount: int, days_ago: int = 0,
+def _paid_order(ctx: dict[str, Any], outlet: str, at: str, subtotal: int, pb1: int = 0,
+                delivery: int = 0, *, paid_days_later: int = 0) -> str:  # fmt: skip
+    """A paid order created at the SQL timestamp `at`, with its ledger rows (revenue, PB1,
+    delivery fee) posted on the payment date `paid_days_later` days after it."""
+    kind = ("whatsapp_online", "delivery") if delivery else ("counter", "takeaway")
+    order = admin_sql(
+        "insert into app.orders (tenant_id, outlet_id, order_no, channel, type, payment_mode,"
+        " status, payment_status, subtotal, pb1_amount, delivery_fee, total, delivery_address,"
+        " created_by_actor, created_at) select %s, %s, coalesce(max(order_no), 1000) + 1, %s, %s,"
+        " 'pay_first', 'completed', 'paid', %s, %s, %s, %s, %s, 'system', "
+        f"{at} from app.orders where outlet_id = %s returning id, created_at",
+        (ctx["tenant"], outlet, *kind, subtotal, pb1, delivery, subtotal + pb1 + delivery,
+         "Jl. Riau 1" if delivery else None, outlet),
+    )  # fmt: skip
+    order_id, created = order[0]
+    day = created.astimezone(ZoneInfo(TZ)).date() + timedelta(days=paid_days_later)
+    for kind_, amount in (("revenue", subtotal), ("pb1", pb1), ("delivery_fee", delivery)):
+        if amount:
+            _ledger(ctx, outlet, kind_, amount, day, order_id)
+    return str(order_id)
+
+
+def _ledger(ctx: dict[str, Any], outlet: str, kind: str, amount: int, day: Any, order: Any,
             pb1_portion: int = 0) -> None:  # fmt: skip
-    day = datetime.now(ZoneInfo(TZ)).date() - timedelta(days=days_ago)
     admin_sql(
         "insert into app.ledger_entries (tenant_id, outlet_id, type, amount, payment_method,"
-        " business_date, pb1_portion, actor_type) values (%s, %s, %s, %s, 'qris', %s, %s,"
-        " 'system')",
-        (ctx["tenant"], outlet, kind, amount, day, pb1_portion),
+        " business_date, pb1_portion, order_id, actor_type) values (%s, %s, %s, %s, 'qris', %s,"
+        " %s, %s, 'system')",
+        (ctx["tenant"], outlet, kind, amount, day, pb1_portion, order),
     )
 
 
@@ -179,29 +204,51 @@ def test_kpis_and_methods_from_real_counter_orders(client, ctx) -> None:
         assert _get(client, ctx, outlet_id=ctx["dago"], period=period)["kpis"]["orders"] == 2
 
 
-def test_revenue_subtracts_refunds_and_compares_with_yesterday(client, ctx) -> None:
-    riau = ctx["riau"]
-    _ledger(ctx, riau, "revenue", 150000)
-    _ledger(ctx, riau, "pb1", 15000)
-    _ledger(ctx, riau, "delivery_fee", 10000)
-    _ledger(ctx, riau, "refund", -55000, pb1_portion=5000)  # 50.000 menu + 5.000 PB1
-    _ledger(ctx, riau, "revenue", 80000, days_ago=1)
-    k = _get(client, ctx, outlet_id=riau)["kpis"]
-    assert k["revenue_excl_pb1"] == 100000
-    assert k["pb1_collected"] == 10000
-    assert k["delivery_fee"] == 10000
-    assert k["change_pct"] == 25  # 100.000 vs 80.000
+def test_money_follows_order_time_refunds_and_previous_period(client, ctx) -> None:
+    kemang = ctx["kemang"]
+    today = datetime.now(ZoneInfo(TZ)).date()
+    noon = f"{LOCAL_MIDNIGHT} + interval '12 hours'"
+    _paid_order(ctx, kemang, noon, 150000, pb1=15000)
+    # A delivery order reversed the same day: revenue, PB1 and delivery fee all go back to 0.
+    reversed_id = _paid_order(ctx, kemang, noon, 50000, pb1=5000, delivery=10000)
+    _ledger(ctx, kemang, "refund", -65000, today, reversed_id, pb1_portion=5000)
+    # Opened yesterday 23:30, paid today: counts yesterday (order time), not today.
+    _paid_order(ctx, kemang, f"{LOCAL_MIDNIGHT} - interval '30 minutes'", 80000,
+                paid_days_later=1)  # fmt: skip
+    k = _get(client, ctx, outlet_id=kemang)["kpis"]
+    assert k["revenue_excl_pb1"] == 150000
+    assert k["pb1_collected"] == 15000
+    assert k["delivery_fee"] == 0
+    assert k["change_pct"] == 88  # 150.000 vs 80.000 yesterday
+
+
+def test_hour_filter_counts_money_by_order_hour(client, ctx) -> None:
+    """Money follows the hour the order was created, not when it was paid: with any hour
+    filter, revenue matches the orders counted (every order here is Rp 10.000, and all its
+    ledger rows are posted now, at some other hour)."""
+    res = client.post("/api/v1/owner/outlets", headers=ctx["owner"], json={"name": "Senopati"})
+    assert res.status_code == 201, res.text
+    outlet = res.json()["id"]
+    _opening_hours(ctx["tenant"], outlet)
+    for hour, n in ((8, 1), (12, 6), (13, 1), (14, 1)):
+        for _ in range(n):
+            _paid_order(ctx, outlet, f"{LOCAL_MIDNIGHT} + interval '{hour} hours 5 minutes'", 10000)
+    seen = set()
+    for hours in ("all", "busy", "quiet"):
+        k = _get(client, ctx, outlet_id=outlet, hours=hours)["kpis"]
+        assert k["revenue_excl_pb1"] == k["orders"] * 10000, hours
+        seen.add(k["orders"])
+    assert 9 in seen  # "all" counts every order
 
 
 def test_orders_per_hour_marks_and_hour_filter(client, ctx) -> None:
     riau = ctx["riau"]
     for hour, n in WIREFRAME.items():
         _insert_orders(ctx, riau, n, f"{LOCAL_MIDNIGHT} + interval '{hour} hours 10 minutes'")
-    # Not counted: unpaid, cancelled, and outside opening hours.
+    # Not counted: unpaid and cancelled.
     _insert_orders(ctx, riau, 5, f"{LOCAL_MIDNIGHT} + interval '12 hours'", payment="unpaid",
                    status="pending_payment")  # fmt: skip
     _insert_orders(ctx, riau, 5, f"{LOCAL_MIDNIGHT} + interval '12 hours'", status="cancelled")
-    _insert_orders(ctx, riau, 3, f"{LOCAL_MIDNIGHT} + interval '3 hours'")
 
     body = _get(client, ctx, outlet_id=riau)
     series = body["orders_per_hour"]
@@ -209,7 +256,7 @@ def test_orders_per_hour_marks_and_hour_filter(client, ctx) -> None:
     assert {s["hour"]: s["orders"] for s in series} == WIREFRAME
     assert body["busy_summary"] == {"hours": [12, 13, 18, 19], "orders": 52, "share_pct": 48}
     assert body["quiet_summary"] == {"hours": [8, 9, 15, 16, 21], "orders": 17, "share_pct": 16}
-    assert body["kpis"]["orders"] == 109 + 3  # the KPI counts every paid order of the day
+    assert body["kpis"]["orders"] == 109
 
     busy = _get(client, ctx, outlet_id=riau, hours="busy")
     assert busy["kpis"]["orders"] == 52
@@ -267,6 +314,16 @@ def test_current_crowd_from_tables_bills_and_active_orders(client, ctx) -> None:
     crowd = {c["name"]: c for c in _get(client, ctx)["current_crowd"]}
     assert crowd["Riau"]["occupied_tables"] == 3
     assert crowd["Riau"]["level"] == "ramai"  # 75%
+    # A seated walk-in and an open bill nobody closed since yesterday do not count.
+    admin_sql(
+        "update app.reservations set starts_at = now() - interval '20 hours',"
+        " ends_at = now() - interval '18 hours' where table_id = %s",
+        (tables[2],),
+    )
+    admin_sql("update app.bills set opened_at = now() - interval '20 hours' where table_id = %s",
+              (tables[0],))  # fmt: skip
+    crowd = {c["name"]: c for c in _get(client, ctx)["current_crowd"]}
+    assert crowd["Riau"]["occupied_tables"] == 1  # only the table with the live order
     assert crowd["Dago"]["total_tables"] == 0 and crowd["Dago"]["level"] in ("sepi", "normal")
 
 
@@ -296,10 +353,12 @@ def test_low_stock_lists_out_then_low_for_the_selected_outlets(client, ctx) -> N
         (items[0][1], "low", "Dago"),
     ]
     assert rows[1]["on_hand"] == "5.000" and rows[1]["low_threshold"] == "10.000"
-    # All outlets: Riau has no stock rows, so its items are all out.
+    # All outlets: Riau never stocked these items, so nothing shows as sold out there.
     every = _get(client, ctx)["low_stock"]
-    assert {r["outlet"] for r in every} == {"Dago", "Riau"}
-    assert [r["status"] for r in every] == sorted((r["status"] for r in every), key="low".__eq__)
+    assert [(r["stock_item"], r["outlet"]) for r in every] == [
+        (items[1][1], "Dago"),
+        (items[0][1], "Dago"),
+    ]
 
 
 def test_owner_only_validation_and_tenant_isolation(client, ctx) -> None:
