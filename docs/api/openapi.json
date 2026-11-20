@@ -866,6 +866,34 @@
         "title": "Bucket",
         "type": "object"
       },
+      "BusynessCell": {
+        "properties": {
+          "avg_orders": {
+            "title": "Avg Orders",
+            "type": "number"
+          },
+          "hour": {
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour",
+            "type": "integer"
+          },
+          "weekday": {
+            "description": "ISO weekday, 1 = Monday",
+            "maximum": 7.0,
+            "minimum": 1.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday",
+          "hour",
+          "avg_orders"
+        ],
+        "title": "BusynessCell",
+        "type": "object"
+      },
       "CashCount": {
         "properties": {
           "from": {
@@ -1100,6 +1128,34 @@
         "title": "CashflowTotals",
         "type": "object"
       },
+      "ChannelShare": {
+        "properties": {
+          "channel": {
+            "enum": [
+              "whatsapp_online",
+              "whatsapp_table",
+              "counter"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          },
+          "share_pct": {
+            "title": "Share Pct",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "channel",
+          "orders",
+          "share_pct"
+        ],
+        "title": "ChannelShare",
+        "type": "object"
+      },
       "CloseIn": {
         "properties": {
           "note": {
@@ -1113,6 +1169,149 @@
           "note"
         ],
         "title": "CloseIn",
+        "type": "object"
+      },
+      "Crowd": {
+        "properties": {
+          "active_orders": {
+            "title": "Active Orders",
+            "type": "integer"
+          },
+          "level": {
+            "enum": [
+              "ramai",
+              "normal",
+              "sepi"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "occupied_tables": {
+            "title": "Occupied Tables",
+            "type": "integer"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "total_tables": {
+            "title": "Total Tables",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "name",
+          "timezone",
+          "occupied_tables",
+          "total_tables",
+          "active_orders",
+          "level"
+        ],
+        "title": "Crowd",
+        "type": "object"
+      },
+      "Dashboard": {
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "busy_summary": {
+            "$ref": "#/components/schemas/HourSummary"
+          },
+          "busyness_map": {
+            "items": {
+              "$ref": "#/components/schemas/BusynessCell"
+            },
+            "title": "Busyness Map",
+            "type": "array"
+          },
+          "channel_mix": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelShare"
+            },
+            "title": "Channel Mix",
+            "type": "array"
+          },
+          "current_crowd": {
+            "items": {
+              "$ref": "#/components/schemas/Crowd"
+            },
+            "title": "Current Crowd",
+            "type": "array"
+          },
+          "hours": {
+            "enum": [
+              "all",
+              "busy",
+              "quiet"
+            ],
+            "title": "Hours",
+            "type": "string"
+          },
+          "kpis": {
+            "$ref": "#/components/schemas/Kpis"
+          },
+          "low_stock": {
+            "items": {
+              "$ref": "#/components/schemas/LowStock"
+            },
+            "title": "Low Stock",
+            "type": "array"
+          },
+          "orders_per_hour": {
+            "items": {
+              "$ref": "#/components/schemas/HourCount"
+            },
+            "title": "Orders Per Hour",
+            "type": "array"
+          },
+          "payment_methods": {
+            "items": {
+              "$ref": "#/components/schemas/MethodTotal"
+            },
+            "title": "Payment Methods",
+            "type": "array"
+          },
+          "period": {
+            "enum": [
+              "today",
+              "week",
+              "month"
+            ],
+            "title": "Period",
+            "type": "string"
+          },
+          "quiet_summary": {
+            "$ref": "#/components/schemas/HourSummary"
+          }
+        },
+        "required": [
+          "period",
+          "hours",
+          "as_of",
+          "kpis",
+          "busyness_map",
+          "current_crowd",
+          "orders_per_hour",
+          "busy_summary",
+          "quiet_summary",
+          "low_stock",
+          "channel_mix",
+          "payment_methods"
+        ],
+        "title": "Dashboard",
         "type": "object"
       },
       "Drawer": {
@@ -1457,6 +1656,66 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HourCount": {
+        "properties": {
+          "hour": {
+            "title": "Hour",
+            "type": "integer"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "enum": [
+                  "busy",
+                  "quiet"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
+          },
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hour",
+          "orders",
+          "mark"
+        ],
+        "title": "HourCount",
+        "type": "object"
+      },
+      "HourSummary": {
+        "properties": {
+          "hours": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Hours",
+            "type": "array"
+          },
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          },
+          "share_pct": {
+            "title": "Share Pct",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hours",
+          "orders",
+          "share_pct"
+        ],
+        "title": "HourSummary",
+        "type": "object"
+      },
       "InviteRequest": {
         "properties": {
           "display_name": {
@@ -1487,6 +1746,63 @@
           "outlet_ids"
         ],
         "title": "InviteRequest",
+        "type": "object"
+      },
+      "Kpis": {
+        "properties": {
+          "cash_count": {
+            "title": "Cash Count",
+            "type": "integer"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revenue vs the previous period (yesterday / same days last week / last month); null when the previous period had none",
+            "title": "Change Pct"
+          },
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "delivery_orders": {
+            "title": "Delivery Orders",
+            "type": "integer"
+          },
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          },
+          "pb1_collected": {
+            "title": "Pb1 Collected",
+            "type": "integer"
+          },
+          "qris_count": {
+            "title": "Qris Count",
+            "type": "integer"
+          },
+          "revenue_excl_pb1": {
+            "description": "Menu revenue minus refunds, excl. PB1 and delivery fee",
+            "title": "Revenue Excl Pb1",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revenue_excl_pb1",
+          "change_pct",
+          "orders",
+          "cash_count",
+          "qris_count",
+          "pb1_collected",
+          "delivery_fee",
+          "delivery_orders"
+        ],
+        "title": "Kpis",
         "type": "object"
       },
       "LineIn": {
@@ -1529,6 +1845,66 @@
           "quantity"
         ],
         "title": "LineIn",
+        "type": "object"
+      },
+      "LowStock": {
+        "properties": {
+          "display_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Unit"
+          },
+          "low_threshold": {
+            "title": "Low Threshold",
+            "type": "string"
+          },
+          "on_hand": {
+            "title": "On Hand",
+            "type": "string"
+          },
+          "outlet": {
+            "title": "Outlet",
+            "type": "string"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "low",
+              "out"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_item": {
+            "title": "Stock Item",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_item",
+          "outlet_id",
+          "outlet",
+          "on_hand",
+          "low_threshold",
+          "unit",
+          "display_unit",
+          "status"
+        ],
+        "title": "LowStock",
         "type": "object"
       },
       "MeOutlet": {
@@ -1827,6 +2203,33 @@
           "available"
         ],
         "title": "MenuOption",
+        "type": "object"
+      },
+      "MethodTotal": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "qris"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "transactions": {
+            "title": "Transactions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "method",
+          "amount",
+          "transactions"
+        ],
+        "title": "MethodTotal",
         "type": "object"
       },
       "MoveIn": {
@@ -9688,6 +10091,87 @@
         "summary": "Set Option Recipe",
         "tags": [
           "owner: catalog"
+        ]
+      }
+    },
+    "/api/v1/owner/dashboard": {
+      "get": {
+        "description": "O2 tab Ringkasan: KPI tiles, peta keramaian, keramaian outlet sekarang, order per jam,\nstok rendah & sold out, komposisi per kanal, and metode bayar. The busyness map, current\ncrowd, and low stock ignore `period` and `hours`.",
+        "operationId": "summary_api_v1_owner_dashboard_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "today",
+              "enum": [
+                "today",
+                "week",
+                "month"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hours",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "busy",
+                "quiet"
+              ],
+              "title": "Hours",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Summary",
+        "tags": [
+          "owner: dashboard"
         ]
       }
     },

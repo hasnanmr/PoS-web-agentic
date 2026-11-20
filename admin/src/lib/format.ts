@@ -144,3 +144,34 @@ export function offsetAt(tz: string, date: string, time: string): string {
   const m = /GMT([+-])(\d{2}):?(\d{2})?/.exec(name)
   return m ? `${m[1]}${m[2]}:${m[3] ?? '00'}` : '+00:00'
 }
+
+const hour2 = (h: number) => String(h % 24).padStart(2, '0')
+
+/** Hours in day order starting after the longest closed stretch (same rule as the API), so an
+ * outlet open 18:00–02:00 reads 18 … 23, 00, 01. */
+export function circularHours(hours: number[]): number[] {
+  const sorted = [...new Set(hours)].sort((a, b) => a - b)
+  if (sorted.length < 2) return sorted
+  let start = 0
+  let widest = -1
+  sorted.forEach((h, i) => {
+    const gap = (sorted[(i + 1) % sorted.length] - h + 24) % 24 || 24
+    if (gap >= widest) {
+      widest = gap
+      start = (i + 1) % sorted.length
+    }
+  })
+  return [...sorted.slice(start), ...sorted.slice(0, start)]
+}
+
+/** [12, 13, 18, 19] → "12–14 & 18–20"; [23, 0] → "23–01"; three or more groups use commas. */
+export function hourRanges(hours: number[]): string {
+  const groups: [number, number][] = []
+  for (const h of circularHours(hours)) {
+    const last = groups[groups.length - 1]
+    if (last && last[1] % 24 === h) last[1] = h + 1
+    else groups.push([h, h + 1])
+  }
+  const parts = groups.map(([a, b]) => `${hour2(a)}–${hour2(b)}`)
+  return parts.length === 2 ? parts.join(' & ') : parts.join(', ')
+}

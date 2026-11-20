@@ -1,9 +1,10 @@
 // Wireframe O2 — Dashboard (T-071), owner only, with header tabs **Ringkasan** and **PO & Supplier**
 // (PRD v0.15, issue #16).
-// - Tab Ringkasan (O2): header outlet filter + "Item terlaris" card so far. The other O2 cards (KPI,
-//   peta keramaian, keramaian outlet sekarang, order per jam, stok rendah, komposisi per kanal) and
-//   the header period/jam toggles come with T-071/T-123.
-//   Endpoint: GET /owner/dashboard/top-items?outlet_id=&period=day|month|year.
+// - Tab Ringkasan (O2, T-071/T-124): header outlet filter + period (Hari ini / Minggu / Bulan) +
+//   jam (Semua jam / Jam ramai / Jam sepi); KPI tiles, peta keramaian, keramaian outlet sekarang,
+//   order per jam, stok rendah & sold out, komposisi per kanal + metode bayar (./dashboard/Summary,
+//   GET /owner/dashboard?outlet_id=&period=&hours=), and "Item terlaris"
+//   (GET /owner/dashboard/top-items?outlet_id=&period=day|month|year).
 //   Canvas notes (Item terlaris): the card has its own period toggle (Hari ini / Bulan ini / Tahun
 //   ini, default Hari ini) and follows only the header outlet filter; top 5 by quantity sold (ties:
 //   higher revenue); paid orders only; revenue excl. PB1 and delivery fee; empty → "Belum ada item
@@ -16,10 +17,11 @@ import { useSearchParams } from 'react-router'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatNumber, formatRupiah, todayIn } from '../lib/format'
-import type { TopItems, TopItemsPeriod } from '../lib/types'
+import type { DashboardPeriod, DashboardSummary, HoursFilter, TopItems, TopItemsPeriod } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Loading, Select } from '../ui/kit'
+import { BusynessMap, ChannelsAndMethods, CurrentCrowd, KpiTiles, LowStock, OrdersPerHour } from './dashboard/Summary'
 import { SupplierDialog } from './po/dialogs'
 import { PoForm } from './po/PoForm'
 import { PoTab } from './po/PoTab'
@@ -31,12 +33,44 @@ const PERIODS: { key: TopItemsPeriod; label: string }[] = [
   { key: 'year', label: 'Tahun ini' },
 ]
 
+const HEADER_PERIODS: { key: DashboardPeriod; label: string }[] = [
+  { key: 'today', label: 'Hari ini' },
+  { key: 'week', label: 'Minggu' },
+  { key: 'month', label: 'Bulan' },
+]
+const HOURS: { key: HoursFilter; label: string }[] = [
+  { key: 'all', label: 'Semua jam' },
+  { key: 'busy', label: 'Jam ramai' },
+  { key: 'quiet', label: 'Jam sepi' },
+]
+
+/** Header toggle (O2 "Hari ini | Minggu | Bulan", "Semua jam | Jam ramai | Jam sepi"). */
+function Segmented<T extends string>({ label, options, value, onChange }: {
+  label: string
+  options: { key: T; label: string }[]
+  value: T
+  onChange: (v: T) => void
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex h-8 rounded-md border border-border bg-[#EEF2F8] p-0.5 text-[12px]">
+      {options.map((o) => (
+        <button key={o.key} type="button" aria-pressed={value === o.key} onClick={() => onChange(o.key)}
+          className={`rounded px-2.5 ${value === o.key ? 'border border-primary bg-surface font-semibold text-primary' : 'text-[#444444]'}`}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { me } = useSession()
   const [search, setSearch] = useSearchParams()
   const tab = search.get('tab') === 'po' ? 'po' : 'summary'
   const creating = tab === 'po' && search.get('view') === 'new'
   const [outletId, setOutletId] = useState('')
+  const [period, setPeriod] = useState<DashboardPeriod>('today')
+  const [hours, setHours] = useState<HoursFilter>('all')
   const [poOutletId, setPoOutletId] = useState('')
   const tz = me.outlets.find((o) => o.id === poOutletId)?.timezone ?? 'Asia/Jakarta'
   const currentMonth = todayIn(tz).slice(0, 7)
@@ -80,7 +114,7 @@ export default function DashboardPage() {
   )
 
   const outletSelect = (value: string, onChange: (v: string) => void) => (
-    <Select aria-label="Outlet" className="h-8 w-auto text-[12px]" value={value} onChange={(e) => onChange(e.target.value)}>
+    <Select aria-label="Outlet" className="h-8 w-full text-[12px] sm:w-[150px]" value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">Semua outlet</option>
       {me.outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
     </Select>
@@ -113,9 +147,48 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" tabs={tabs} actions={outletSelect(outletId, setOutletId)} />
+      <PageHeader title="Dashboard" tabs={tabs} actions={
+        <div className="flex flex-wrap items-center gap-2">
+          {outletSelect(outletId, setOutletId)}
+          <Segmented label="Periode" options={HEADER_PERIODS} value={period} onChange={setPeriod} />
+          <Segmented label="Jam" options={HOURS} value={hours} onChange={setHours} />
+        </div>
+      } />
       <div className="space-y-4 p-4 md:p-6">
+        <SummaryCards outletId={outletId} period={period} hours={hours}
+          outletCount={outletId ? 1 : me.outlets.length} />
         <TopItemsCard outletId={outletId} />
+      </div>
+    </>
+  )
+}
+
+function SummaryCards({ outletId, period, hours, outletCount }: {
+  outletId: string
+  period: DashboardPeriod
+  hours: HoursFilter
+  outletCount: number
+}) {
+  const { api } = useSession()
+  const params = new URLSearchParams({ period, hours })
+  if (outletId) params.set('outlet_id', outletId)
+  const query = params.toString()
+  const result = useLoad(() => api.get<DashboardSummary>(`/owner/dashboard?${query}`), query)
+  const data = result.data
+  if (result.error && !data) return <Alert>Ringkasan belum bisa dimuat: {errorMessage(result.error)}</Alert>
+  if (!data) return <Loading />
+  return (
+    <>
+      {result.error ? <Alert>Ringkasan belum bisa dimuat: {errorMessage(result.error)}</Alert> : null}
+      <KpiTiles data={data} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[640fr_356fr]">
+        <BusynessMap data={data} />
+        <CurrentCrowd data={data} />
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <OrdersPerHour data={data} />
+        <LowStock data={data} outletCount={outletCount} />
+        <ChannelsAndMethods data={data} />
       </div>
     </>
   )
