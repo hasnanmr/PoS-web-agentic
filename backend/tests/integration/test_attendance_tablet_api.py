@@ -55,7 +55,7 @@ def client() -> Iterator[TestClient]:
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limit() -> None:
-    device_api._failed.clear()
+    device_api._attempts.clear()
 
 
 def _add_staff(tenant: str, user: UUID, name: str, outlets: list[str]) -> None:
@@ -119,11 +119,15 @@ def _selfie(client: TestClient, token: str, body: bytes = JPEG, kind: str = "ima
     return res.json()["selfie_id"]
 
 
-def _tap(client: TestClient, token: str, user: UUID, selfie: str | None = None) -> Any:
+def _tap(client: TestClient, token: str, user: UUID, action: str, selfie: str | None = None) -> Any:
     return client.post(
         "/api/v1/device/attendance",
         headers=_dev(token),
-        json={"user_id": str(user), "selfie_id": selfie or _selfie(client, token)},
+        json={
+            "user_id": str(user),
+            "selfie_id": selfie or _selfie(client, token),
+            "action": action,
+        },
     )
 
 
@@ -181,13 +185,26 @@ def test_expired_code_is_refused(client: TestClient, ctx: dict[str, Any]) -> Non
     assert res.json()["error"]["code"] == "pairing_code_invalid"
 
 
-def test_wrong_codes_are_rate_limited(client: TestClient) -> None:
+def test_wrong_codes_are_rate_limited(client: TestClient, ctx: dict[str, Any]) -> None:
+    # Right codes do not count against the client.
+    for _ in range(3):
+        _pair(client, ctx, ctx["dago"])
     for _ in range(10):
         res = client.post("/api/v1/device/pair", json={"code": "000000"})
-        assert res.status_code in (400, 201)
+        assert res.status_code == 400
     res = client.post("/api/v1/device/pair", json={"code": "000000"})
     assert res.status_code == 429
     assert res.json()["error"]["code"] == "too_many_attempts"
+    # Only that client is limited (the last X-Forwarded-For entry is the one the proxy added).
+    other = {"X-Forwarded-For": "203.0.113.9, 198.51.100.7"}
+    res = client.post("/api/v1/device/pair", json={"code": "000000"}, headers=other)
+    assert res.status_code == 400
+    # An attempt is counted before the database call, so a burst cannot get past the limit.
+    device_api._attempts.clear()
+    for _ in range(10):
+        device_api._reserve_attempt("burst")
+    with pytest.raises(device_api.ApiError):
+        device_api._reserve_attempt("burst")
 
 
 def test_device_list_shows_last_activity(client: TestClient, ctx: dict[str, Any]) -> None:
@@ -217,7 +234,6 @@ def test_staff_list_is_scoped_to_the_outlet(client: TestClient, ctx: dict[str, A
     assert body["outlet"] == {"name": "Riau", "timezone": "Asia/Makassar"}
     assert [s["display_name"] for s in body["staff"]] == ["Dodi", "Maya"]
     assert all(s["status"] == "not_clocked_in" and s["since"] is None for s in body["staff"])
-    assert body["server_time"]
 
 
 def test_clock_in_then_out_with_required_selfie(client: TestClient, ctx: dict[str, Any]) -> None:
@@ -226,7 +242,7 @@ def test_clock_in_then_out_with_required_selfie(client: TestClient, ctx: dict[st
     res = client.post(
         "/api/v1/device/attendance",
         headers=_dev(token),
-        json={"user_id": str(RINA), "selfie_id": str(uuid4())},
+        json={"user_id": str(RINA), "selfie_id": str(uuid4()), "action": "clock_in"},
     )
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "selfie_required"
@@ -239,11 +255,10 @@ def test_clock_in_then_out_with_required_selfie(client: TestClient, ctx: dict[st
     assert rina["first_time"] is True
 
     selfie = _selfie(client, token)
-    res = _tap(client, token, RINA, selfie)
+    res = _tap(client, token, RINA, "clock_in", selfie)
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["action"] == "clock_in"
-    assert body["first_time_notice"] is True
     assert body["duration_minutes"] is None
     assert body["display_name"] == "Rina"
 
@@ -251,22 +266,35 @@ def test_clock_in_then_out_with_required_selfie(client: TestClient, ctx: dict[st
     rina = next(s for s in staff if s["display_name"] == "Rina")
     assert rina["status"] == "working" and rina["since"] and rina["first_time"] is False
 
-    # A selfie is used once.
-    res = _tap(client, token, RINA, selfie)
-    assert res.status_code == 422
-    assert res.json()["error"]["code"] == "selfie_required"
+    # A retried "Simpan" (same selfie) returns the stored clock in instead of clocking out.
+    again = _tap(client, token, RINA, "clock_in", selfie)
+    assert again.status_code == 201, again.text
+    assert again.json()["action"] == "clock_in" and again.json()["at"] == body["at"]
+    assert admin_sql("select count(*) from app.attendance_records where user_id = %s", (RINA,)) == [
+        (1,)
+    ]
+    # A stale K1 ("Belum masuk" on another tablet) is refused instead of clocking out.
+    res = _tap(client, token, RINA, "clock_in")
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "state_changed"
 
     admin_sql(
         "update app.attendance_records set clock_in_at = now() - interval '8 hours 32 minutes'"
         " where user_id = %s and status = 'open'",
         (RINA,),
     )
-    res = _tap(client, token, RINA)
+    out_selfie = _selfie(client, token)
+    res = _tap(client, token, RINA, "clock_out", out_selfie)
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["action"] == "clock_out"
     assert body["duration_minutes"] == 512
-    assert body["first_time_notice"] is False
+    # Retrying the clock out does not start a new shift.
+    again = _tap(client, token, RINA, "clock_out", out_selfie)
+    assert again.status_code == 201 and again.json()["action"] == "clock_out"
+    res = _tap(client, token, RINA, "clock_out")
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "state_changed"
 
     rows = admin_sql(
         "select status::text, clock_in_selfie_id is not null, clock_out_selfie_id is not null"
@@ -304,12 +332,51 @@ def test_selfie_type_and_size_are_checked(client: TestClient, ctx: dict[str, Any
     assert res.status_code == 422
     assert _selfie(client, token, WEBP, "image/webp")
 
+    # A chunked body (no Content-Length) is cut off at 2 MB too.
+    def chunks() -> Iterator[bytes]:
+        yield JPEG
+        for _ in range(40):
+            yield b"\x00" * 65536
+
+    res = client.post(
+        "/api/v1/device/selfies",
+        headers={**_dev(token), "Content-Type": "image/jpeg"},
+        content=chunks(),
+    )
+    assert res.status_code == 422
+
+
+def test_unassigned_while_working_can_still_clock_out(
+    client: TestClient, ctx: dict[str, Any]
+) -> None:
+    token, _ = _pair(client, ctx, ctx["dago"])
+    assert _tap(client, token, RINA, "clock_in").status_code == 201
+    admin_sql(
+        "delete from app.staff_outlets where user_id = %s and outlet_id = %s", (RINA, ctx["dago"])
+    )
+    try:
+        staff = client.get("/api/v1/device/staff", headers=_dev(token)).json()["staff"]
+        rina = next(s for s in staff if s["display_name"] == "Rina")
+        assert rina["status"] == "working"
+        res = _tap(client, token, RINA, "clock_out")
+        assert res.status_code == 201, res.text
+        staff = client.get("/api/v1/device/staff", headers=_dev(token)).json()["staff"]
+        assert "Rina" not in {s["display_name"] for s in staff}
+        res = _tap(client, token, RINA, "clock_in")
+        assert res.status_code == 403
+        assert res.json()["error"]["code"] == "not_assigned"
+    finally:
+        admin_sql(
+            "insert into app.staff_outlets (user_id, outlet_id, tenant_id) values (%s, %s, %s)",
+            (RINA, ctx["dago"], ctx["tenant"]),
+        )
+
 
 def test_selfie_from_another_tablet_is_refused(client: TestClient, ctx: dict[str, Any]) -> None:
     one, _ = _pair(client, ctx, ctx["dago"])
     two, _ = _pair(client, ctx, ctx["dago"])
     selfie = _selfie(client, one)
-    res = _tap(client, two, RINA, selfie)
+    res = _tap(client, two, RINA, "clock_in", selfie)
     assert res.status_code == 422
     assert res.json()["error"]["code"] == "selfie_required"
 
@@ -318,17 +385,17 @@ def test_unassigned_staff_and_open_elsewhere(client: TestClient, ctx: dict[str, 
     dago, _ = _pair(client, ctx, ctx["dago"])
     riau, _ = _pair(client, ctx, ctx["riau"])
 
-    res = _tap(client, dago, MAYA)
+    res = _tap(client, dago, MAYA, "clock_in")
     assert res.status_code == 403
     assert res.json()["error"]["code"] == "not_assigned"
 
-    res = _tap(client, dago, DODI)
+    res = _tap(client, dago, DODI, "clock_in")
     assert res.status_code == 201 and res.json()["action"] == "clock_in"
     # One open record per staff member: Dodi cannot clock in at Riau while working at Dago.
-    res = _tap(client, riau, DODI)
+    res = _tap(client, riau, DODI, "clock_in")
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "open_elsewhere"
-    res = _tap(client, dago, DODI)
+    res = _tap(client, dago, DODI, "clock_out")
     assert res.status_code == 201 and res.json()["action"] == "clock_out"
 
 
@@ -391,7 +458,7 @@ def _as(
 
 def test_rls_scopes_tablets_and_staff(client: TestClient, ctx: dict[str, Any]) -> None:
     token, paired = _pair(client, ctx, ctx["dago"])
-    assert _tap(client, token, RINA).status_code == 201  # Rina works at Dago now
+    assert _tap(client, token, RINA, "clock_in").status_code == 201  # Rina works at Dago now
     device_id = admin_sql(
         "select id from app.attendance_devices where outlet_id = %s and name = %s",
         (ctx["dago"], paired["device_name"]),

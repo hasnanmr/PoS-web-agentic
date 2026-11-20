@@ -4,12 +4,13 @@
 // QRIS statis card (T-014, PoC demo): PUT/GET /owner/outlets/{id}/qris, image from
 // GET /ops/outlets/{id}/qris/image. Tablet absensi (T-121): GET /owner/outlets/{id}/attendance-devices,
 // POST /owner/outlets/{id}/attendance-pairing-codes, POST /owner/attendance-devices/{id}/revoke.
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatDay, hhmm, localDay, summarizeHours, timeAgo, WEEKDAYS } from '../lib/format'
 import { TIMEZONE_LABEL, type AttendanceDevice, type Drawer, type PairingCode, type OpeningHours, type OutletDetail, type QrisStatus, type Timezone } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
+import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { useQrisImage } from '../lib/useQrisImage'
 import { Alert, Button, Card, FieldRow, LinkButton, Loading, Select, StatusDot, TextInput } from '../ui/kit'
@@ -414,11 +415,22 @@ function DrawerCard({ outletId, grace, onGrace }: { outletId: string; grace: num
 function AttendanceTablets({ outletId }: { outletId: string }) {
   const { api } = useSession()
   const devices = useLoad(() => api.get<AttendanceDevice[]>(`/owner/outlets/${outletId}/attendance-devices`), outletId)
-  const [code, setCode] = useState<PairingCode & { outletId: string }>()
+  const [code, setCode] = useState<PairingCode & { outletId: string; createdAt: number }>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
   const active = (devices.data ?? []).filter((d) => !d.revoked_at)
-  const shownCode = code?.outletId === outletId && new Date(code.expires_at) > new Date() ? code : undefined
+  // The one-time code disappears once a tablet used it (a device paired after it was created)
+  // or when it expires, so "+ Pairing tablet baru" is offered again for the next tablet.
+  const used = code !== undefined && active.some((d) => new Date(d.paired_at).getTime() >= code.createdAt - 5000)
+  const live = code !== undefined && new Date(code.expires_at).getTime() > now
+  const shownCode = code?.outletId === outletId && live && !used ? code : undefined
+  usePolling(devices, shownCode ? 3000 : 60_000)
+  useEffect(() => {
+    if (!code) return
+    const id = setTimeout(() => setNow(Date.now()), Math.max(0, new Date(code.expires_at).getTime() - code.createdAt))
+    return () => clearTimeout(id)
+  }, [code])
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true)
@@ -464,7 +476,9 @@ function AttendanceTablets({ outletId }: { outletId: string }) {
       ) : (
         <LinkButton disabled={busy} onClick={() => void run(async () => {
           const created = await api.post<PairingCode>(`/owner/outlets/${outletId}/attendance-pairing-codes`)
-          setCode({ ...created, outletId })
+          const at = Date.now()
+          setNow(at)
+          setCode({ ...created, outletId, createdAt: at })
         })}>+ Pairing tablet baru → kode 6 digit</LinkButton>
       )}
       {error && <Alert>{error}</Alert>}

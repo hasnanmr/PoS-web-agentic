@@ -47,19 +47,28 @@ language sql stable security definer set search_path = '' as $$
       and u.tenant_id = app.current_tenant() and u.is_active and u.role = 'staff')
 $$;
 
--- K1: staff of the tablet's outlet (the tablet cannot read app.users itself). `has_attendance`
--- = the person has clocked in before at any outlet, so K3 shows the first-use privacy notice.
+-- K1: people the tablet may show (it cannot read app.users itself): active staff assigned to its
+-- outlet, plus anyone with an open record here, so a person unassigned or deactivated while
+-- working can still clock out (`assigned` false: clock out only). `has_attendance` = clocked in
+-- before at any outlet, so K3 shows the first-use privacy notice.
 create function app.device_outlet_staff()
-returns table (user_id uuid, display_name text, has_attendance boolean)
+returns table (user_id uuid, display_name text, has_attendance boolean, assigned boolean)
 language sql stable security definer set search_path = '' as $$
   select u.id, u.display_name,
-         exists (select 1 from app.attendance_records r where r.user_id = u.id)
-  from app.staff_outlets so
-  join app.users u on u.id = so.user_id
+         exists (select 1 from app.attendance_records r where r.user_id = u.id),
+         u.is_active and u.role = 'staff' and exists (
+           select 1 from app.staff_outlets so
+           where so.user_id = u.id and so.outlet_id = app.current_device_outlet())
+  from app.users u
   where app.current_actor() = 'device'
-    and so.outlet_id = app.current_device_outlet()
     and u.tenant_id = app.current_tenant()
-    and u.is_active and u.role = 'staff'
+    and ((u.is_active and u.role = 'staff' and exists (
+            select 1 from app.staff_outlets so
+            where so.user_id = u.id and so.outlet_id = app.current_device_outlet()))
+         or exists (
+            select 1 from app.attendance_records r
+            where r.user_id = u.id and r.outlet_id = app.current_device_outlet()
+              and r.status = 'open'))
   order by u.display_name
 $$;
 

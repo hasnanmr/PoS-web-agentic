@@ -20,8 +20,14 @@ export function loadPairing(): Pairing | null {
   }
 }
 
-export function savePairing(p: Pairing): void {
-  try { localStorage.setItem(PAIRING_STORAGE_KEY, JSON.stringify(p)) } catch { /* private mode */ }
+/** False when the browser refuses storage (the tablet then keeps the session in memory only). */
+export function savePairing(p: Pairing): boolean {
+  try {
+    localStorage.setItem(PAIRING_STORAGE_KEY, JSON.stringify(p))
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function clearPairing(): void {
@@ -51,12 +57,14 @@ export function durationLabel(minutes: number): string {
   return h ? `${h} j ${String(m).padStart(2, '0')} mnt` : `${m} mnt`
 }
 
-/** K4 error copy (canvas "State error"). */
-export function tabletErrorMessage(error: unknown): string {
+/** K4 error copy (canvas "State error"). "Absen belum tercatat" only when a save failed. */
+export function tabletErrorMessage(error: unknown, context: 'save' | 'other' = 'other'): string {
   if (error instanceof ApiError) {
     switch (error.code) {
       case 'network_error':
-        return 'Absen belum tercatat. Periksa internet lalu coba lagi.'
+        return context === 'save'
+          ? 'Absen belum tercatat. Periksa internet lalu coba lagi.'
+          : 'Tidak ada koneksi internet. Periksa jaringan tablet.'
       case 'device_revoked':
       case 'device_unpaired':
         return 'Tablet ini tidak lagi terhubung ke outlet. Minta kode pairing baru dari owner.'

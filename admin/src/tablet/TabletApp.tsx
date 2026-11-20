@@ -27,7 +27,6 @@ export interface TabletStaff {
 interface StaffList {
   outlet: { name: string; timezone: string }
   device_name: string
-  server_time: string
   staff: TabletStaff[]
 }
 
@@ -50,22 +49,30 @@ const REFRESH_MS = 30000
 
 export function TabletApp({ apiBaseUrl }: { apiBaseUrl: string }) {
   const [pairing, setPairing] = useState<Pairing | null>(() => loadPairing())
-  const [api] = useState(() => createApi(apiBaseUrl, async () => loadPairing()?.token ?? null))
-  return <Tablet api={api} pairing={pairing} onPairing={(p) => {
-    if (p) savePairing(p)
+  const [stored, setStored] = useState(true)
+  // The token lives in memory too, so the tablet keeps working when the browser refuses
+  // localStorage (private window, blocked site data).
+  const [client] = useState(() => {
+    let token = loadPairing()?.token ?? null
+    return { api: createApi(apiBaseUrl, async () => token), setToken: (t: string | null) => { token = t } }
+  })
+  return <Tablet api={client.api} pairing={pairing} storageBlocked={!stored} onPairing={(p) => {
+    client.setToken(p?.token ?? null)
+    if (p) setStored(savePairing(p))
     else clearPairing()
     setPairing(p)
   }} />
 }
 
-export function Tablet({ api, pairing, onPairing }: {
+export function Tablet({ api, pairing, onPairing, storageBlocked = false }: {
   api: Api
   pairing: Pairing | null
   onPairing: (p: Pairing | null) => void
+  storageBlocked?: boolean
 }) {
   const [notice, setNotice] = useState<string>()
   if (!pairing) return <PairingScreen api={api} notice={notice} onPaired={(p) => { setNotice(undefined); onPairing(p) }} />
-  return <AttendanceScreens api={api} pairing={pairing} onUnpaired={(message) => {
+  return <AttendanceScreens api={api} pairing={pairing} storageBlocked={storageBlocked} onUnpaired={(message) => {
     setNotice(message)
     onPairing(null)
   }} />
@@ -84,17 +91,23 @@ function PairingScreen({ api, notice, onPaired }: {
   const inputs = useRef<(HTMLInputElement | null)[]>([])
   const code = digits.join('')
 
+  function spread(text: string, from: number) {
+    const clean = text.replace(/\D/g, '').slice(0, 6 - from)
+    setDigits((d) => d.map((c, j) => (j >= from && j < from + clean.length ? clean[j - from] : c)))
+    inputs.current[Math.min(from + clean.length, 5)]?.focus()
+  }
+
   function setDigit(i: number, value: string) {
     const clean = value.replace(/\D/g, '')
-    if (clean.length > 1) {
-      // Pasted code: spread it over the boxes.
-      const next = clean.slice(0, 6).padEnd(6, ' ').split('').map((c) => c.trim())
-      setDigits(next)
-      inputs.current[Math.min(clean.length, 5)]?.focus()
+    if (clean.length >= 6) {
+      spread(clean, 0) // one-time-code autofill
       return
     }
-    setDigits((d) => d.map((c, j) => (j === i ? clean : c)))
-    if (clean && i < 5) inputs.current[i + 1]?.focus()
+    // Typing over a filled box: keep only the newly typed digit.
+    const prev = digits[i]
+    const digit = clean.length > 1 ? (clean[0] === prev ? clean.slice(-1) : clean[0]) : clean
+    setDigits((d) => d.map((c, j) => (j === i ? digit : c)))
+    if (digit && i < 5) inputs.current[i + 1]?.focus()
   }
 
   async function submit() {
@@ -128,6 +141,8 @@ function PairingScreen({ api, notice, onPaired }: {
             <input key={i} ref={(el) => { inputs.current[i] = el }} value={d} inputMode="numeric"
               autoComplete="one-time-code" aria-label={`Digit ${i + 1}`} autoFocus={i === 0}
               onChange={(e) => setDigit(i, e.target.value)}
+              onFocus={(e) => e.target.select()}
+              onPaste={(e) => { e.preventDefault(); spread(e.clipboardData.getData('text'), i) }}
               onKeyDown={(e) => { if (e.key === 'Backspace' && !d && i > 0) inputs.current[i - 1]?.focus() }}
               className="h-12 w-10 rounded-md border border-border bg-surface text-center text-[20px] font-semibold focus:border-primary focus:outline-none sm:h-14 sm:w-12" />
           ))}
@@ -148,11 +163,13 @@ function PairingScreen({ api, notice, onPaired }: {
 
 // K1–K4 ----------------------------------------------------------------------------------------
 
-function AttendanceScreens({ api, pairing, onUnpaired }: {
+function AttendanceScreens({ api, pairing, storageBlocked, onUnpaired }: {
   api: Api
   pairing: Pairing
+  storageBlocked: boolean
   onUnpaired: (message: string) => void
 }) {
+  const [listNotice, setListNotice] = useState<string>()
   const staff = useLoad(() => api.get<StaffList>('/device/staff'), pairing.token)
   usePolling(staff, REFRESH_MS)
   const [step, setStep] = useState<Step>({ name: 'list' })
@@ -196,8 +213,13 @@ function AttendanceScreens({ api, pairing, onUnpaired }: {
     return (
       <ConfirmScreen api={api} person={step.person} photo={step.photo} outletName={outlet.name}
         deviceName={deviceName} timezone={outlet.timezone} now={now} onError={handleError}
+        onStateChanged={() => {
+          setListNotice('Status absen sudah berubah di tablet lain. Cek nama kamu lalu coba lagi.')
+          setStep({ name: 'list' })
+          void staff.reload()
+        }}
         onRetake={() => setStep({ name: 'camera', person: step.person })}
-        onDone={(result) => { setStep({ name: 'done', result }); void staff.reload() }} />
+        onDone={(result) => { setListNotice(undefined); setStep({ name: 'done', result }); void staff.reload() }} />
     )
   }
 
@@ -218,6 +240,15 @@ function AttendanceScreens({ api, pairing, onUnpaired }: {
           <div>{dateLabel(now, outlet.timezone)}</div>
         </div>
       </header>
+      {storageBlocked && (
+        <div role="alert" className="mt-4 rounded-md bg-warning-soft px-3 py-2 text-[12px] text-warning">
+          Browser tidak bisa menyimpan sesi tablet. Jangan tutup atau muat ulang halaman ini; izinkan penyimpanan situs
+          agar tablet tetap terhubung.
+        </div>
+      )}
+      {listNotice && (
+        <div role="status" className="mt-4 rounded-md bg-warning-soft px-3 py-2 text-[12px] text-warning">{listNotice}</div>
+      )}
       {listError && (
         <div role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-[12px] text-danger">{listError}</div>
       )}
@@ -258,7 +289,7 @@ function AttendanceScreens({ api, pairing, onUnpaired }: {
 
 // K3 · Cek foto & simpan (+ pemberitahuan pertama kali) ---------------------------------------
 
-function ConfirmScreen({ api, person, photo, outletName, deviceName, timezone, now, onError, onRetake, onDone }: {
+function ConfirmScreen({ api, person, photo, outletName, deviceName, timezone, now, onError, onStateChanged, onRetake, onDone }: {
   api: Api
   person: TabletStaff
   photo: Blob
@@ -267,9 +298,11 @@ function ConfirmScreen({ api, person, photo, outletName, deviceName, timezone, n
   timezone: string
   now: Date
   onError: (e: unknown) => string | undefined
+  onStateChanged: () => void
   onRetake: () => void
   onDone: (r: AttendanceResult) => void
 }) {
+  const selfieId = useRef<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const url = useMemo(() => URL.createObjectURL(photo), [photo])
@@ -282,17 +315,29 @@ function ConfirmScreen({ api, person, photo, outletName, deviceName, timezone, n
     setBusy(true)
     setError(undefined)
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      setError(tabletErrorMessage(new ApiError(0, 'network_error', 'offline')))
+      setError(tabletErrorMessage(new ApiError(0, 'network_error', 'offline'), 'save'))
       setBusy(false)
       return
     }
     try {
-      const { selfie_id } = await api.post<{ selfie_id: string }>('/device/selfies', photo,
-        { 'Content-Type': photo.type || 'image/jpeg' })
-      const result = await api.post<AttendanceResult>('/device/attendance', { user_id: person.user_id, selfie_id })
+      // One selfie per K3 screen: a retry reuses it, and the server returns the stored result
+      // instead of flipping clock in into clock out.
+      let id = selfieId.current
+      if (!id) {
+        id = (await api.post<{ selfie_id: string }>('/device/selfies', photo,
+          { 'Content-Type': photo.type || 'image/jpeg' })).selfie_id
+        selfieId.current = id
+      }
+      const result = await api.post<AttendanceResult>('/device/attendance',
+        { user_id: person.user_id, selfie_id: id, action: clockOut ? 'clock_out' : 'clock_in' })
       onDone(result)
     } catch (e) {
-      const message = onError(e)
+      if (e instanceof ApiError && e.code === 'state_changed') {
+        onStateChanged()
+        return
+      }
+      if (e instanceof ApiError && e.code === 'selfie_required') selfieId.current = undefined
+      const message = e instanceof ApiError && e.code === 'network_error' ? tabletErrorMessage(e, 'save') : onError(e)
       if (message) setError(message)
       setBusy(false)
     }

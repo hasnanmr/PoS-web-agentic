@@ -234,7 +234,17 @@
       },
       "AttendanceIn": {
         "properties": {
+          "action": {
+            "description": "What K2/K3 showed; `state_changed` (409) when the record says otherwise",
+            "enum": [
+              "clock_in",
+              "clock_out"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
           "selfie_id": {
+            "description": "Reuse the same selfie when retrying: the save is idempotent",
             "format": "uuid",
             "title": "Selfie Id",
             "type": "string"
@@ -247,7 +257,8 @@
         },
         "required": [
           "user_id",
-          "selfie_id"
+          "selfie_id",
+          "action"
         ],
         "title": "AttendanceIn",
         "type": "object"
@@ -267,11 +278,6 @@
             "title": "At",
             "type": "string"
           },
-          "clock_in_at": {
-            "format": "date-time",
-            "title": "Clock In At",
-            "type": "string"
-          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -288,15 +294,6 @@
             "description": "Clock out: \"8 j 32 mnt\"",
             "title": "Duration Minutes"
           },
-          "first_time_notice": {
-            "title": "First Time Notice",
-            "type": "boolean"
-          },
-          "record_id": {
-            "format": "uuid",
-            "title": "Record Id",
-            "type": "string"
-          },
           "timezone": {
             "title": "Timezone",
             "type": "string"
@@ -304,12 +301,9 @@
         },
         "required": [
           "action",
-          "record_id",
           "display_name",
           "at",
-          "clock_in_at",
           "duration_minutes",
-          "first_time_notice",
           "timezone"
         ],
         "title": "AttendanceOut",
@@ -6839,11 +6833,6 @@
           "outlet": {
             "$ref": "#/components/schemas/OutletInfo"
           },
-          "server_time": {
-            "format": "date-time",
-            "title": "Server Time",
-            "type": "string"
-          },
           "staff": {
             "items": {
               "$ref": "#/components/schemas/StaffOut"
@@ -6855,7 +6844,6 @@
         "required": [
           "outlet",
           "device_name",
-          "server_time",
           "staff"
         ],
         "title": "StaffList",

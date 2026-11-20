@@ -14,7 +14,6 @@ const PAIRING: Pairing = {
 const STAFF = {
   outlet: PAIRING.outlet,
   device_name: 'Tablet 1',
-  server_time: '2026-11-17T01:01:00Z',
   staff: [
     { user_id: 'u-dodi', display_name: 'Dodi', status: 'working', since: '2026-11-17T00:30:00Z', first_time: false },
     { user_id: 'u-rina', display_name: 'Rina', status: 'not_clocked_in', since: null, first_time: true },
@@ -75,7 +74,73 @@ describe('K0 Pairing tablet ke outlet', () => {
   })
 })
 
+describe('K0 digit boxes', () => {
+  it('replaces one wrong digit without wiping the code, and spreads a pasted code', async () => {
+    render(<Tablet api={fakeApi()} pairing={null} onPairing={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText('Digit 1'), '482813')
+    await userEvent.click(screen.getByLabelText('Digit 4'))
+    await userEvent.keyboard('9')
+    expect(['1', '2', '3', '4', '5', '6'].map((n) => (screen.getByLabelText(`Digit ${n}`) as HTMLInputElement).value).join(''))
+      .toBe('482913')
+    await userEvent.click(screen.getByLabelText('Digit 1'))
+    await userEvent.paste('123456')
+    expect(['1', '2', '3', '4', '5', '6'].map((n) => (screen.getByLabelText(`Digit ${n}`) as HTMLInputElement).value).join(''))
+      .toBe('123456')
+  })
+})
+
 describe('K1–K4 attendance', () => {
+  it('retries a save with the same selfie and never uploads twice', async () => {
+    fakeCamera()
+    let attempts = 0
+    const api = fakeApi({ 'GET /device/staff': STAFF, 'POST /device/selfies': { selfie_id: 's1' } })
+    const post = api.post
+    api.post = vi.fn(async (path: string, body?: unknown, headers?: Record<string, string>) => {
+      if (path === '/device/attendance' && attempts++ === 0) {
+        throw new ApiError(0, 'network_error', 'lost')
+      }
+      if (path === '/device/attendance') {
+        return { action: 'clock_out', display_name: 'Dodi', at: '2026-11-17T09:02:00Z', duration_minutes: 512, timezone: 'Asia/Jakarta' }
+      }
+      return post(path, body, headers)
+    }) as typeof api.post
+    render(<Tablet api={api} pairing={PAIRING} onPairing={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Dodi, clock out' }))
+    const shoot = screen.getByRole('button', { name: '● Ambil foto' })
+    await waitFor(() => expect(shoot).toBeEnabled())
+    await userEvent.click(shoot)
+    await userEvent.click(screen.getByRole('button', { name: '✓ Simpan clock out' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Absen belum tercatat')
+    await userEvent.click(screen.getByRole('button', { name: '✓ Simpan clock out' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Dodi clock out 16:02 WIB')
+    expect(api.calls.filter(([, p]) => p === '/device/selfies')).toHaveLength(1)
+    expect(api.post).toHaveBeenCalledWith('/device/attendance', { user_id: 'u-dodi', selfie_id: 's1', action: 'clock_out' })
+  })
+
+  it('goes back to the staff list when another tablet changed the state', async () => {
+    fakeCamera()
+    const api = fakeApi({
+      'GET /device/staff': STAFF,
+      'POST /device/selfies': { selfie_id: 's1' },
+      'POST /device/attendance': new ApiError(409, 'state_changed', 'changed'),
+    })
+    render(<Tablet api={api} pairing={PAIRING} onPairing={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Rina, clock in' }))
+    const shoot = screen.getByRole('button', { name: '● Ambil foto' })
+    await waitFor(() => expect(shoot).toBeEnabled())
+    await userEvent.click(shoot)
+    await userEvent.click(screen.getByRole('button', { name: '✓ Simpan clock in' }))
+    expect(await screen.findByText('Tap nama kamu untuk clock in / clock out')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Status absen sudah berubah')
+  })
+
+  it('shows a neutral message when the staff list cannot load', async () => {
+    const api = fakeApi({ 'GET /device/staff': new ApiError(0, 'network_error', 'offline') })
+    render(<Tablet api={api} pairing={PAIRING} onPairing={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Tidak ada koneksi internet')
+    expect(screen.queryByText(/Absen belum tercatat/)).not.toBeInTheDocument()
+  })
+
   it('lists the outlet staff with their state', async () => {
     const api = fakeApi({ 'GET /device/staff': STAFF })
     render(<Tablet api={api} pairing={PAIRING} onPairing={vi.fn()} />)
@@ -92,8 +157,8 @@ describe('K1–K4 attendance', () => {
       'GET /device/staff': STAFF,
       'POST /device/selfies': { selfie_id: 's1' },
       'POST /device/attendance': {
-        action: 'clock_in', record_id: 'r1', display_name: 'Rina', at: '2026-11-17T01:01:00Z',
-        clock_in_at: '2026-11-17T01:01:00Z', duration_minutes: null, first_time_notice: true, timezone: 'Asia/Jakarta',
+        action: 'clock_in', display_name: 'Rina', at: '2026-11-17T01:01:00Z', duration_minutes: null,
+        timezone: 'Asia/Jakarta',
       },
     })
     render(<Tablet api={api} pairing={PAIRING} onPairing={vi.fn()} />)
@@ -109,7 +174,7 @@ describe('K1–K4 attendance', () => {
     await userEvent.click(screen.getByRole('button', { name: '✓ Simpan clock in' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Rina clock in 08:01 WIB')
     expect(screen.getByText(/Selamat bekerja!/)).toBeInTheDocument()
-    expect(api.calls).toContainEqual(['POST', '/device/attendance', { user_id: 'u-rina', selfie_id: 's1' }])
+    expect(api.calls).toContainEqual(['POST', '/device/attendance', { user_id: 'u-rina', selfie_id: 's1', action: 'clock_in' }])
     const upload = api.calls.find(([m, p]) => m === 'POST' && p === '/device/selfies')
     expect(upload?.[2]).toBeInstanceOf(Blob)
   })

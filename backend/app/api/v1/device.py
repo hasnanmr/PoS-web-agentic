@@ -22,7 +22,7 @@ from app import db
 from app.api.errors import ApiError
 from app.core import attendance as core
 from app.core.actor import ActorContext
-from app.core.errors import DomainError, ValidationFailedError
+from app.core.errors import ValidationFailedError
 
 router = APIRouter(prefix="/api/v1/device", tags=["attendance tablet (K0-K4)"])
 
@@ -56,39 +56,52 @@ CurrentDevice = Annotated[core.Device, Depends(current_device)]
 
 # K0 · pairing -------------------------------------------------------------------------------
 
-# Wrong codes: at most 10 per client address and 100 in total per 10 minutes (per API process),
-# so a 6-digit code that lives 10 minutes cannot be guessed.
-_FAILED_WINDOW_SECONDS = 600
-_FAILED_LIMITS = {"client": 10, "all": 100}
-_failed: dict[str, deque[float]] = {}
+# Pairing attempts: at most 10 unconfirmed or wrong codes per client address per 10 minutes (per
+# API process). An attempt is counted BEFORE the database call, so a burst of concurrent
+# requests cannot slip past the check, and released when the code was right. There is no
+# global cap, so one client cannot block pairing for everyone else.
+_ATTEMPT_WINDOW_SECONDS = 600
+_ATTEMPT_LIMIT = 10
+_attempts: dict[str, deque[float]] = {}
 
 
 def _client_key(request: Request) -> str:
-    # The platform proxy appends the real peer address last; earlier entries are client-supplied.
+    # The platform proxy appends the address it saw as the LAST X-Forwarded-For entry; earlier
+    # entries are supplied by the client and can be spoofed, so they are ignored.
     forwarded = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",")]
-    peer = forwarded[-1] if forwarded[-1] else (request.client.host if request.client else "?")
-    return f"client:{peer}"
+    if forwarded[-1]:
+        return forwarded[-1]
+    return request.client.host if request.client else "?"
 
 
-def _hits(key: str, now: float) -> deque[float]:
-    hits = _failed.setdefault(key, deque())
-    while hits and hits[0] < now - _FAILED_WINDOW_SECONDS:
-        hits.popleft()
-    return hits
+def _prune(now: float) -> None:
+    for key in list(_attempts):
+        hits = _attempts[key]
+        while hits and hits[0] < now - _ATTEMPT_WINDOW_SECONDS:
+            hits.popleft()
+        if not hits:
+            del _attempts[key]
 
 
-def _check_rate(client: str) -> None:
+def _reserve_attempt(client: str) -> float:
     now = time.monotonic()
-    if len(_hits(client, now)) >= _FAILED_LIMITS["client"] or (
-        len(_hits("all", now)) >= _FAILED_LIMITS["all"]
-    ):
+    _prune(now)
+    hits = _attempts.setdefault(client, deque())
+    if len(hits) >= _ATTEMPT_LIMIT:
         raise ApiError(429, "too_many_attempts", "too many wrong codes; wait a few minutes")
+    hits.append(now)
+    return now
 
 
-def _note_failure(client: str) -> None:
-    now = time.monotonic()
-    _hits(client, now).append(now)
-    _hits("all", now).append(now)
+def _release_attempt(client: str, at: float) -> None:
+    hits = _attempts.get(client)
+    if hits is not None:
+        try:
+            hits.remove(at)
+        except ValueError:
+            pass
+        if not hits:
+            _attempts.pop(client, None)
 
 
 class PairIn(BaseModel):
@@ -110,13 +123,10 @@ class PairOut(BaseModel):
 async def pair(body: PairIn, request: Request) -> PairOut:
     """K0 "Hubungkan tablet". `pairing_code_invalid` (400) for a wrong, used, or expired code."""
     client = _client_key(request)
-    _check_rate(client)
-    try:
-        async with _pool(request).connection() as conn, conn.transaction():
-            token, device = await core.pair_device(conn, body.code)
-    except DomainError:
-        _note_failure(client)
-        raise
+    attempt = _reserve_attempt(client)
+    async with _pool(request).connection() as conn, conn.transaction():
+        token, device = await core.pair_device(conn, body.code)
+    _release_attempt(client, attempt)  # a right code does not count against the client
     return PairOut(
         device_token=token,
         device_name=device.device_name,
@@ -138,7 +148,6 @@ class StaffOut(BaseModel):
 class StaffList(BaseModel):
     outlet: OutletInfo
     device_name: str
-    server_time: datetime
     staff: list[StaffOut]
 
 
@@ -147,11 +156,9 @@ async def staff(request: Request, device: CurrentDevice) -> StaffList:
     """K1 "Tap nama kamu untuk clock in / clock out": only staff assigned to this outlet."""
     async with db.transaction(_pool(request), device.actor()) as conn:
         rows = await core.outlet_staff(conn)
-        now = await core.server_time(conn)
     return StaffList(
         outlet=OutletInfo(name=device.outlet_name, timezone=device.timezone),
         device_name=device.device_name,
-        server_time=now,
         staff=[StaffOut(**r) for r in rows],
     )
 
@@ -181,7 +188,15 @@ async def upload_selfie(request: Request, device: CurrentDevice) -> SelfieOut:
     declared = request.headers.get("content-length", "")
     if declared.isdigit() and int(declared) > core.SELFIE_MAX_BYTES:
         raise ValidationFailedError("the photo is larger than 2 MB", {"field": "selfie"})
-    data = await request.body()
+    # Read at most 2 MB, whatever the headers say (chunked bodies have no Content-Length).
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > core.SELFIE_MAX_BYTES:
+            raise ValidationFailedError("the photo is larger than 2 MB", {"field": "selfie"})
+        chunks.append(chunk)
+    data = b"".join(chunks)
     ctx = device.actor()
     async with db.transaction(_pool(request), ctx) as conn:
         selfie_id = await core.save_selfie(
@@ -195,17 +210,19 @@ async def upload_selfie(request: Request, device: CurrentDevice) -> SelfieOut:
 
 class AttendanceIn(BaseModel):
     user_id: UUID
-    selfie_id: UUID
+    selfie_id: UUID = Field(
+        description="Reuse the same selfie when retrying: the save is idempotent"
+    )
+    action: Literal["clock_in", "clock_out"] = Field(
+        description="What K2/K3 showed; `state_changed` (409) when the record says otherwise"
+    )
 
 
 class AttendanceOut(BaseModel):
     action: Literal["clock_in", "clock_out"]
-    record_id: UUID
     display_name: str
     at: datetime
-    clock_in_at: datetime
     duration_minutes: int | None = Field(description='Clock out: "8 j 32 mnt"')
-    first_time_notice: bool
     timezone: str
 
 
@@ -215,6 +232,6 @@ async def record(body: AttendanceIn, request: Request, device: CurrentDevice) ->
     ctx: ActorContext = device.actor()
     async with db.transaction(_pool(request), ctx) as conn:
         row = await core.record_attendance(
-            conn, ctx, user_id=body.user_id, selfie_id=body.selfie_id
+            conn, ctx, user_id=body.user_id, selfie_id=body.selfie_id, action=body.action
         )
     return AttendanceOut(**row, timezone=device.timezone)

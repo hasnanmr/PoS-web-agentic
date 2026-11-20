@@ -18,7 +18,7 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection, AsyncCursor, errors
@@ -178,7 +178,7 @@ async def outlet_staff(conn: AsyncConnection) -> list[dict[str, Any]]:
     await cur.execute(
         """
         select s.user_id, s.display_name, not s.has_attendance as first_time,
-               r.clock_in_at as since
+               r.clock_in_at as since, s.assigned
         from app.device_outlet_staff() s
         left join app.attendance_records r
           on r.user_id = s.user_id and r.status = 'open'
@@ -189,14 +189,8 @@ async def outlet_staff(conn: AsyncConnection) -> list[dict[str, Any]]:
     rows = await cur.fetchall()
     for r in rows:
         r["status"] = "working" if r["since"] else "not_clocked_in"
-    return rows
-
-
-async def server_time(conn: AsyncConnection) -> datetime:
-    cur = await conn.execute("select now()")
-    row = await cur.fetchone()
-    assert row is not None  # noqa: S101
-    return row[0]
+    # Unassigned people are listed only while they still have to clock out here.
+    return [r for r in rows if r.pop("assigned") or r["since"]]
 
 
 # K2/K3 · Selfie ------------------------------------------------------------------------------
@@ -253,17 +247,71 @@ async def _usable_selfie(cur: AsyncCursor[dict[str, Any]], selfie_id: UUID) -> N
         raise SelfieRequiredError("selfie_required", "a new selfie is required")
 
 
-async def record_attendance(
-    conn: AsyncConnection, ctx: ActorContext, *, user_id: UUID, selfie_id: UUID
-) -> dict[str, Any]:
-    """Clock in, or clock out when the person is working here. The server decides (K1 note:
-    "Staf yang sedang bekerja tap namanya → otomatis jadi Clock out")."""
-    cur = conn.cursor(row_factory=dict_row)
+Action = Literal["clock_in", "clock_out"]
+
+
+async def _person(cur: AsyncCursor[dict[str, Any]], user_id: UUID) -> dict[str, Any] | None:
     await cur.execute(
-        "select display_name, has_attendance from app.device_outlet_staff() where user_id = %s",
+        "select display_name, has_attendance, assigned from app.device_outlet_staff()"
+        " where user_id = %s",
         (user_id,),
     )
-    person = await cur.fetchone()
+    return await cur.fetchone()
+
+
+async def _replay(
+    cur: AsyncCursor[dict[str, Any]], user_id: UUID, selfie_id: UUID
+) -> dict[str, Any] | None:
+    """The stored result when this selfie already saved a clock in/out for this person (a
+    retried or duplicated "Simpan"), so a retry never flips the result."""
+    await cur.execute(
+        """
+        select r.clock_in_at, r.clock_out_at, r.clock_out_selfie_id = s.id as is_out
+        from app.attendance_selfies s
+        join app.attendance_records r on s.id in (r.clock_in_selfie_id, r.clock_out_selfie_id)
+        where s.id = %s and s.device_id = app.current_device_id() and r.user_id = %s
+        """,
+        (selfie_id, user_id),
+    )
+    row = await cur.fetchone()
+    if row is None:
+        return None
+    person = await _person(cur, user_id)
+    name = person["display_name"] if person else ""
+    if row["is_out"]:
+        return _result("clock_out", name, row["clock_out_at"], row["clock_in_at"])
+    return _result("clock_in", name, row["clock_in_at"], None)
+
+
+def _result(
+    action: Action, name: str, at: datetime, clock_in_at: datetime | None
+) -> dict[str, Any]:
+    minutes = int((at - clock_in_at).total_seconds() // 60) if clock_in_at else None
+    return {"action": action, "display_name": name, "at": at, "duration_minutes": minutes}
+
+
+def _state_changed() -> ConflictError:
+    return ConflictError("state_changed", "this person's attendance changed; reload the staff list")
+
+
+async def record_attendance(
+    conn: AsyncConnection,
+    ctx: ActorContext,
+    *,
+    user_id: UUID,
+    selfie_id: UUID,
+    action: Action,
+) -> dict[str, Any]:
+    """K3 "Simpan clock in" / "Simpan clock out". `action` is what K2/K3 showed the person; the
+    server refuses it (`state_changed`) when the record says otherwise, so the tablet reloads K1
+    instead of storing the opposite (K1 note: "Staf yang sedang bekerja tap namanya → otomatis
+    jadi Clock out"). Idempotent per selfie: a retry with the same selfie returns the stored
+    result."""
+    cur = conn.cursor(row_factory=dict_row)
+    replay = await _replay(cur, user_id, selfie_id)
+    if replay is not None:
+        return replay
+    person = await _person(cur, user_id)
     if person is None:
         raise DeviceForbiddenError("not_assigned", "this person is not staff of this outlet")
     await _usable_selfie(cur, selfie_id)
@@ -276,6 +324,11 @@ async def record_attendance(
         (user_id,),
     )
     open_record = await cur.fetchone()
+    if open_record is None and (replay := await _replay(cur, user_id, selfie_id)):
+        return replay  # a concurrent duplicate committed while this one waited
+    if (open_record is not None) != (action == "clock_out"):
+        raise _state_changed()
+
     if open_record is not None:
         await cur.execute(
             """
@@ -291,17 +344,10 @@ async def record_attendance(
         row = await cur.fetchone()
         assert row is not None  # noqa: S101
         await _event(conn, ctx, row["id"], "clock_out", {"at": row["clock_out_at"].isoformat()})
-        minutes = int((row["clock_out_at"] - row["clock_in_at"]).total_seconds() // 60)
-        return {
-            "action": "clock_out",
-            "record_id": row["id"],
-            "display_name": person["display_name"],
-            "at": row["clock_out_at"],
-            "clock_in_at": row["clock_in_at"],
-            "duration_minutes": minutes,
-            "first_time_notice": False,
-        }
+        return _result("clock_out", person["display_name"], row["clock_out_at"], row["clock_in_at"])
 
+    if not person["assigned"]:
+        raise DeviceForbiddenError("not_assigned", "this person is not staff of this outlet")
     record_id = uuid4()
     try:
         async with conn.transaction():
@@ -316,6 +362,8 @@ async def record_attendance(
                 (record_id, ctx.tenant_id, ctx.device_outlet_id, user_id, ctx.device_id, selfie_id),
             )
     except errors.UniqueViolation as exc:
+        if replay := await _replay(cur, user_id, selfie_id):
+            return replay
         if "attendance_one_open" in str(exc):
             # Still clocked in at another outlet (this tablet cannot see that record).
             raise ConflictError(
@@ -325,15 +373,7 @@ async def record_attendance(
     row = await cur.fetchone()
     assert row is not None  # noqa: S101
     await _event(conn, ctx, record_id, "clock_in", {"at": row["clock_in_at"].isoformat()})
-    return {
-        "action": "clock_in",
-        "record_id": record_id,
-        "display_name": person["display_name"],
-        "at": row["clock_in_at"],
-        "clock_in_at": row["clock_in_at"],
-        "duration_minutes": None,
-        "first_time_notice": not person["has_attendance"],
-    }
+    return _result("clock_in", person["display_name"], row["clock_in_at"], None)
 
 
 async def _event(
