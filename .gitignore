@@ -38,3 +38,7 @@ supabase/.temp/
 
 # Internal business notes (pricing, packages): not for the repo
 docs/business/
+
+# Local research notes and reports (payment gateway research etc.): not for the repo
+research_notes/
+reports/
