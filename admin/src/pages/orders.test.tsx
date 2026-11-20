@@ -54,14 +54,17 @@ describe('S1 Counter', () => {
     expect(await screen.findByText('Rp 27.500')).toBeInTheDocument()
     expect(screen.getByText('PB1 10%')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '▤ Cash' }))
-    await userEvent.type(screen.getByLabelText('Uang diterima'), '50000')
-    expect(screen.getByText('Rp 22.500')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' }))
+    const pay = screen.getByRole('dialog', { name: 'Pembayaran cash' })
+    await userEvent.type(within(pay).getByLabelText('Uang diterima'), '50000')
+    expect(within(pay).getByText('Rp 22.500')).toBeInTheDocument()
+    await userEvent.click(within(pay).getByRole('button', { name: 'Pembayaran selesai' }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/outlets/o-dago/orders', {
       type: 'dine_in', table_id: null,
       items: [{ product_id: 'p-kopi', quantity: 1, addon_option_ids: ['o-reg'] }],
       payment: { method: 'cash', cash_received: 50000, drawer_id: 'd1' } }]))
     expect(await screen.findByText('Order #A-1001 dibuat · Rp 27.500 · Kembalian Rp 22.500')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Pembayaran cash' })).not.toBeInTheDocument()
   })
 
   it('lets an optional single-choice add-on be unselected; a required one stays chosen', async () => {
@@ -143,32 +146,37 @@ describe('S1 Counter: cash change and drawer', () => {
     opened_at: '2026-11-18T01:00:00Z', starting_cash: 500000, opened_by: openedBy, opened_by_name: null,
   })
 
-  it('shows no change while the next quote is still loading', async () => {
-    const quote = (total: number): Quote => ({ lines: [], subtotal: total, pb1_rate_bps: null, pb1_amount: 0, total })
-    const pending: ((q: Quote) => void)[] = []
+  it('opens the cash step: change and "Pembayaran selesai" only once the money covers the total', async () => {
     const api = fakeApi({
       'GET /ops/outlets/o-dago/menu': [{ ...KOPI, addon_groups: [] }],
       'GET /ops/outlets/o-dago/tables': [],
       'GET /ops/outlets/o-dago/shifts/current': [shift('s1', 'd1', 1, 'u1', 'Kasir depan')],
+      'POST /ops/outlets/o-dago/quotes': { lines: [], subtotal: 27500, pb1_rate_bps: null, pb1_amount: 0, total: 27500 },
+      'POST /ops/outlets/o-dago/orders': new ApiError(500, 'http_error', 'Stok tidak cukup'),
     })
-    const base = api.post
-    api.post = vi.fn(async (path: string, body?: unknown) => {
-      if (path.endsWith('/quotes')) return new Promise<Quote>((resolve) => { pending.push(resolve) })
-      return base(path, body)
-    }) as typeof api.post
     render(<MemoryRouter><WithSession session={fakeSession('staff', { api, outlet: PAY_FIRST })}><CounterPage /></WithSession></MemoryRouter>)
     await userEvent.click(await screen.findByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
     await userEvent.click(screen.getByRole('button', { name: '▤ Cash' }))
-    await userEvent.type(screen.getByLabelText('Uang diterima'), '50000')
-    // Nothing is quoted yet: the cash received must not be shown as change.
-    expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('—')
-    await act(async () => { pending[0](quote(25000)) })
-    await waitFor(() => expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('Rp 25.000'))
-
-    await userEvent.click(screen.getByRole('button', { name: 'Tambah jumlah Es Kopi Susu Senja' }))
-    expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('—')
-    await act(async () => { pending[1](quote(50000)) })
-    await waitFor(() => expect(screen.getByText('Kembalian').nextSibling).toHaveTextContent('Rp 0'))
+    // No cash input before the payment step.
+    expect(screen.queryByLabelText('Uang diterima')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' }))
+    const pay = screen.getByRole('dialog', { name: 'Pembayaran cash' })
+    const done = within(pay).getByRole('button', { name: 'Pembayaran selesai' })
+    expect(done).toBeDisabled()
+    await userEvent.type(within(pay).getByLabelText('Uang diterima'), '20000')
+    expect(within(pay).getByText('Kurang Rp 7.500')).toBeInTheDocument()
+    expect(within(pay).queryByText('Kembalian')).not.toBeInTheDocument()
+    expect(done).toBeDisabled()
+    await userEvent.click(within(pay).getByRole('button', { name: 'Rp 50.000' }))
+    expect(within(pay).getByText('Kembalian').nextSibling).toHaveTextContent('Rp 22.500')
+    expect(done).toBeEnabled()
+    // A failed order keeps the dialog open with the error.
+    await userEvent.click(done)
+    expect(await within(pay).findByText('Stok tidak cukup')).toBeInTheDocument()
+    await userEvent.click(within(pay).getByRole('button', { name: 'Batal' }))
+    expect(screen.queryByRole('dialog', { name: 'Pembayaran cash' })).not.toBeInTheDocument()
+    expect(api.calls.filter(([m, p]) => m === 'POST' && p.endsWith('/orders'))).toHaveLength(1)
   })
 
   it('asks which drawer receives cash when several shifts are open', async () => {
@@ -191,8 +199,10 @@ describe('S1 Counter: cash change and drawer', () => {
     expect(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' })).toBeDisabled()
 
     await userEvent.selectOptions(screen.getByLabelText('Drawer'), 'd2')
-    await userEvent.type(screen.getByLabelText('Uang diterima'), '25000')
     await userEvent.click(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' }))
+    const pay = screen.getByRole('dialog', { name: 'Pembayaran cash' })
+    await userEvent.click(within(pay).getByRole('button', { name: 'Uang pas' }))
+    await userEvent.click(within(pay).getByRole('button', { name: 'Pembayaran selesai' }))
     await waitFor(() => expect(api.calls.find(([m, p]) => m === 'POST' && p.endsWith('/orders'))?.[2])
       .toMatchObject({ payment: { method: 'cash', cash_received: 25000, drawer_id: 'd2' } }))
   })
@@ -308,12 +318,24 @@ describe('S1 Counter QRIS (PoC)', () => {
       'POST /ops/outlets/o-dago/quotes': { lines: [{ product_id: 'p-kopi', name: 'Es Kopi Susu Senja', unit_price: 25000,
         quantity: 1, line_total: 25000, addons: [] }], subtotal: 25000, pb1_rate_bps: null, pb1_amount: 0, total: 25000 },
       'BLOB /ops/outlets/o-dago/qris/image': new ApiError(404, 'not_found', 'qris_image not found'),
+      'POST /ops/outlets/o-dago/orders': { id: 'ord1', order_no: '#A-1002', status: 'confirmed', payment_status: 'paid',
+        subtotal: 25000, pb1_amount: 0, total: 25000, change_due: null, bill_id: null },
     })
     render(<MemoryRouter><WithSession session={fakeSession('staff', { api, outlet: PAY_FIRST })}><CounterPage /></WithSession></MemoryRouter>)
     await userEvent.click(await screen.findByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
     await userEvent.click(await screen.findByRole('button', { name: '▦ QRIS' }))
-    expect(await screen.findByText('Scan QRIS · bayar tepat Rp 25.000')).toBeInTheDocument()
-    expect(await screen.findByText('Belum ada QRIS. Owner mengunggahnya di Bisnis & Outlet.')).toBeInTheDocument()
+    // The QRIS shows in the payment popup, not before.
+    expect(screen.queryByText('Scan QRIS · bayar tepat Rp 25.000')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Buat order & terima bayar (F9)' }))
+    const pay = screen.getByRole('dialog', { name: 'Pembayaran QRIS' })
+    expect(await within(pay).findByText('Scan QRIS · bayar tepat Rp 25.000')).toBeInTheDocument()
+    expect(await within(pay).findByText('Belum ada QRIS. Owner mengunggahnya di Bisnis & Outlet.')).toBeInTheDocument()
+    expect(api.calls.some(([m, p]) => m === 'POST' && p.endsWith('/orders'))).toBe(false)
+    await userEvent.click(within(pay).getByRole('button', { name: 'Pembayaran selesai' }))
+    await waitFor(() => expect(api.calls.find(([m, p]) => m === 'POST' && p.endsWith('/orders'))?.[2])
+      .toMatchObject({ payment: { method: 'qris' } }))
+    expect(await screen.findByText('Order #A-1002 dibuat · Rp 25.000')).toBeInTheDocument()
   })
 })
 
@@ -338,12 +360,38 @@ describe('S5 Open Bills', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cash' }))
     expect(screen.getByRole('button', { name: 'Cash' })).toHaveAttribute('aria-pressed', 'true')
     // ...but paying cash stays blocked until a shift is open.
-    await userEvent.type(screen.getByLabelText('Uang diterima bill'), '120000')
     expect(screen.getByText('Cash butuh shift kasir terbuka.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Tutup bill & bayar Rp 116\.600/ })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'QRIS' }))
     await userEvent.click(screen.getByRole('button', { name: /Tutup bill & bayar Rp 116\.600/ }))
+    const pay = screen.getByRole('dialog', { name: 'Pembayaran QRIS' })
+    expect(await within(pay).findByText('Scan QRIS · bayar tepat Rp 116.600')).toBeInTheDocument()
+    expect(api.calls.some(([m, p]) => m === 'POST' && p === '/ops/bills/b1/close')).toBe(false)
+    await userEvent.click(within(pay).getByRole('button', { name: 'Pembayaran selesai' }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/bills/b1/close', { method: 'qris' }]))
+  })
+
+  it('closes the bill with cash: money received and change in the payment step', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/bills': { payment_mode: 'open_bill', bills: [{ id: 'b1', table_id: 't5', table_name: 'Meja 05',
+        table_area: 'Indoor', guest_name: null, running_total: 116600, order_count: 1, opened_at: new Date().toISOString() }] },
+      'GET /ops/bills/b1': { id: 'b1', table_name: 'Meja 05', table_area: 'Indoor', guest_name: null, status: 'open',
+        opened_at: new Date().toISOString(), orders: [{ id: 'o1', order_no: '#A-1028', channel: 'counter',
+          created_at: new Date().toISOString(), status: 'served', line_total: 106000, items: [{ name: 'Es Kopi Susu Senja', quantity: 4, addons: null }] }],
+        subtotal: 106000, pb1_rate_bps: 1000, pb1_amount: 10600, total: 116600 },
+      'GET /ops/outlets/o-dago/shifts/current': [{ id: 's1', drawer_id: 'd1', drawer_name: 'Kasir depan', drawer_number: 1,
+        opened_at: '2026-11-18T01:00:00Z', starting_cash: 500000, opened_by: 'u1', opened_by_name: 'Rina' }],
+      'POST /ops/bills/b1/close': { bill_id: 'b1', total: 116600, method: 'cash', change_due: 3400, orders_completed: 1 },
+    })
+    render(<WithSession session={fakeSession('staff', { api })}><OpenBillsPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: /Tutup bill & bayar Rp 116\.600/ }))
+    const pay = screen.getByRole('dialog', { name: 'Pembayaran cash' })
+    expect(within(pay).getByRole('button', { name: 'Pembayaran selesai' })).toBeDisabled()
+    await userEvent.type(within(pay).getByLabelText('Uang diterima'), '120000')
+    expect(within(pay).getByText('Kembalian').nextSibling).toHaveTextContent('Rp 3.400')
+    await userEvent.click(within(pay).getByRole('button', { name: 'Pembayaran selesai' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/bills/b1/close',
+      { method: 'cash', cash_received: 120000, drawer_id: 'd1' }]))
   })
 
   it('shows a failed shifts request as an error, not as "no open shift"', async () => {

@@ -50,6 +50,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | S1 Counter / POS (dine-in, takeaway) | US-011, US-018, US-019, US-020, US-034 | T-038, T-067 |
+| S1 · Popup Pembayaran — Cash (uang diterima → kembalian) & QRIS (gambar QRIS → bukti bayar); also used by S5 Tutup bill. Order / bill completes only on "Pembayaran selesai" | US-018, US-020, US-034 | T-038, T-067, T-068 |
 | S2 Order Board | US-013, US-014, US-015, US-016 | T-030, T-031, T-068 |
 | S3 Detail Order & Reversal | US-004, US-016, US-021 | T-031, T-032, T-068 |
 | S4 Review Pembayaran QRIS | US-017, US-021 | T-036, T-037, T-068 |

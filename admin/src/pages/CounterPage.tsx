@@ -4,6 +4,8 @@
 // Behavior notes from the canvas: required add-on groups must be chosen before "Tambah";
 // options without enough stock show "unavailable"; Cash only with an open shift, otherwise
 // disabled with a "Buka shift" link.
+// Payment step (owner request): Cash / QRIS open a PaymentDialog — cash received + change, or
+// the QRIS to scan — and the order is created only on "Pembayaran selesai" there.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { ROUTES } from '../app/nav'
@@ -16,7 +18,7 @@ import { usePhotoRefresh } from '../lib/usePhotoRefresh'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Loading, Select, TextInput } from '../ui/kit'
 import { Photo } from '../ui/Photo'
-import { QrisPayPanel } from '../ui/QrisImage'
+import { PaymentDialog } from '../ui/PaymentDialog'
 
 interface CartLine {
   key: string
@@ -55,7 +57,8 @@ export default function CounterPage() {
   const [cart, setCart] = useState<CartLine[]>([])
   const [picking, setPicking] = useState<MenuItem>()
   const [method, setMethod] = useState<Method>()
-  const [received, setReceived] = useState('')
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string>()
   // A quote counts only for the exact cart it was asked for; while the next one is on its
   // way the total, "Uang pas", "Kembalian" and submit never use the previous cart's numbers.
   const [quoted, setQuoted] = useState<{ key: string; quote: Quote }>()
@@ -96,17 +99,14 @@ export default function CounterPage() {
   }, [api, outletId, type, items, quoteKey])
 
   const total = items.length ? quote?.total ?? 0 : 0
-  const cashReceived = Number(received.replace(/\D/g, '') || 0)
-  const change = quote && effectiveMethod === 'cash' && cashReceived >= total
-    ? cashReceived - total
-    : null
   const canSubmit = !busy && cart.length > 0 && Boolean(quote) && Boolean(effectiveMethod) &&
-    (!toBill || Boolean(tableId)) && (effectiveMethod !== 'cash' || (Boolean(shift) && cashReceived >= total))
+    (!toBill || Boolean(tableId)) && (effectiveMethod !== 'cash' || Boolean(shift))
 
-  const submit = useCallback(async () => {
+  const create = useCallback(async (cashReceived?: number) => {
     if (!canSubmit || !outlet) return
     setBusy(true)
     setNotice(undefined)
+    setPayError(undefined)
     try {
       const payment = effectiveMethod === 'open_bill' ? { to_open_bill: true }
         : effectiveMethod === 'cash'
@@ -119,25 +119,35 @@ export default function CounterPage() {
         : created.bill_id ? ' · masuk open bill' : ''
       setNotice({ tone: 'success', text: `Order ${created.order_no} dibuat · ${formatRupiah(created.total)}${extra}` })
       setCart([])
-      setReceived('')
+      setPaying(false)
       setQuoted(undefined)
       setIdemKey(newKey())
       await Promise.all([menu.reload(), tables.reload()])
     } catch (e) {
-      setNotice({ tone: 'danger', text: errorMessage(e) })
+      // A failed payment keeps the dialog open with the error, so the cashier can retry.
+      if (effectiveMethod === 'open_bill') setNotice({ tone: 'danger', text: errorMessage(e) })
+      else setPayError(errorMessage(e))
     } finally {
       setBusy(false)
     }
-  }, [canSubmit, outlet, effectiveMethod, cashReceived, api, type, tableId, items, idemKey, menu, tables, shift])
+  }, [canSubmit, outlet, effectiveMethod, api, type, tableId, items, idemKey, menu, tables, shift])
+
+  // Open bill goes straight to the bill; Cash and QRIS first open the payment step.
+  const submit = useCallback(() => {
+    if (!canSubmit) return
+    if (effectiveMethod === 'open_bill') void create()
+    else { setPayError(undefined); setPaying(true) }
+  }, [canSubmit, effectiveMethod, create])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus() }
-      if (e.key === 'F9') { e.preventDefault(); void submit() }
+      if (e.key === 'F9') { e.preventDefault(); submit() }
     }
+    if (paying) return // the payment dialog handles its own keys
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [submit])
+  }, [submit, paying])
 
   function add(item: MenuItem, optionIds: string[]) {
     const key = `${item.product_id}:${[...optionIds].sort().join(',')}`
@@ -283,29 +293,8 @@ export default function CounterPage() {
               <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka. <Link to={ROUTES.shifts.path} className="text-primary hover:underline">Buka shift</Link></p>
             )}
           </div>
-          {effectiveMethod === 'qris' && total > 0 && outlet && <QrisPayPanel outletId={outlet.id} amount={total} />}
-          {effectiveMethod === 'cash' && (
-            <div className="mt-3 space-y-2 text-[12px]">
-              <label className="flex items-center justify-between gap-2">
-                <span>Uang diterima</span>
-                <TextInput aria-label="Uang diterima" inputMode="numeric" className="h-8 w-32 text-right"
-                  value={received ? Number(received).toLocaleString('id-ID') : ''}
-                  onChange={(e) => setReceived(e.target.value.replace(/\D/g, ''))} />
-              </label>
-              <div className="flex flex-wrap justify-end gap-1">
-                {[total, 50000, 100000].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map((v) => (
-                  <button key={v} type="button" className="rounded border border-border px-2 py-0.5 hover:bg-page" onClick={() => setReceived(String(v))}>
-                    {v === total ? 'Uang pas' : formatRupiah(v)}
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-between font-semibold">
-                <span>Kembalian</span><span>{change == null ? '—' : formatRupiah(change)}</span>
-              </div>
-            </div>
-          )}
           {notice && <div className="mt-3"><Alert tone={notice.tone}>{notice.text}</Alert></div>}
-          <Button variant="action" className="mt-3 w-full" disabled={!canSubmit} onClick={() => void submit()}>
+          <Button variant="action" className="mt-3 w-full" disabled={!canSubmit} onClick={submit}>
             {busy ? 'Memproses…' : toBill ? 'Buat order ke open bill (F9)' : 'Buat order & terima bayar (F9)'}
           </Button>
           <button type="button" className="mt-2 w-full text-[12px] text-text-muted hover:text-danger" onClick={() => setCart([])}>
@@ -313,6 +302,10 @@ export default function CounterPage() {
           </button>
         </aside>
       </div>
+      {paying && (effectiveMethod === 'cash' || effectiveMethod === 'qris') && (
+        <PaymentDialog method={effectiveMethod} total={total} outletId={outlet.id} busy={busy} error={payError}
+          onConfirm={(cash) => void create(cash)} onCancel={() => setPaying(false)} />
+      )}
       {picking && <AddonModal item={picking} onClose={() => setPicking(undefined)} onAdd={(ids) => { add(picking, ids); setPicking(undefined) }} />}
     </>
   )
