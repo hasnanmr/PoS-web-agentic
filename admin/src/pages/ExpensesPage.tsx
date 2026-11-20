@@ -73,7 +73,8 @@ export default function ExpensesPage() {
             <option value="">Semua outlet</option>
             {me.outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           </Select>
-          <RangePicker value={s ? { from: s.from, to: s.to } : range} onChange={setRange} />
+          {/* The picked range shows right away; before any pick, the summary's resolved period. */}
+          <RangePicker value={range ?? (s ? { from: s.from, to: s.to } : undefined)} onChange={setRange} />
         </div>
         {summary.error ? <Alert>Ringkasan belum bisa dimuat: {errorMessage(summary.error)}</Alert> : null}
         {s ? (
