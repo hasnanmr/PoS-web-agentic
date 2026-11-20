@@ -11,7 +11,8 @@ services:
   postgres:
     # 16.16 is the 12 November 2026 security release (52 CVEs, including CVE-2026-6460, where an
     # object creator can execute code as the OS user running the database). An existing 16.x
-    # volume upgrades in place; no dump/restore.
+    # volume upgrades in place; no dump/restore. Keep the `postgres-data` volume: never run
+    # `docker compose down -v` here, it deletes the local database (schema, seed, test data).
     image: postgres:16.16
     environment:
       POSTGRES_USER: pos
@@ -35,8 +36,9 @@ services:
     # dumps) are fixed in 4.3.7/4.2.12/4.1.17, and 3.13.21 is enterprise-only. 4.3.8 is the
     # patch release on the line where the fixes landed. Nothing talks to the broker yet (the
     # worker is a stub), so the major bump only affects local development.
-    # A 3.13 `rabbitmq-data` volume upgrades in place; if the node refuses to start, recreate
-    # it with `docker compose down -v`.
+    # The `rabbitmq-data` volume is kept as is. Do not delete volumes (no `down -v`): they must
+    # persist across image bumps, DB fixes and migrations. Plain `docker compose up -d` or
+    # `down` (without -v) is safe.
     image: rabbitmq:4.3.8-management
     environment:
       RABBITMQ_DEFAULT_USER: guest
