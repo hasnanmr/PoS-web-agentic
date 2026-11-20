@@ -233,6 +233,7 @@ async def order_status(
                 "name": i["name"],
                 "quantity": i["quantity"],
                 "addons": [a["name"] for a in i["addons"]],
+                "note": i["note"],
                 "line_total": i["line_total"],
             }
             for i in detail["items"]

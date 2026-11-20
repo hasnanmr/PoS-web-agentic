@@ -49,3 +49,18 @@ export function forgetOrder(token: string, orderId: string): SavedOrder[] {
   write({ ...store, [token]: orders })
   return orders
 }
+
+// The open order is also kept in the URL fragment (#order=…&key=…&no=…), so a refresh shows its
+// status again even when the browser keeps no site data (private mode, in-app browsers). The
+// fragment never reaches the server.
+export function orderFromHash(hash: string): SavedOrder | null {
+  const params = new URLSearchParams(hash.replace(/^#/, ''))
+  const orderId = params.get('order')
+  const key = params.get('key')
+  if (!orderId || !key) return null
+  return { order_id: orderId, access_key: key, order_no: params.get('no') ?? '', saved_at: new Date().toISOString() }
+}
+
+export function orderHash(order: SavedOrder): string {
+  return `#${new URLSearchParams({ order: order.order_id, key: order.access_key, no: order.order_no }).toString()}`
+}

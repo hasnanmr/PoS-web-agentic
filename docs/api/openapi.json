@@ -7852,6 +7852,18 @@
             "title": "Name",
             "type": "string"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per-item \"Catatan untuk dapur\"",
+            "title": "Note"
+          },
           "quantity": {
             "title": "Quantity",
             "type": "integer"
@@ -7861,6 +7873,7 @@
           "name",
           "quantity",
           "addons",
+          "note",
           "line_total"
         ],
         "title": "StatusItem",

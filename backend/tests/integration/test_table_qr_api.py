@@ -240,7 +240,7 @@ def test_web_order_is_pay_first_and_never_joins_the_open_bill(client, ctx) -> No
     res = client.post(f"/api/v1/public/t/{token}/orders", json={"items": []})
     assert res.status_code == 422  # Idempotency-Key + items required
     key = uuid4().hex
-    body = [{"product_id": americano["product_id"], "quantity": 2}]
+    body = [{"product_id": americano["product_id"], "quantity": 2, "note": "es sedikit"}]
     res = _place(client, token, body, key, note="kurang manis", customer_name="  Rina ")
     assert res.status_code == 201, res.text
     order = res.json()
@@ -267,6 +267,12 @@ def test_web_order_is_pay_first_and_never_joins_the_open_bill(client, ctx) -> No
     card = _card(client, ctx, order["order_id"])
     assert card["channel"] == "web_table" and card["table"] == "M05"
     assert card["customer_name"] == "Rina" and card["note"] == "kurang manis"
+    assert card["item_summary"] == "2× Americano (es sedikit)"  # noqa: RUF001 - per-item note
+    status = client.get(
+        f"/api/v1/public/t/{token}/orders/{order['order_id']}",
+        headers={"X-Order-Key": order["access_key"]},
+    ).json()
+    assert status["items"][0]["note"] == "es sedikit"
     assert card["auto_cancel_at"] is not None and card["payment_claimed_at"] is None
     assert "preparing" not in card["allowed_actions"]
 
