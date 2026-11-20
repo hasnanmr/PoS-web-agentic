@@ -1,7 +1,7 @@
 // Wireframe components `Sidebar/Owner` and `Sidebar/Staff` (01-admin-owner.png, 02-admin-staff.png):
 // light 220px sidebar, logo, outlet switcher, grouped nav with uppercase headings.
 import { NavLink } from 'react-router'
-import { NAV, STAFF_SIDEBAR_NOTE, type Role } from '../app/nav'
+import { NAV, rolePath, STAFF_SIDEBAR_NOTE, type Role } from '../app/nav'
 import { useSession } from '../app/session'
 import { Brand } from '../ui/Brand'
 
@@ -48,7 +48,7 @@ export function Sidebar({ role, onNavigate }: SidebarProps) {
             {group.items.map((item) => (
               <li key={item.path}>
                 <NavLink
-                  to={item.path}
+                  to={rolePath(role, item.path)}
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     [

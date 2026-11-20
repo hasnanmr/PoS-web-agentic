@@ -56,7 +56,7 @@ Staff calling it → `403` (AC7.7).
 | Action | Endpoint | Fields |
 |---|---|---|
 | Staff table | `GET /owner/staff` ✅ | `[{id, display_name, email, outlets:[…], status: active\|inactive\|invited}]`. |
-| Undang staf | `POST /owner/staff/invitations` ✅ | `display_name, email, outlet_ids[]`. Sends Supabase invite email. |
+| Undang staf | `POST /owner/staff/invitations` ✅ | `display_name, email, outlet_ids[]`. Sends Supabase invite email; the link lands on the staff area `ADMIN_APP_URL/admin` (staff pages live under `/admin/…`, owner pages at the root, each area with its own sign-in so an owner and a staff tab can be open on one device). Resend uses the same link. |
 | Menu ⋯: Edit outlet | `PUT /owner/staff/{id}/outlets` ✅ | `outlet_ids[]`. |
 | Menu ⋯: Kirim ulang undangan | `POST /owner/staff/{id}/invitations/resend` ✅ | |
 | Menu ⋯: Nonaktifkan | `POST /owner/staff/{id}/deactivate` ✅ | Revokes sessions immediately. |

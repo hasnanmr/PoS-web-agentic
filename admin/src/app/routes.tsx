@@ -23,7 +23,7 @@ import StaffPage from '../pages/StaffPage'
 import StockPage from '../pages/StockPage'
 import TablesPage from '../pages/TablesPage'
 import WhatsAppSetupPage from '../pages/WhatsAppSetupPage'
-import { HOME_PATH, navItemsFor, ROUTES } from './nav'
+import { HOME_PATH, navItemsFor, rolePath, ROUTES } from './nav'
 import { useSession } from './session'
 
 const PAGES: Record<keyof typeof ROUTES, ComponentType> = {
@@ -56,8 +56,8 @@ const PAGE_BY_PATH = new Map<string, ComponentType>(
 )
 
 /**
- * Only routes in the current role's navigation are mounted; anything else redirects to the
- * role's home. This is UX only — real authorization is enforced by the API (T-006/T-013).
+ * Only routes in the current role's navigation are mounted, under the role's URL area (staff:
+ * `/admin/…`); anything else redirects to the role's home. This is UX only — real authorization is enforced by the API (T-006/T-013).
  */
 export function AppRoutes() {
   const { role } = useSession()
@@ -67,7 +67,8 @@ export function AppRoutes() {
       <Route element={<AppShell />}>
         {navItemsFor(role).map((item) => {
           const Page = PAGE_BY_PATH.get(item.path)
-          return Page ? <Route key={item.path} path={item.path} element={<Page />} /> : null
+          const path = rolePath(role, item.path)
+          return Page ? <Route key={path} path={path} element={<Page />} /> : null
         })}
         <Route path="*" element={<Navigate to={home} replace />} />
       </Route>
