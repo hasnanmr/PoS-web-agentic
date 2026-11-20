@@ -175,3 +175,11 @@ export function hourRanges(hours: number[]): string {
   const parts = groups.map(([a, b]) => `${hour2(a)}–${hour2(b)}`)
   return parts.length === 2 ? parts.join(' & ') : parts.join(', ')
 }
+
+/** Worked time: "8 j 30 m" (tables) or "8 j 30 mnt" (cards, `long`). */
+export function formatMinutes(minutes: number, long = false): string {
+  const h = Math.floor(minutes / 60)
+  const m = String(minutes % 60).padStart(2, '0')
+  const unit = long ? 'mnt' : 'm'
+  return h ? `${h} j ${m} ${unit}` : `${minutes % 60} ${unit}`
+}

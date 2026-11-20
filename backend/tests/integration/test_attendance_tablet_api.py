@@ -278,6 +278,15 @@ def test_clock_in_then_out_with_required_selfie(client: TestClient, ctx: dict[st
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "state_changed"
 
+    # Long hours and the longest grace, so an 8.5-hour shift is never flagged as forgotten
+    # (whatever the time of day the test runs).
+    admin_sql("update app.outlets set attendance_grace_minutes = 720 where id = %s", (ctx["dago"],))
+    admin_sql(
+        "insert into app.outlet_opening_hours (outlet_id, tenant_id, weekday, opens_at, closes_at)"
+        " select %s, %s, d, '00:00', '23:59' from generate_series(1, 7) d"
+        " on conflict (outlet_id, weekday) do update set opens_at = '00:00', closes_at = '23:59'",
+        (ctx["dago"], ctx["tenant"]),
+    )
     admin_sql(
         "update app.attendance_records set clock_in_at = now() - interval '8 hours 32 minutes'"
         " where user_id = %s and status = 'open'",

@@ -309,6 +309,47 @@
         "title": "AttendanceOut",
         "type": "object"
       },
+      "AttendanceReport": {
+        "properties": {
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "needs_correction_count": {
+            "title": "Needs Correction Count",
+            "type": "integer"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/RecordOut"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "summary": {
+            "items": {
+              "$ref": "#/components/schemas/StaffTotal"
+            },
+            "title": "Summary",
+            "type": "array"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "summary",
+          "needs_correction_count",
+          "records"
+        ],
+        "title": "AttendanceReport",
+        "type": "object"
+      },
       "AuditActor": {
         "properties": {
           "id": {
@@ -1219,7 +1260,7 @@
             "type": "string"
           },
           "outlet": {
-            "$ref": "#/components/schemas/OutletRef"
+            "$ref": "#/components/schemas/app__api__v1__owner__finance__OutletRef"
           },
           "shift_id": {
             "format": "uuid",
@@ -1414,6 +1455,67 @@
           "note"
         ],
         "title": "CloseIn",
+        "type": "object"
+      },
+      "Correction": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "from": {
+            "$ref": "#/components/schemas/Times"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Times"
+          }
+        },
+        "required": [
+          "at",
+          "by",
+          "from",
+          "to",
+          "reason"
+        ],
+        "title": "Correction",
+        "type": "object"
+      },
+      "CorrectionIn": {
+        "properties": {
+          "clock_out_at": {
+            "description": "O14 \"Jam pulang *\" (the only time the panel corrects)",
+            "format": "date-time",
+            "title": "Clock Out At",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Required (blank → reason_required)",
+            "maxLength": 500,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clock_out_at",
+          "reason"
+        ],
+        "title": "CorrectionIn",
         "type": "object"
       },
       "Crowd": {
@@ -1611,6 +1713,38 @@
         "title": "DeviceOut",
         "type": "object"
       },
+      "Devices": {
+        "properties": {
+          "clock_in": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock In"
+          },
+          "clock_out": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Out"
+          }
+        },
+        "required": [
+          "clock_in",
+          "clock_out"
+        ],
+        "title": "Devices",
+        "type": "object"
+      },
       "Drawer": {
         "properties": {
           "has_open_shift": {
@@ -1801,7 +1935,7 @@
             "type": "integer"
           },
           "outlet": {
-            "$ref": "#/components/schemas/OutletRef"
+            "$ref": "#/components/schemas/app__api__v1__owner__finance__OutletRef"
           },
           "recorded_by": {
             "anyOf": [
@@ -1920,6 +2054,70 @@
         "title": "ExpenseReversalIn",
         "type": "object"
       },
+      "Flag": {
+        "properties": {
+          "at": {
+            "description": "\"Ditandai otomatis 23:00\"",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Outlet closing time, \"22:00\"",
+            "title": "Closes At"
+          },
+          "grace_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grace Minutes"
+          }
+        },
+        "required": [
+          "at",
+          "closes_at",
+          "grace_minutes"
+        ],
+        "title": "Flag",
+        "type": "object"
+      },
+      "Flagged": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/app__api__v1__ops__attendance__OutletRef"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "outlet"
+        ],
+        "title": "Flagged",
+        "type": "object"
+      },
       "GoodsBuckets": {
         "properties": {
           "arrived": {
@@ -1951,6 +2149,40 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "History": {
+        "properties": {
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/RecordOut"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          },
+          "total_minutes": {
+            "description": "Without flagged or open records",
+            "title": "Total Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "records",
+          "total_minutes"
+        ],
+        "title": "History",
         "type": "object"
       },
       "HourCount": {
@@ -4023,25 +4255,6 @@
         "title": "OutletPriceRow",
         "type": "object"
       },
-      "OutletRef": {
-        "properties": {
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "OutletRef",
-        "type": "object"
-      },
       "OutletSummary": {
         "properties": {
           "id": {
@@ -5961,6 +6174,205 @@
         "title": "RecipeLineRow",
         "type": "object"
       },
+      "RecordDetail": {
+        "properties": {
+          "clock_in_at": {
+            "format": "date-time",
+            "title": "Clock In At",
+            "type": "string"
+          },
+          "clock_out_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Out At"
+          },
+          "corrections": {
+            "items": {
+              "$ref": "#/components/schemas/Correction"
+            },
+            "title": "Corrections",
+            "type": "array"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "devices": {
+            "$ref": "#/components/schemas/Devices"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Closed or corrected records only",
+            "title": "Duration Minutes"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Flag"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_selfie_in": {
+            "title": "Has Selfie In",
+            "type": "boolean"
+          },
+          "has_selfie_out": {
+            "title": "Has Selfie Out",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "original": {
+            "$ref": "#/components/schemas/Times"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "closed",
+              "needs_correction",
+              "corrected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/Ref"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "user",
+          "outlet",
+          "timezone",
+          "clock_in_at",
+          "clock_out_at",
+          "duration_minutes",
+          "has_selfie_in",
+          "has_selfie_out",
+          "status",
+          "devices",
+          "original",
+          "flag",
+          "corrections"
+        ],
+        "title": "RecordDetail",
+        "type": "object"
+      },
+      "RecordOut": {
+        "properties": {
+          "clock_in_at": {
+            "format": "date-time",
+            "title": "Clock In At",
+            "type": "string"
+          },
+          "clock_out_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Out At"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Closed or corrected records only",
+            "title": "Duration Minutes"
+          },
+          "has_selfie_in": {
+            "title": "Has Selfie In",
+            "type": "boolean"
+          },
+          "has_selfie_out": {
+            "title": "Has Selfie Out",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "closed",
+              "needs_correction",
+              "corrected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/Ref"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "user",
+          "outlet",
+          "timezone",
+          "clock_in_at",
+          "clock_out_at",
+          "duration_minutes",
+          "has_selfie_in",
+          "has_selfie_out",
+          "status"
+        ],
+        "title": "RecordOut",
+        "type": "object"
+      },
       "Ref": {
         "properties": {
           "id": {
@@ -6958,6 +7370,37 @@
         "title": "StaffOutlet",
         "type": "object"
       },
+      "StaffTotal": {
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "outlets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outlets",
+            "type": "array"
+          },
+          "user": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "worked_minutes": {
+            "description": "Without flagged or open records",
+            "title": "Worked Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user",
+          "outlets",
+          "worked_minutes",
+          "days"
+        ],
+        "title": "StaffTotal",
+        "type": "object"
+      },
       "StateBuckets": {
         "properties": {
           "closed": {
@@ -7682,6 +8125,103 @@
         "title": "Tile",
         "type": "object"
       },
+      "Times": {
+        "properties": {
+          "clock_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock In At"
+          },
+          "clock_out_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Out At"
+          }
+        },
+        "required": [
+          "clock_in_at",
+          "clock_out_at"
+        ],
+        "title": "Times",
+        "type": "object"
+      },
+      "Today": {
+        "properties": {
+          "clock_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock In At"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "tablet \"Kasir Dago\"",
+            "title": "Device Name"
+          },
+          "flagged_records": {
+            "description": "Banner \"Kamu lupa clock out 16 Nov\"",
+            "items": {
+              "$ref": "#/components/schemas/Flagged"
+            },
+            "title": "Flagged Records",
+            "type": "array"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__api__v1__ops__attendance__OutletRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "working",
+              "not_clocked_in"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "clock_in_at",
+          "device_name",
+          "outlet",
+          "flagged_records"
+        ],
+        "title": "Today",
+        "type": "object"
+      },
       "TopItem": {
         "properties": {
           "name": {
@@ -7812,6 +8352,30 @@
           "party_size"
         ],
         "title": "WalkInIn",
+        "type": "object"
+      },
+      "app__api__v1__ops__attendance__OutletRef": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OutletRef",
         "type": "object"
       },
       "app__api__v1__ops__orders__Board": {
@@ -7987,6 +8551,25 @@
           "id"
         ],
         "title": "Created",
+        "type": "object"
+      },
+      "app__api__v1__owner__finance__OutletRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "OutletRef",
         "type": "object"
       },
       "app__api__v1__owner__outlets__Created": {
@@ -8439,6 +9022,150 @@
         "summary": "Open Shift",
         "tags": [
           "ops: bills & shifts"
+        ]
+      }
+    },
+    "/api/v1/ops/me/attendance": {
+      "get": {
+        "description": "S9 \"Riwayat saya · minggu ini\" (default: Monday of this week to today, counted in WIT, the\neasternmost zone, so today's record at a WITA/WIT outlet is never cut off).",
+        "operationId": "history_api_v1_ops_me_attendance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/History"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "ops: my attendance"
+        ]
+      }
+    },
+    "/api/v1/ops/me/attendance/today": {
+      "get": {
+        "description": "S9 \"Status hari ini\" and the forgotten clock-out banner.",
+        "operationId": "today_api_v1_ops_me_attendance_today_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Today"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Today",
+        "tags": [
+          "ops: my attendance"
+        ]
+      }
+    },
+    "/api/v1/ops/me/attendance/{record_id}/selfies/{which}": {
+      "get": {
+        "description": "S9 \"lihat selfie masuk & pulang milik sendiri\" (404 for anyone else's).",
+        "operationId": "my_selfie_api_v1_ops_me_attendance__record_id__selfies__which__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "which",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "title": "Which",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {},
+              "image/webp": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Selfie",
+        "tags": [
+          "ops: my attendance"
         ]
       }
     },
@@ -10724,6 +11451,127 @@
         ]
       }
     },
+    "/api/v1/owner/attendance": {
+      "get": {
+        "description": "O14 summary cards, \"Perlu dikoreksi\", and the table. \"⭳ Ekspor CSV\" = `format=csv`.",
+        "operationId": "attendance_report_api_v1_owner_attendance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outlet_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attendance Report",
+        "tags": [
+          "owner: attendance"
+        ]
+      }
+    },
     "/api/v1/owner/attendance-devices/{device_id}/revoke": {
       "post": {
         "description": "O3 \"Cabut\": the tablet is refused on its next request and goes back to K0.",
@@ -10763,6 +11611,206 @@
           }
         },
         "summary": "Revoke Device",
+        "tags": [
+          "owner: attendance"
+        ]
+      }
+    },
+    "/api/v1/owner/attendance/{record_id}": {
+      "get": {
+        "description": "O14 \"Koreksi catatan\": original values, the automatic flag, and the correction history.",
+        "operationId": "attendance_record_api_v1_owner_attendance__record_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attendance Record",
+        "tags": [
+          "owner: attendance"
+        ]
+      }
+    },
+    "/api/v1/owner/attendance/{record_id}/corrections": {
+      "post": {
+        "description": "O14 \"Simpan koreksi\": the original values stay in the append-only history.",
+        "operationId": "correct_attendance_api_v1_owner_attendance__record_id__corrections_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Attendance",
+        "tags": [
+          "owner: attendance"
+        ]
+      }
+    },
+    "/api/v1/owner/attendance/{record_id}/selfies/{which}": {
+      "delete": {
+        "description": "Owner deletes a selfie before the 45-day purge; the record and its hours stay. Audited.\nNo screen yet (product owner, 2026-11-20). Staff cannot delete selfies, not even their own.",
+        "operationId": "delete_attendance_selfie_api_v1_owner_attendance__record_id__selfies__which__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "which",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "title": "Which",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Attendance Selfie",
+        "tags": [
+          "owner: attendance"
+        ]
+      },
+      "get": {
+        "description": "O14 \"Selfie masuk / pulang\". PoC: the photo bytes (no Storage bucket yet), never cached.",
+        "operationId": "attendance_selfie_api_v1_owner_attendance__record_id__selfies__which__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "which",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "title": "Which",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {},
+              "image/webp": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attendance Selfie",
         "tags": [
           "owner: attendance"
         ]

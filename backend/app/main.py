@@ -16,6 +16,7 @@ from app import db
 from app.api import health
 from app.api.errors import install_error_handlers
 from app.api.v1 import device, me
+from app.api.v1.ops import attendance as ops_attendance
 from app.api.v1.ops import bills as ops_bills
 from app.api.v1.ops import orders as ops_orders
 from app.api.v1.ops import proofs as ops_proofs
@@ -149,6 +150,7 @@ def create_app(
     app.include_router(ops_reservations.router)
     app.include_router(attendance.router)
     app.include_router(device.router)
+    app.include_router(ops_attendance.router)
 
     logger.info(
         "api configured",

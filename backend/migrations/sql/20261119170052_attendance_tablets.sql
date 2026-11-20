@@ -29,7 +29,7 @@ create table app.attendance_selfies (
 );
 create index on app.attendance_selfies (created_at);
 
--- Each clock-in and clock-out keeps its selfie; the 30-day purge deletes the photo and the
+-- Each clock-in and clock-out keeps its selfie; the 45-day purge deletes the photo and the
 -- record stays (FR5.7), so the link goes null.
 alter table app.attendance_records
   add column clock_in_selfie_id  uuid unique references app.attendance_selfies (id) on delete set null,

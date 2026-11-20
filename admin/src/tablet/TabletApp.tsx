@@ -357,7 +357,7 @@ function ConfirmScreen({ api, person, photo, outletName, deviceName, timezone, n
           {person.first_time && !clockOut && (
             <div className="mt-3 rounded-md border border-[#E8C66B] bg-warning-soft px-3 py-2 text-[10px] text-text">
               <div className="font-semibold text-warning">Pertama kali absen</div>
-              Selfie disimpan sebagai bukti kehadiran selama 30 hari, hanya bisa dilihat owner dan kamu sendiri, lalu
+              Selfie disimpan sebagai bukti kehadiran selama 45 hari, hanya bisa dilihat owner dan kamu sendiri, lalu
               dihapus otomatis. Tidak ada pengenalan wajah otomatis.
             </div>
           )}
