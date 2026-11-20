@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fakeApi, fakeSession } from '../test/fakes'
 import { WithSession } from '../test/session'
 import type { ProductDetail, ProductRow, StockResponse } from '../lib/types'
@@ -52,6 +52,39 @@ describe('S7 Stok', () => {
     expect(await screen.findByText(/bahan 1/)).toBeInTheDocument()
     expect(screen.getByText(/bahan 2/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Muat lagi' })).not.toBeInTheDocument()
+  })
+
+  it('filters the riwayat and lets only the owner download it as CSV (issue #37)', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/stock': STOCK,
+      'GET /ops/outlets/o-dago/stock-movements?limit=20': { items: [], next_cursor: null },
+      'GET /ops/outlets/o-dago/stock-movements?limit=20&stock_item_id=matcha&type=waste': { items: [], next_cursor: null },
+      'BLOB /owner/outlets/o-dago/stock-movements/export?stock_item_id=matcha&type=waste&format=csv': new Blob(['x']),
+    })
+    URL.createObjectURL = vi.fn(() => 'blob:csv')
+    URL.revokeObjectURL = vi.fn()
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    render(<WithSession session={fakeSession('owner', { api })}><StockPage /></WithSession>)
+    await screen.findByText('2,4 kg')
+    await userEvent.selectOptions(screen.getByLabelText('Filter bahan'), 'matcha')
+    await userEvent.selectOptions(screen.getByLabelText('Filter tipe'), 'waste')
+    expect(await screen.findByText('Tidak ada movement untuk filter ini.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '⭳ Unduh CSV' }))
+    await waitFor(() => expect(click).toHaveBeenCalled())
+    expect(api.calls).toContainEqual(
+      ['BLOB', '/owner/outlets/o-dago/stock-movements/export?stock_item_id=matcha&type=waste&format=csv', undefined])
+    click.mockRestore()
+  })
+
+  it('hides the CSV download from staff', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/stock': STOCK,
+      'GET /ops/outlets/o-dago/stock-movements?limit=20': { items: [], next_cursor: null },
+    })
+    render(<WithSession session={fakeSession('staff', { api })}><StockPage /></WithSession>)
+    expect(await screen.findByText('Belum ada movement.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Filter tipe')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '⭳ Unduh CSV' })).not.toBeInTheDocument()
   })
 
   it('shows levels, filters, and records a restock in the display unit', async () => {

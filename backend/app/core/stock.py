@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
@@ -19,6 +20,7 @@ from psycopg.rows import dict_row
 
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
+from app.core.localtime import local_day_bounds
 from app.core.units import NegativeQuantityError, portions_available, recipe_with_addons
 
 ZERO = Decimal("0.000")
@@ -207,14 +209,27 @@ async def record_movement(
     return int(row[0])
 
 
+HistoryType = Literal["restock", "waste", "adjustment", "sale"]
+"""Riwayat filter: ``sale`` ("penjualan") covers sales and their reversals."""
+
+EXPORT_MAX_ROWS = 50_000
+"""Cap for one CSV export; a wider range must be split by date."""
+
+
 async def movement_history(
     conn: AsyncConnection,
     outlet_id: UUID,
     *,
     stock_item_id: UUID | None = None,
+    type: HistoryType | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
     cursor: int | None = None,
     limit: int = 50,
 ) -> tuple[list[dict[str, Any]], int | None]:
+    """Newest first. ``since``/``until`` are UTC ``[since, until)`` bounds (outlet-local days
+    converted by the caller); ``next_cursor`` is set when more rows exist past ``limit``."""
+    types = ["sale", "sale_reversal"] if type == "sale" else [type] if type else None
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         """
@@ -226,13 +241,24 @@ async def movement_history(
         join app.outlets ou on ou.id = m.outlet_id
         left join app.orders o on o.id = m.order_id
         left join app.users u on u.id = m.actor_id
-        where m.outlet_id = %s
-          and (%s::uuid is null or m.stock_item_id = %s)
-          and (%s::bigint is null or m.id < %s)
+        where m.outlet_id = %(outlet)s
+          and (%(item)s::uuid is null or m.stock_item_id = %(item)s)
+          and (%(types)s::text[] is null or m.type::text = any(%(types)s::text[]))
+          and (%(since)s::timestamptz is null or m.created_at >= %(since)s)
+          and (%(until)s::timestamptz is null or m.created_at < %(until)s)
+          and (%(cursor)s::bigint is null or m.id < %(cursor)s)
         order by m.id desc
-        limit %s
+        limit %(limit)s
         """,
-        (outlet_id, stock_item_id, stock_item_id, cursor, cursor, limit + 1),
+        {
+            "outlet": outlet_id,
+            "item": stock_item_id,
+            "types": types,
+            "since": since,
+            "until": until,
+            "cursor": cursor,
+            "limit": limit + 1,
+        },
     )
     rows = await cur.fetchall()
     next_cursor = rows[limit - 1]["id"] if len(rows) > limit else None
@@ -244,3 +270,14 @@ async def movement_history(
         r["actor"] = r.pop("actor_name") or r["actor_type"]
         out.append(r)
     return out, next_cursor
+
+
+def history_bounds(
+    date_from: date | None, date_to: date | None, tz: str
+) -> tuple[datetime | None, datetime | None]:
+    """UTC ``[since, until)`` for outlet-local days ``from``..``to`` (inclusive, AC3.4)."""
+    if date_from and date_to and date_from > date_to:
+        raise ValidationFailedError("from must not be after to", {"field": "from"})
+    since = local_day_bounds(date_from, tz)[0] if date_from else None
+    until = local_day_bounds(date_to, tz)[1] if date_to else None
+    return since, until

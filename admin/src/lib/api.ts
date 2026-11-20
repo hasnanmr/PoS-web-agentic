@@ -143,6 +143,9 @@ const ERROR_COPY: Record<string, string> = {
 
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    if (error.code === 'validation_failed' && typeof error.details.max_rows === 'number') {
+      return `Terlalu banyak data (maks ${error.details.max_rows.toLocaleString('id-ID')} baris). Persempit rentang tanggal.`
+    }
     if (error.code === 'validation_failed' && error.details.field === 'pb1_rate_bps') {
       return 'Isi tarif PB1 saat PB1 aktif.'
     }
