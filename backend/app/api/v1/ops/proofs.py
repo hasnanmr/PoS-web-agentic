@@ -23,6 +23,9 @@ router = APIRouter(prefix="/api/v1/ops", tags=["ops: payment proofs"])
 
 class ProofQueueItem(BaseModel):
     proof_id: UUID
+    kind: Literal["screenshot", "customer_claim"] = Field(
+        description='customer_claim = "Saya sudah bayar" on the table web page, no screenshot'
+    )
     order_id: UUID
     order_no: str
     channel: str
@@ -35,6 +38,7 @@ class ProofQueueItem(BaseModel):
 
 class ProofDetail(BaseModel):
     proof_id: UUID
+    kind: Literal["screenshot", "customer_claim"]
     status: Literal["pending", "accepted", "rejected"]
     image_url: str | None
     order_id: UUID

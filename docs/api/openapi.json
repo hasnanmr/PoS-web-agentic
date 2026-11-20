@@ -3357,9 +3357,34 @@
             "title": "Item Summary",
             "type": "string"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Web orders: \"Catatan untuk dapur\"",
+            "title": "Note"
+          },
           "order_no": {
             "title": "Order No",
             "type": "string"
+          },
+          "payment_claimed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Web orders: \"Pelanggan bilang sudah bayar · 12:44\" (no screenshot)",
+            "title": "Payment Claimed At"
           },
           "payment_id": {
             "anyOf": [
@@ -3391,6 +3416,19 @@
           "payment_status": {
             "title": "Payment Status",
             "type": "string"
+          },
+          "proof_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pending payment proof to review in S4",
+            "title": "Proof Id"
           },
           "qris_checked": {
             "anyOf": [
@@ -3441,6 +3479,9 @@
           "qris_checked",
           "table",
           "customer_name",
+          "note",
+          "proof_id",
+          "payment_claimed_at",
           "item_summary",
           "total",
           "bill_id",
@@ -3643,9 +3684,34 @@
             "title": "Items",
             "type": "array"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Web orders: \"Catatan untuk dapur\"",
+            "title": "Note"
+          },
           "order_no": {
             "title": "Order No",
             "type": "string"
+          },
+          "payment_claimed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Web orders: \"Pelanggan bilang sudah bayar · 12:44\" (no screenshot)",
+            "title": "Payment Claimed At"
           },
           "payment_id": {
             "anyOf": [
@@ -3692,6 +3758,19 @@
               }
             ],
             "title": "Pb1 Rate Bps"
+          },
+          "proof_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pending payment proof to review in S4",
+            "title": "Proof Id"
           },
           "qris_checked": {
             "anyOf": [
@@ -3762,6 +3841,9 @@
           "qris_checked",
           "table",
           "customer_name",
+          "note",
+          "proof_id",
+          "payment_claimed_at",
           "item_summary",
           "total",
           "bill_id",
@@ -4194,6 +4276,24 @@
           "timezone"
         ],
         "title": "OutletInfo",
+        "type": "object"
+      },
+      "OutletOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "timezone"
+        ],
+        "title": "OutletOut",
         "type": "object"
       },
       "OutletPatch": {
@@ -5912,6 +6012,14 @@
             ],
             "title": "Image Url"
           },
+          "kind": {
+            "enum": [
+              "screenshot",
+              "customer_claim"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
           "order_id": {
             "format": "uuid",
             "title": "Order Id",
@@ -6012,6 +6120,7 @@
         },
         "required": [
           "proof_id",
+          "kind",
           "status",
           "image_url",
           "order_id",
@@ -6037,6 +6146,15 @@
         "properties": {
           "channel": {
             "title": "Channel",
+            "type": "string"
+          },
+          "kind": {
+            "description": "customer_claim = \"Saya sudah bayar\" on the table web page, no screenshot",
+            "enum": [
+              "screenshot",
+              "customer_claim"
+            ],
+            "title": "Kind",
             "type": "string"
           },
           "order_id": {
@@ -6084,6 +6202,7 @@
         },
         "required": [
           "proof_id",
+          "kind",
           "order_id",
           "order_no",
           "channel",
@@ -6094,6 +6213,66 @@
           "timezone"
         ],
         "title": "ProofQueueItem",
+        "type": "object"
+      },
+      "QrSettingsIn": {
+        "properties": {
+          "target": {
+            "enum": [
+              "web_whatsapp",
+              "web",
+              "whatsapp"
+            ],
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "title": "QrSettingsIn",
+        "type": "object"
+      },
+      "QrSettingsOut": {
+        "properties": {
+          "target": {
+            "enum": [
+              "web_whatsapp",
+              "web",
+              "whatsapp"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "whatsapp_connected": {
+            "description": "Without WhatsApp the QR always leads to the web page (options disabled)",
+            "title": "Whatsapp Connected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target",
+          "whatsapp_connected"
+        ],
+        "title": "QrSettingsOut",
+        "type": "object"
+      },
+      "QrTokenOut": {
+        "properties": {
+          "qr_token": {
+            "title": "Qr Token",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "qr_token",
+          "url"
+        ],
+        "title": "QrTokenOut",
         "type": "object"
       },
       "QrisCheckIn": {
@@ -7637,6 +7816,56 @@
         "title": "StateBuckets",
         "type": "object"
       },
+      "StatusEvent": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "at"
+        ],
+        "title": "StatusEvent",
+        "type": "object"
+      },
+      "StatusItem": {
+        "properties": {
+          "addons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Addons",
+            "type": "array"
+          },
+          "line_total": {
+            "title": "Line Total",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "quantity",
+          "addons",
+          "line_total"
+        ],
+        "title": "StatusItem",
+        "type": "object"
+      },
       "StockCounts": {
         "properties": {
           "low": {
@@ -8195,9 +8424,30 @@
         "title": "TableCreate",
         "type": "object"
       },
-      "TableOut": {
+      "TablePage": {
         "properties": {
-          "area": {
+          "outlet": {
+            "$ref": "#/components/schemas/OutletOut"
+          },
+          "table": {
+            "$ref": "#/components/schemas/app__api__v1__public_table__TableOut"
+          },
+          "target": {
+            "description": "Effective: web while WhatsApp isn't connected",
+            "enum": [
+              "web_whatsapp",
+              "web",
+              "whatsapp"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "web_ordering": {
+            "description": "False without a static QRIS: menu only",
+            "title": "Web Ordering",
+            "type": "boolean"
+          },
+          "whatsapp_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -8206,34 +8456,17 @@
                 "type": "null"
               }
             ],
-            "title": "Area"
-          },
-          "capacity": {
-            "title": "Capacity",
-            "type": "integer"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "is_bookable": {
-            "title": "Is Bookable",
-            "type": "boolean"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
+            "title": "Whatsapp Url"
           }
         },
         "required": [
-          "id",
-          "name",
-          "capacity",
-          "area",
-          "is_bookable"
+          "outlet",
+          "table",
+          "target",
+          "web_ordering",
+          "whatsapp_url"
         ],
-        "title": "TableOut",
+        "title": "TablePage",
         "type": "object"
       },
       "TablePatch": {
@@ -8630,6 +8863,273 @@
         "title": "WalkInIn",
         "type": "object"
       },
+      "WebOrderCreated": {
+        "properties": {
+          "access_key": {
+            "description": "Keep on the phone; send as `X-Order-Key`",
+            "title": "Access Key",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "pay_by": {
+            "format": "date-time",
+            "title": "Pay By",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "order_id",
+          "access_key",
+          "order_no",
+          "status",
+          "payment_status",
+          "subtotal",
+          "pb1_amount",
+          "total",
+          "pay_by"
+        ],
+        "title": "WebOrderCreated",
+        "type": "object"
+      },
+      "WebOrderIn": {
+        "properties": {
+          "customer_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "expected_total": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total the page showed; `price_changed` if it differs",
+            "title": "Expected Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "WebOrderIn",
+        "type": "object"
+      },
+      "WebOrderStatus": {
+        "properties": {
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "claimed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/StatusEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StatusItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "pay_by": {
+            "format": "date-time",
+            "title": "Pay By",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "order_no",
+          "created_at",
+          "customer_name",
+          "note",
+          "status",
+          "payment_status",
+          "claimed_at",
+          "pay_by",
+          "items",
+          "subtotal",
+          "pb1_amount",
+          "total",
+          "reject_reason",
+          "cancel_reason",
+          "events",
+          "timezone"
+        ],
+        "title": "WebOrderStatus",
+        "type": "object"
+      },
+      "WebQuoteIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "WebQuoteIn",
+        "type": "object"
+      },
       "app__api__v1__ops__attendance__OutletRef": {
         "properties": {
           "name": {
@@ -8918,6 +9418,72 @@
           "method"
         ],
         "title": "PaymentIn",
+        "type": "object"
+      },
+      "app__api__v1__owner__tables__TableOut": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_bookable": {
+            "title": "Is Bookable",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "capacity",
+          "area",
+          "is_bookable"
+        ],
+        "title": "TableOut",
+        "type": "object"
+      },
+      "app__api__v1__public_table__TableOut": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "area"
+        ],
+        "title": "TableOut",
         "type": "object"
       }
     }
@@ -10025,7 +10591,8 @@
                   "enum": [
                     "counter",
                     "whatsapp_online",
-                    "whatsapp_table"
+                    "whatsapp_table",
+                    "web_table"
                   ],
                   "type": "string"
                 },
@@ -13701,6 +14268,100 @@
         ]
       }
     },
+    "/api/v1/owner/outlets/{outlet_id}/table-qr-settings": {
+      "get": {
+        "operationId": "get_qr_settings_api_v1_owner_outlets__outlet_id__table_qr_settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QrSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Qr Settings",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      },
+      "put": {
+        "operationId": "put_qr_settings_api_v1_owner_outlets__outlet_id__table_qr_settings_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QrSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QrSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Qr Settings",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
     "/api/v1/owner/outlets/{outlet_id}/tables": {
       "get": {
         "operationId": "list_tables_api_v1_owner_outlets__outlet_id__tables_get",
@@ -13722,7 +14383,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/TableOut"
+                    "$ref": "#/components/schemas/app__api__v1__owner__tables__TableOut"
                   },
                   "title": "Response List Tables Api V1 Owner Outlets  Outlet Id  Tables Get",
                   "type": "array"
@@ -13776,7 +14437,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TableOut"
+                  "$ref": "#/components/schemas/app__api__v1__owner__tables__TableOut"
                 }
               }
             },
@@ -13794,6 +14455,48 @@
           }
         },
         "summary": "Create Table",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/tables/qr.pdf": {
+      "get": {
+        "description": "\"⭳ Unduh semua QR (PDF)\": one page per active table (QR, table name, outlet name).",
+        "operationId": "outlet_qr_pdf_api_v1_owner_outlets__outlet_id__tables_qr_pdf_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outlet Qr Pdf",
         "tags": [
           "owner: tables & reservation rules"
         ]
@@ -15677,7 +16380,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TableOut"
+                  "$ref": "#/components/schemas/app__api__v1__owner__tables__TableOut"
                 }
               }
             },
@@ -15697,6 +16400,578 @@
         "summary": "Update Table",
         "tags": [
           "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/tables/{table_id}/qr-token": {
+      "post": {
+        "description": "\"↻ Ganti\": a new token; the old printed QR shows Q0 \"QR tidak berlaku\" at once.",
+        "operationId": "replace_qr_token_api_v1_owner_tables__table_id__qr_token_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QrTokenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Qr Token",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/tables/{table_id}/qr.png": {
+      "get": {
+        "description": "\"⭳ Unduh\": the QR of one table (PNG).",
+        "operationId": "table_qr_png_api_v1_owner_tables__table_id__qr_png_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Table Qr Png",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}": {
+      "get": {
+        "description": "Q1: the outlet and table, where the QR leads, and the WhatsApp link when allowed.",
+        "operationId": "table_page_api_v1_public_t__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TablePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Table Page",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/menu": {
+      "get": {
+        "description": "Q2/Q2a: the outlet's active menu with prices, add-ons and sold-out state.",
+        "operationId": "menu_api_v1_public_t__token__menu_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MenuItem"
+                  },
+                  "title": "Response Menu Api V1 Public T  Token  Menu Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Menu",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/orders": {
+      "post": {
+        "description": "Q3 \"Pesan & bayar\": a pay-first dine-in order for this table (stock deducted).",
+        "operationId": "place_order_api_v1_public_t__token__orders_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Place Order",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/orders/{order_id}": {
+      "get": {
+        "description": "Q5 (and Q4 on reload): only with the order's access key.",
+        "operationId": "order_status_api_v1_public_t__token__orders__order_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Status",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/orders/{order_id}/cancel": {
+      "post": {
+        "description": "Q4 \"Batalkan pesanan\": only before \"Saya sudah bayar\"; stock returns.",
+        "operationId": "cancel_api_v1_public_t__token__orders__order_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/orders/{order_id}/payment-claim": {
+      "post": {
+        "description": "Q4 \"Saya sudah bayar\": staff check the merchant account and confirm in S2/S4.",
+        "operationId": "payment_claim_api_v1_public_t__token__orders__order_id__payment_claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payment Claim",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/orders/{order_id}/qris": {
+      "get": {
+        "description": "Q4: the outlet's static QRIS image (same as O3 / the S1 popup).",
+        "operationId": "order_qris_api_v1_public_t__token__orders__order_id__qris_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Qris",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/quote": {
+      "post": {
+        "description": "Q3 totals before ordering (subtotal, PB1, total), priced by the server like S1.",
+        "operationId": "web_quote_api_v1_public_t__token__quote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebQuoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Web Quote",
+        "tags": [
+          "public: table web page (Q0-Q5)"
         ]
       }
     },

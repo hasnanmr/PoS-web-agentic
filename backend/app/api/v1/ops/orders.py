@@ -17,7 +17,8 @@ from app import db
 from app.api.errors import ApiError
 from app.api.photos import attach_photo_urls
 from app.auth.deps import TenantUser
-from app.core import catalog, idempotency, orders, outlets
+from app.core import catalog, idempotency, orders, outlets, table_qr
+from app.core.actor import ActorContext
 from app.core.orders import CounterOrder
 from app.core.payments import PaymentInput
 from app.core.pricing import LineInput, outlet_pb1, quote
@@ -140,6 +141,11 @@ class OrderCard(BaseModel):
     )
     table: str | None
     customer_name: str | None
+    note: str | None = Field(description='Web orders: "Catatan untuk dapur"')
+    proof_id: UUID | None = Field(description="Pending payment proof to review in S4")
+    payment_claimed_at: datetime | None = Field(
+        description='Web orders: "Pelanggan bilang sudah bayar · 12:44" (no screenshot)'
+    )
     item_summary: str
     total: int
     bill_id: UUID | None
@@ -327,12 +333,18 @@ async def order_board(
     outlet_id: UUID,
     request: Request,
     user: TenantUser,
-    channel: Literal["counter", "whatsapp_online", "whatsapp_table"] | None = None,
+    channel: Literal["counter", "whatsapp_online", "whatsapp_table", "web_table"] | None = None,
     type: Literal["dine_in", "takeaway", "delivery", "pickup"] | None = None,
     q: str | None = Query(default=None, max_length=60),
 ) -> Board:
     async with db.transaction(_pool(request), user.actor()) as conn:
         await outlets.require_outlet(conn, outlet_id)
+    # Unpaid web orders past the outlet's limit are cancelled by the system first (FR10.4; no
+    # poller yet), so the board never shows an order the customer can no longer pay.
+    system = ActorContext.for_system(user.tenant_id)
+    async with db.transaction(_pool(request), system) as conn:
+        await table_qr.expire_unpaid(conn, system, outlet_id)
+    async with db.transaction(_pool(request), user.actor()) as conn:
         columns = await orders.board(conn, outlet_id, channel=channel, type=type, q=q)
     return Board(**columns)
 

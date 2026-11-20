@@ -1,21 +1,23 @@
 """Owner tables and reservation rules — wireframe O8 "Meja & Aturan Reservasi" (T-057).
 
-Contract: docs/architecture/screen-endpoint-map.md → O8. The table QR download belongs to
-T-054 (WhatsApp, pilot) and is not served yet.
+Contract: docs/architecture/screen-endpoint-map.md → O8. Table QR (T-136, #44): each QR encodes
+the table web page `{ADMIN_APP_URL}/t/{qr_token}`; the owner downloads one (PNG) or all (PDF),
+replaces a table's token, and picks where the QR leads ("Tujuan QR meja").
 """
 
 from __future__ import annotations
 
 from datetime import time
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app import db
+from app.api.errors import ApiError
 from app.auth.deps import OwnerOnly
-from app.core import outlets
+from app.core import outlets, table_qr
 from app.core import tables as core
 
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: tables & reservation rules"])
@@ -123,3 +125,102 @@ async def put_settings(
         await outlets.require_outlet(conn, outlet_id)
         row = await core.put_settings(conn, ctx, outlet_id, body.model_dump())
     return ReservationSettingsOut(**row)
+
+
+# Table QR (T-136) -----------------------------------------------------------------------------
+
+
+class QrSettingsIn(BaseModel):
+    target: Literal["web_whatsapp", "web", "whatsapp"]
+
+
+class QrSettingsOut(QrSettingsIn):
+    whatsapp_connected: bool = Field(
+        description="Without WhatsApp the QR always leads to the web page (options disabled)"
+    )
+
+
+class QrTokenOut(BaseModel):
+    qr_token: str
+    url: str
+
+
+def _app_url(request: Request) -> str:
+    url = request.app.state.settings.admin_app_url
+    if not url:
+        raise ApiError(503, "admin_app_url_not_configured", "ADMIN_APP_URL is not set")
+    return str(url)
+
+
+def _filename(name: str) -> str:
+    return "".join(c if c.isalnum() or c in "-_" else "-" for c in name) or "meja"
+
+
+@router.get("/tables/{table_id}/qr.png")
+async def table_qr_png(table_id: UUID, request: Request, user: OwnerOnly) -> Response:
+    """ "⭳ Unduh": the QR of one table (PNG)."""
+    app_url = _app_url(request)
+    async with db.transaction(_pool(request), user.actor()) as conn:
+        table = await table_qr.table_token(conn, table_id)
+    png = table_qr.qr_png(table_qr.table_url(app_url, table["qr_token"]))
+    name = _filename(f"qr-meja-{table['name']}")
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Content-Disposition": f'attachment; filename="{name}.png"'},
+    )
+
+
+@router.get("/outlets/{outlet_id}/tables/qr.pdf")
+async def outlet_qr_pdf(outlet_id: UUID, request: Request, user: OwnerOnly) -> Response:
+    """ "⭳ Unduh semua QR (PDF)": one page per active table (QR, table name, outlet name)."""
+    app_url = _app_url(request)
+    async with db.transaction(_pool(request), user.actor()) as conn:
+        await outlets.require_outlet(conn, outlet_id)
+        rows = await table_qr.outlet_tokens(conn, outlet_id)
+    if not rows:
+        raise ApiError(404, "not_found", "this outlet has no tables")
+    pdf = table_qr.qr_pdf(
+        [
+            {
+                "url": table_qr.table_url(app_url, r["qr_token"]),
+                "title": f"Meja {r['name']}",
+                "subtitle": r["outlet_name"],
+            }
+            for r in rows
+        ]
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="qr-meja.pdf"'},
+    )
+
+
+@router.post("/tables/{table_id}/qr-token")
+async def replace_qr_token(table_id: UUID, request: Request, user: OwnerOnly) -> QrTokenOut:
+    """ "↻ Ganti": a new token; the old printed QR shows Q0 "QR tidak berlaku" at once."""
+    app_url = _app_url(request)
+    ctx = user.actor()
+    async with db.transaction(_pool(request), ctx) as conn:
+        token = await table_qr.replace_token(conn, ctx, table_id)
+    return QrTokenOut(qr_token=token, url=table_qr.table_url(app_url, token))
+
+
+@router.get("/outlets/{outlet_id}/table-qr-settings")
+async def get_qr_settings(outlet_id: UUID, request: Request, user: OwnerOnly) -> QrSettingsOut:
+    async with db.transaction(_pool(request), user.actor()) as conn:
+        await outlets.require_outlet(conn, outlet_id)
+        row = await table_qr.qr_settings(conn, outlet_id)
+    return QrSettingsOut(**row)
+
+
+@router.put("/outlets/{outlet_id}/table-qr-settings")
+async def put_qr_settings(
+    outlet_id: UUID, body: QrSettingsIn, request: Request, user: OwnerOnly
+) -> QrSettingsOut:
+    ctx = user.actor()
+    async with db.transaction(_pool(request), ctx) as conn:
+        await outlets.require_outlet(conn, outlet_id)
+        row = await table_qr.put_qr_settings(conn, ctx, outlet_id, body.target)
+    return QrSettingsOut(**row)
