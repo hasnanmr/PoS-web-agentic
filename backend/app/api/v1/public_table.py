@@ -21,10 +21,10 @@ from pydantic import BaseModel, Field, field_validator
 from app import db
 from app.api.errors import ApiError
 from app.api.photos import attach_photo_urls
-from app.api.v1.ops.orders import LineIn, MenuItem
+from app.api.v1.ops.orders import LineIn, MenuItem, QuoteLine, QuoteResponse
 from app.core import catalog, idempotency, orders, qris
 from app.core import table_qr as core
-from app.core.pricing import LineInput
+from app.core.pricing import LineInput, quote
 
 router = APIRouter(prefix="/api/v1/public/t", tags=["public: table web page (Q0-Q5)"])
 
@@ -102,6 +102,10 @@ class TablePage(BaseModel):
     )
     web_ordering: bool = Field(description="False without a static QRIS: menu only")
     whatsapp_url: str | None
+
+
+class WebQuoteIn(BaseModel):
+    items: list[LineIn] = Field(min_length=1, max_length=50)
 
 
 class WebOrderIn(BaseModel):
@@ -187,6 +191,37 @@ async def menu(table: Table, request: Request) -> list[MenuItem]:
 
 
 # Q3 · Q4 · Q5 -----------------------------------------------------------------------------
+
+
+@router.post("/{token}/quote")
+async def web_quote(body: WebQuoteIn, table: Table, request: Request) -> QuoteResponse:
+    """Q3 totals before ordering (subtotal, PB1, total), priced by the server like S1."""
+    async with db.transaction(_pool(request), table.actor()) as conn:
+        priced = await quote(
+            conn,
+            table.outlet_id,
+            [
+                LineInput(i.product_id, i.quantity, tuple(i.addon_option_ids), i.note)
+                for i in body.items
+            ],
+        )
+    return QuoteResponse(
+        lines=[
+            QuoteLine(
+                product_id=line.product_id,
+                name=line.name,
+                unit_price=line.unit_price,
+                quantity=line.quantity,
+                line_total=line.line_total,
+                addons=[{"id": a.option_id, "name": a.name, "price": a.price} for a in line.addons],
+            )
+            for line in priced.lines
+        ],
+        subtotal=priced.quote.subtotal,
+        pb1_rate_bps=priced.quote.pb1_rate_bps,
+        pb1_amount=priced.quote.pb1_amount,
+        total=priced.quote.total,
+    )
 
 
 @router.post("/{token}/orders", status_code=status.HTTP_201_CREATED)

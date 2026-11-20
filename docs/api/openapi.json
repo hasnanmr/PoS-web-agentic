@@ -9112,6 +9112,24 @@
         "title": "WebOrderStatus",
         "type": "object"
       },
+      "WebQuoteIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "WebQuoteIn",
+        "type": "object"
+      },
       "app__api__v1__ops__attendance__OutletRef": {
         "properties": {
           "name": {
@@ -16899,6 +16917,59 @@
           }
         },
         "summary": "Order Qris",
+        "tags": [
+          "public: table web page (Q0-Q5)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/quote": {
+      "post": {
+        "description": "Q3 totals before ordering (subtotal, PB1, total), priced by the server like S1.",
+        "operationId": "web_quote_api_v1_public_t__token__quote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebQuoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Web Quote",
         "tags": [
           "public: table web page (Q0-Q5)"
         ]

@@ -274,6 +274,20 @@ def test_web_order_is_pay_first_and_never_joins_the_open_bill(client, ctx) -> No
 def test_price_changed_when_the_page_total_is_stale(client, ctx) -> None:
     token = _token(ctx)
     americano = _menu(client, token)["Americano"]["product_id"]
+    q = client.post(
+        f"/api/v1/public/t/{token}/quote",
+        json={"items": [{"product_id": americano, "quantity": 2}]},
+    )
+    assert q.status_code == 200, q.text
+    assert q.json()["pb1_rate_bps"] == 1000
+    assert q.json()["total"] == q.json()["subtotal"] + q.json()["pb1_amount"]
+    ok = _place(
+        client,
+        token,
+        [{"product_id": americano, "quantity": 2}],
+        expected_total=q.json()["total"],
+    )
+    assert ok.status_code == 201, ok.text
     res = _place(client, token, [{"product_id": americano, "quantity": 1}], expected_total=1)
     assert res.status_code == 409 and res.json()["error"]["code"] == "price_changed"
     assert res.json()["error"]["details"]["quote"]["total"] > 1
