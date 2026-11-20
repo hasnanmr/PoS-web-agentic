@@ -72,14 +72,26 @@ export default function CashflowPage() {
         {!r ? (report.loading ? <Loading /> : null) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Kpi label="Kas masuk" tile={r.totals.cash_in} previous={r.previous} />
-              <Kpi label="Kas keluar" tile={r.totals.cash_out} previous={r.previous} />
-              <Kpi label="Kas bersih" tile={r.totals.net} previous={r.previous} />
-              <div className="rounded-lg border border-border bg-surface p-4">
-                <p className="text-[12px] text-text-muted">PB1 terkumpul</p>
-                <p className="mt-1 text-[20px] font-bold">{formatRupiah(r.totals.pb1_collected.amount)}</p>
-                <p className="mt-1 text-[11px] text-text-muted">Titipan pajak, bukan pendapatan</p>
-              </div>
+              <Kpi label="Kas masuk" tile={r.totals.cash_in} previous={r.previous} details={[
+                ['Revenue (excl. PB1)', formatRupiah(r.breakdown.revenue_excl_pb1)],
+                ['PB1 (titipan pajak)', formatRupiah(r.breakdown.pb1)],
+                ['Delivery fee', formatRupiah(r.breakdown.delivery_fee)],
+                ['Cash', formatRupiah(r.breakdown.cash)],
+                ['QRIS', formatRupiah(r.breakdown.qris)],
+              ]} />
+              <Kpi label="Kas keluar" tile={r.totals.cash_out} previous={r.previous} details={[
+                ['Refund / reversal', formatRupiah(-r.breakdown.refunds)],
+                ['Pengeluaran', formatRupiah(-r.breakdown.expenses)],
+              ]} />
+              <Kpi label="Kas bersih" tile={r.totals.net} previous={r.previous} details={[
+                ['Kas masuk', formatRupiah(r.totals.cash_in.amount)],
+                ['Kas keluar', formatSignedRupiah(-r.totals.cash_out.amount)],
+                ['Selisih kas shift (surplus − shortage)', formatSignedRupiah(r.breakdown.cash_difference)],
+              ]} note="Kas bersih = kas masuk − kas keluar + selisih kas dari penutupan shift." />
+              <Kpi label="PB1 terkumpul" tile={r.totals.pb1_collected} caption="Titipan pajak, bukan pendapatan" details={[
+                ['PB1 dari penjualan', formatRupiah(r.breakdown.pb1)],
+                ['PB1 dikembalikan lewat refund', formatRupiah(r.breakdown.pb1 - r.totals.pb1_collected.amount)],
+              ]} />
             </div>
             <div className="grid gap-4 lg:grid-cols-3">
               <Card className="lg:col-span-2" title={SERIES_TITLE[r.granularity]}>
@@ -94,12 +106,17 @@ export default function CashflowPage() {
                 </p>
                 <ul className="space-y-2 text-[12px]">
                   {r.expenses_by_outlet.map((e) => (
-                    <li key={e.outlet_id}>
+                    <li key={e.outlet_id} tabIndex={0}
+                      title={`${e.outlet}: ${formatRupiah(e.amount)} · ${r.expenses_total ? Math.round((e.amount / r.expenses_total) * 100) : 0}% dari total · ${e.count} entri`}
+                      className="group cursor-default rounded-md px-1.5 py-1 -mx-1.5 hover:bg-primary-soft focus:bg-primary-soft focus:outline-none">
                       <div className="flex justify-between"><span>{e.outlet}</span><span>{formatRupiah(e.amount)}</span></div>
                       <div className="mt-1 h-1.5 rounded-full bg-page">
-                        <div className="h-1.5 rounded-full bg-accent-orange"
+                        <div className="h-1.5 rounded-full bg-accent-orange transition-opacity group-hover:opacity-80"
                           style={{ width: `${r.expenses_total ? Math.max(2, (e.amount / r.expenses_total) * 100) : 0}%` }} />
                       </div>
+                      <p className="mt-0.5 hidden text-[11px] text-text-muted group-hover:block group-focus:block">
+                        {r.expenses_total ? Math.round((e.amount / r.expenses_total) * 100) : 0}% dari total · {e.count} entri
+                      </p>
                     </li>
                   ))}
                   {r.expenses_by_outlet.length === 0 && <li className="text-text-muted">Belum ada pengeluaran di periode ini.</li>}
@@ -126,15 +143,35 @@ export default function CashflowPage() {
   )
 }
 
-function Kpi({ label, tile, previous }: { label: string; tile: Tile; previous: { from: string; to: string } }) {
+function Kpi({ label, tile, previous, caption, details, note }: {
+  label: string
+  tile: Tile
+  previous?: { from: string; to: string }
+  caption?: string
+  details: [string, string][]
+  note?: string
+}) {
+  const [open, setOpen] = useState(false)
   const pct = tile.change_pct
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <p className="text-[12px] text-text-muted">{label}</p>
-      <p className="mt-1 text-[20px] font-bold">{formatRupiah(tile.amount)}</p>
-      <p className={`mt-1 text-[11px] ${pct === null ? 'text-text-muted' : pct >= 0 ? 'text-success' : 'text-danger'}`}>
-        {pct === null ? '—' : `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}%`} vs {formatRange(previous.from, previous.to, false)}
-      </p>
+    <div className={`self-start rounded-lg border bg-surface transition-colors ${open ? 'border-primary' : 'border-border hover:border-primary'}`}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)}
+        title={open ? 'Sembunyikan rincian' : 'Lihat rincian'} className="block w-full cursor-pointer p-4 text-left">
+        <span className="flex items-center justify-between text-[12px] text-text-muted">
+          {label}
+          <span aria-hidden="true" className={`text-primary transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        </span>
+        <span className="mt-1 block text-[20px] font-bold">{formatRupiah(tile.amount)}</span>
+        <span className={`mt-1 block text-[11px] ${caption || pct === null ? 'text-text-muted' : pct >= 0 ? 'text-success' : 'text-danger'}`}>
+          {caption ?? `${pct === null ? '—' : `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}%`} vs ${previous ? formatRange(previous.from, previous.to, false) : ''}`}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-0.5 border-t border-border px-4 py-3 text-[12px]">
+          {details.map(([k, v]) => <div key={k} className="flex justify-between gap-3"><span className="text-text-muted">{k}</span><span>{v}</span></div>)}
+          {note && <p className="pt-1.5 text-[11px] text-text-muted">{note}</p>}
+        </div>
+      )}
     </div>
   )
 }
