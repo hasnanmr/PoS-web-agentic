@@ -249,6 +249,18 @@ def test_second_code_cannot_pair_a_second_tablet(client: TestClient, ctx: dict[s
     assert client.post("/api/v1/device/pair", json={"code": second}).status_code == 201
 
 
+def test_replacement_tablet_keeps_the_name_tablet_1(
+    client: TestClient, ctx: dict[str, Any]
+) -> None:
+    # Note 2 of the PR #35 review: a forgotten tablet must not push the number up, so the
+    # replacement of "Tablet 1" is named "Tablet 1" too (names repeat across generations).
+    _, first = _pair(client, ctx, ctx["dago"])
+    assert first["device_name"] == "Tablet 1"
+    _forget_all(client, ctx, ctx["dago"])
+    _, second = _pair(client, ctx, ctx["dago"])
+    assert second["device_name"] == "Tablet 1"
+
+
 def test_outlet_with_several_old_tablets_keeps_them(
     client: TestClient, ctx: dict[str, Any]
 ) -> None:
@@ -301,9 +313,13 @@ def test_device_list_shows_last_activity(client: TestClient, ctx: dict[str, Any]
         f"/api/v1/owner/outlets/{ctx['dago']}/attendance-devices", headers=ctx["owner"]
     )
     assert res.status_code == 200, res.text
-    names = {d["name"]: d for d in res.json()}
-    assert names[paired["device_name"]]["last_seen_at"] is not None
-    assert names[paired["device_name"]]["revoked_at"] is None
+    # Names are not unique: a forgotten tablet and its replacement are both "Tablet 1"
+    # (the list returns active ones first), so pick the active device by name.
+    active = [
+        d for d in res.json() if d["revoked_at"] is None and d["name"] == paired["device_name"]
+    ]
+    assert len(active) == 1
+    assert active[0]["last_seen_at"] is not None
     staff = client.get(
         f"/api/v1/owner/outlets/{ctx['dago']}/attendance-devices", headers=ctx["rina"]
     )
