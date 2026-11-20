@@ -345,6 +345,17 @@ Public route `/t/{token}` in the admin app (separate entry like `/tablet`, no si
 
 WhatsApp flows, not REST endpoints. They use the same core functions (quote, create order, reservations, consent) through the workers, with message formats from the wireframe. Covered in T-049–T-061 and T-076–T-077.
 
+**Transport (Wave 5a, T-045–T-050) ✅:** Meta calls `GET /webhooks/whatsapp` (verification: `hub.mode=subscribe`, `hub.verify_token` = `WHATSAPP_VERIFY_TOKEN`, answers `hub.challenge`) and `POST /webhooks/whatsapp` (header `X-Hub-Signature-256` = HMAC-SHA256 of the raw body with `WHATSAPP_APP_SECRET`, else 401 `invalid_signature`). Each message or delivery status becomes one envelope on `wa.inbound` (`wa.inbound.message` keyed by the Meta message id, `wa.inbound.status` keyed by `<id>:<status>`), with the tenant and outlet found from the receiving `phone_number_id` (FR2.10); unknown numbers are acknowledged and dropped; 503 `queue_unavailable` when RabbitMQ does not confirm (Meta retries) and 503 `whatsapp_not_configured` without the variables. Not in the OpenAPI contract. The inbound worker de-duplicates on `processed_messages`, locks the (outlet, customer) pair, upserts `whatsapp_contacts` (`last_inbound_at` for the 24-hour window), keeps `conversations.flow/state`, logs every message in `messages`, and queues replies on `wa.outbound`; the outbound worker sends them through the Cloud API (status `queued` → `enqueued` → `sent` → `delivered` → `read`, or `failed`).
+
+| Screen | Status | Notes |
+|---|---|---|
+| W1 Menu utama | ✅ 5a | List message "Selamat datang di {bisnis} – {outlet} ☕ / Mau ngapain hari ini?", button "Lihat pilihan", section "Pilih layanan", rows Pesan · Rekomendasi · (Reservasi · Reservasi Saya when `reservation_settings.is_enabled`) · Data Saya. Any message outside a flow, or "menu" anywhere, shows it and drops the unfinished flow (AC2.14). A row whose flow is not built yet shows the menu again. |
+| W2–W5, W8 | 5b | Catalog, add-ons, pickup/delivery, summary + sold out, table QR. |
+| W6, W7 | 5c | QRIS + screenshot, status notifications and templates outside 24 hours. |
+| W9–W12 | later | Recommendations, reservations, Reservasi Saya, consent / Data Saya. |
+
+**Outlet number mapping:** no screen yet (O12 / Embedded Signup is T-100). A platform operator runs `python -m app.cli whatsapp-connect --outlet <id> --phone-number-id <id> [--phone +62…]` (or `--disconnect`), which calls `app.connect_outlet_whatsapp` (migration `20261120200000`): sets `outlets.whatsapp_phone_number_id`, `whatsapp_status` (`connected` / `not_started`), and writes an `outlet.whatsapp_connected` / `outlet.whatsapp_disconnected` audit event.
+
 ## Schema fields added for the wireframes
 
 Added to T-004 when this map was written: `outlets.order_prefix` (#A-1036), `outlets.whatsapp_status`, `outlets.catalog_synced_at` (O3/O12), `users.invited_at`, `users.invitation_accepted_at` ("Diundang", O4), `cashier_shifts.count_breakdown` (S8), `order_events.data` (S3 timeline), default drawer name "Kasir depan" (O3/S8); removed configurable hold minutes (O8 shows 15 minutes fixed).

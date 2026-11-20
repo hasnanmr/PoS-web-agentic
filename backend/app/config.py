@@ -25,9 +25,9 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 AppEnv = Literal["local", "demo", "staging", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-# Variables that must be set in every environment except `local`. RABBITMQ_URL is optional
-# until the WhatsApp worker exists (the API does not use the queue yet); add it back here
-# together with the worker.
+# Variables that must be set in every environment except `local`. RABBITMQ_URL and the
+# WHATSAPP_* values stay optional for the API: without them the WhatsApp webhook answers 503
+# and the rest of the API works. The worker requires them itself (`whatsapp_problems`).
 REQUIRED_OUTSIDE_LOCAL: tuple[str, ...] = (
     "database_url",
     "supabase_url",
@@ -83,6 +83,17 @@ class Settings(BaseSettings):
     default_timezone: str = "Asia/Jakarta"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5170"]
 
+    # WhatsApp Cloud API (T-045). One Meta app serves every outlet number; the outlet is
+    # found from the receiving phone number id (FR2.10).
+    # App secret: Meta app → App settings → Basic. Verifies X-Hub-Signature-256.
+    whatsapp_app_secret: SecretStr | None = None
+    # Any string you choose; Meta sends it back when the webhook URL is registered.
+    whatsapp_verify_token: SecretStr | None = None
+    # Permanent System User token with whatsapp_business_messaging (worker only).
+    whatsapp_access_token: SecretStr | None = None
+    whatsapp_graph_url: AnyHttpUrl = AnyHttpUrl("https://graph.facebook.com")
+    whatsapp_graph_version: str = Field(default="v23.0", pattern=r"^v\d+\.\d+$")
+
     @field_validator(
         "database_url",
         "supabase_url",
@@ -91,6 +102,9 @@ class Settings(BaseSettings):
         "rabbitmq_url",
         "supabase_service_role_key",
         "admin_app_url",
+        "whatsapp_app_secret",
+        "whatsapp_verify_token",
+        "whatsapp_access_token",
         mode="before",
     )
     @classmethod
@@ -182,6 +196,25 @@ def _format_errors(exc: ValidationError) -> str:
         message = err["msg"].removeprefix("Value error, ")
         lines.append(f"  - {field}: {message}" if field else f"  - {message}")
     return "Invalid configuration:\n" + "\n".join(lines)
+
+
+def whatsapp_webhook_ready(settings: Settings) -> bool:
+    """The API can accept Meta webhooks: it can verify them and publish to RabbitMQ."""
+    return (
+        settings.whatsapp_app_secret is not None
+        and settings.whatsapp_verify_token is not None
+        and settings.rabbitmq_url is not None
+    )
+
+
+def worker_problems(settings: Settings) -> list[str]:
+    """Variables the WhatsApp worker cannot run without (it refuses to start otherwise)."""
+    needed = {
+        "DATABASE_URL": settings.database_url,
+        "RABBITMQ_URL": settings.rabbitmq_url,
+        "WHATSAPP_ACCESS_TOKEN": settings.whatsapp_access_token,
+    }
+    return [name for name, value in needed.items() if value is None]
 
 
 def load_settings(**overrides: object) -> Settings:

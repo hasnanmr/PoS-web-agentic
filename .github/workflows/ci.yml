@@ -49,10 +49,18 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      rabbitmq:
+        image: rabbitmq:3
+        ports: ["5672:5672"]
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s --health-timeout 10s --health-retries 20
     env:
       DATABASE_URL: postgresql://postgres@localhost:5432/sme_test
       TEST_DATABASE_URL: postgresql://postgres@localhost:5432/sme_test
       TEST_APP_DATABASE_URL: postgresql://app_backend@localhost:5432/sme_test
+      # Throwaway broker for this job only (default guest user, localhost-only).
+      TEST_RABBITMQ_URL: amqp://guest:guest@localhost:5672/
     steps:
       - uses: actions/checkout@v4
         with:

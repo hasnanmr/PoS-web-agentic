@@ -2,12 +2,14 @@
 # uploads backend/ as the service root, so this file and Dockerfile sit at the root of the
 # build context (for Railway-side GitHub deploys set Root Directory = /backend instead).
 #
-# WhatsApp worker: a SEPARATE Railway service later, same image (backend/Dockerfile), start
-# command `python -m app.worker.main`, no healthcheck/public domain.
+# WhatsApp worker: a SEPARATE Railway service, same image (backend/Dockerfile), start
+# command `python -m app.worker.main`, no healthcheck/public domain. It needs DATABASE_URL,
+# RABBITMQ_URL and WHATSAPP_ACCESS_TOKEN (and refuses to start without them).
 #
 # Required variables (see backend/.env.example): APP_ENV, DATABASE_URL, SUPABASE_URL,
-# SUPABASE_JWKS_URL, SUPABASE_JWT_ISSUER, CORS_ORIGINS, DEFAULT_TIMEZONE
-# (RABBITMQ_URL is optional until the WhatsApp worker exists).
+# SUPABASE_JWKS_URL, SUPABASE_JWT_ISSUER, CORS_ORIGINS, DEFAULT_TIMEZONE.
+# For the WhatsApp webhook also RABBITMQ_URL, WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN
+# (without them POST /webhooks/whatsapp answers 503; the rest of the API is unaffected).
 # Railway injects PORT.
 
 [build]

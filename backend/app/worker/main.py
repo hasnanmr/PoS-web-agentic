@@ -2,19 +2,56 @@
 
 Run locally:  uv run python -m app.worker.main
 
-The worker will consume RabbitMQ queues for inbound/outbound WhatsApp messages in later
-tasks. For now it only validates configuration and exits.
+Consumes `wa.inbound.q` (conversation flows, T-046 to T-050) and `wa.outbound.q` (Cloud API
+sender, T-047). Needs DATABASE_URL, RABBITMQ_URL, and WHATSAPP_ACCESS_TOKEN; refuses to start
+without them. Declares the RabbitMQ topology on start (T-110). Stops cleanly on SIGTERM.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import signal
 import sys
 
-from app.config import ConfigError, get_settings
+from app import db
+from app.config import ConfigError, Settings, get_settings, worker_problems
 from app.logging import configure_logging
+from app.messaging.amqp import AmqpBroker
+from app.messaging.topology import WA_INBOUND, WA_OUTBOUND
+from app.whatsapp.graph import HttpGraphClient
+from app.worker.inbound import InboundHandler
+from app.worker.outbound import OutboundHandler
 
 logger = logging.getLogger("app.worker")
+
+
+async def run(settings: Settings, stop: asyncio.Event) -> None:
+    assert settings.database_url is not None  # noqa: S101 - checked by worker_problems
+    assert settings.rabbitmq_url is not None  # noqa: S101
+    assert settings.whatsapp_access_token is not None  # noqa: S101
+    pool = db.create_pool(
+        str(settings.database_url),
+        min_size=settings.db_pool_min_size,
+        max_size=settings.db_pool_max_size,
+    )
+    broker = AmqpBroker(str(settings.rabbitmq_url))
+    graph = HttpGraphClient(
+        str(settings.whatsapp_graph_url),
+        settings.whatsapp_graph_version,
+        settings.whatsapp_access_token.get_secret_value(),
+    )
+    await pool.open(wait=True)
+    try:
+        await broker.connect()
+        await broker.consume(WA_INBOUND, InboundHandler(pool, broker))
+        await broker.consume(WA_OUTBOUND, OutboundHandler(pool, graph))
+        logger.info("whatsapp worker running")
+        await stop.wait()
+    finally:
+        await broker.close()
+        await pool.close()
+        logger.info("whatsapp worker stopped")
 
 
 def main() -> int:
@@ -23,12 +60,21 @@ def main() -> int:
     except ConfigError as exc:
         print(exc, file=sys.stderr)
         return 1
+    missing = worker_problems(settings)
+    if missing:
+        print(f"WhatsApp worker requires these variables: {', '.join(missing)}", file=sys.stderr)
+        return 1
 
     configure_logging(settings.log_level, service="whatsapp-worker", app_env=settings.app_env)
-    logger.info(
-        "whatsapp worker not implemented yet; exiting",
-        extra={"rabbitmq_configured": bool(settings.rabbitmq_url)},
-    )
+
+    async def _main() -> None:
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, stop.set)
+        await run(settings, stop)
+
+    asyncio.run(_main())
     return 0
 
 

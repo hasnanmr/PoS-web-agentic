@@ -49,7 +49,8 @@ backend/app/
                 # reservations, attendance, menu, outlets, staff. Pure Python + SQL.
   db/           # connection pool, transaction + RLS context helpers
   messaging/    # RabbitMQ topology, publisher, consumer framework (T-110, T-111)
-  worker/       # consumers: inbound flows, outbound sender, catalog sync, job handlers
+  whatsapp/     # Cloud API formats only: webhook signature + payloads, outgoing bodies, Graph client
+  worker/       # consumers: inbound flows (worker/flows: W1–W12), outbound sender, catalog sync, job handlers
   agent/        # recommendation agent + tool definitions (T-115)
   config.py     # environment validation (T-003)
   db.py         # psycopg connection helper (T-003; grows into db/ with RLS context, T-113)

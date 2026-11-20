@@ -12,6 +12,13 @@ command, never from the public API.
 
 Flow: Supabase sends the invite email → the owner sets a password → their token
 carries app_role "owner_pending" → O1 "Buat profil bisnis" creates the tenant (T-010).
+
+WhatsApp number mapping (T-045), until the owner setup screen O12 (T-100) exists. Needs only
+DATABASE_URL. The phone number id is in Meta → WhatsApp → API Setup:
+
+    uv run python -m app.cli whatsapp-connect --outlet <uuid> \
+        --phone-number-id 123456789012345 [--phone +6281234567890]
+    uv run python -m app.cli whatsapp-connect --outlet <uuid> --disconnect
 """
 
 from __future__ import annotations
@@ -20,6 +27,8 @@ import argparse
 import asyncio
 import sys
 from uuid import UUID
+
+import psycopg
 
 from app import db
 from app.auth.supabase_admin import SupabaseAdmin, SupabaseAdminError
@@ -72,6 +81,16 @@ async def revoke_owner_invite(
         )
 
 
+async def whatsapp_connect(
+    settings: Settings, outlet_id: UUID, phone_number_id: str | None, phone: str | None
+) -> None:
+    database_url, _ = _require(settings, admin_api=False)
+    async with db.connect(database_url) as conn:
+        await conn.execute(
+            "select app.connect_outlet_whatsapp(%s, %s, %s)", (outlet_id, phone_number_id, phone)
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.cli", description="SME POS platform-admin tools")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -87,6 +106,13 @@ def main(argv: list[str] | None = None) -> int:
     p_rev.add_argument("--invited-by", required=True)
     p_rev.add_argument("--reason", required=True)
 
+    p_wa = sub.add_parser("whatsapp-connect", help="map an outlet to its Meta phone number id")
+    p_wa.add_argument("--outlet", required=True, type=UUID)
+    target = p_wa.add_mutually_exclusive_group(required=True)
+    target.add_argument("--phone-number-id", help="Meta phone number id (digits)")
+    target.add_argument("--disconnect", action="store_true")
+    p_wa.add_argument("--phone", help="the outlet's WhatsApp number, e.g. +6281234567890")
+
     args = parser.parse_args(argv)
     try:
         settings = load_settings()
@@ -95,10 +121,17 @@ def main(argv: list[str] | None = None) -> int:
                 invite_owner(settings, args.email, args.invited_by, args.note, args.redirect_to)
             )
             print(f"Invitation {inv_id} sent to {args.email}")
+        elif args.command == "whatsapp-connect":
+            number = None if args.disconnect else args.phone_number_id.strip()
+            if number is not None and not number.isdigit():
+                raise ValueError("--phone-number-id must be digits")
+            asyncio.run(whatsapp_connect(settings, args.outlet, number, args.phone))
+            state = "disconnected" if number is None else f"connected to {number}"
+            print(f"Outlet {args.outlet} WhatsApp {state}")
         else:
             asyncio.run(revoke_owner_invite(settings, args.id, args.invited_by, args.reason))
             print(f"Invitation {args.id} revoked")
-    except (ConfigError, SupabaseAdminError, ValueError) as exc:
+    except (ConfigError, SupabaseAdminError, ValueError, psycopg.Error) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0

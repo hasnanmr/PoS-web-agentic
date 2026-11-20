@@ -9,7 +9,7 @@ cafes. Monorepo for the pilot.
 backend/            FastAPI API service + WhatsApp worker (Python 3.12+, uv)
   app/main.py       API app factory (/healthz, /readyz)
   app/serve.py      production entrypoint (validates config, then starts uvicorn)
-  app/worker/       WhatsApp worker process entrypoint (separate process; stub for now)
+  app/worker/       WhatsApp worker process: inbound flows (W1 menu), outbound sender
   app/config.py     environment validation (pydantic-settings)
   tests/            pytest
 admin/              Admin web app (React + TypeScript + Vite + Tailwind, pnpm)
@@ -93,8 +93,9 @@ uv run python -m app.worker.main                                     # or: make 
 Configuration comes from environment variables or `backend/.env` (template:
 [`backend/.env.example`](backend/.env.example)). `APP_ENV` is one of `local`, `demo`,
 `staging`, `production`. Outside `local`, `DATABASE_URL`, `SUPABASE_URL`,
-`SUPABASE_JWKS_URL` and `SUPABASE_JWT_ISSUER` are required (`RABBITMQ_URL` is optional until
-the WhatsApp worker exists); the process exits with a list of problems if the configuration is invalid. Default time zone is
+`SUPABASE_JWKS_URL` and `SUPABASE_JWT_ISSUER` are required (`RABBITMQ_URL` and `WHATSAPP_*`
+are optional for the API; the WhatsApp worker requires `DATABASE_URL`, `RABBITMQ_URL` and
+`WHATSAPP_ACCESS_TOKEN`); the process exits with a list of problems if the configuration is invalid. Default time zone is
 `Asia/Jakarta` (WIB). Logs are JSON lines on stdout.
 
 ### Admin web app
@@ -189,5 +190,9 @@ file timestamps; the chain is forward-only.
   Alembic run, `app.tools.migrate` stamps the newest version found in
   `supabase_migrations.schema_migrations`, then applies only later revisions.
 - Alembic keeps its version in schema `alembic` (not exposed by the Data API).
-The WhatsApp worker will be a separate Railway service using the backend image with start
-command `python -m app.worker.main`.
+The WhatsApp worker is a separate Railway service using the backend image with start command
+`python -m app.worker.main` (variables: `DATABASE_URL`, `RABBITMQ_URL`, `WHATSAPP_ACCESS_TOKEN`,
+optional `WHATSAPP_GRAPH_VERSION`). The deploy job does not ship it yet: add a
+`railway up backend --path-as-root --service worker` step once that service exists. Connect an
+outlet to its Meta number with `uv run python -m app.cli whatsapp-connect --outlet <uuid>
+--phone-number-id <id>`, then register `https://<backend>/webhooks/whatsapp` in the Meta app.

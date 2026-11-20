@@ -37,11 +37,14 @@ from app.api.v1.owner import (
     stock,
     tables,
 )
+from app.api.webhooks import whatsapp as whatsapp_webhook
 from app.auth.principal import PgUserDirectory, UserDirectory
 from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
-from app.config import Settings, get_settings
+from app.config import Settings, get_settings, whatsapp_webhook_ready
 from app.logging import configure_logging
+from app.messaging.amqp import AmqpBroker
+from app.messaging.broker import Publisher
 from app.storage import ObjectStorage, SupabaseStorage
 
 logger = logging.getLogger(__name__)
@@ -85,8 +88,9 @@ def create_app(
     user_directory: UserDirectory | None = None,
     auth_admin: AuthAdmin | None = None,
     storage: ObjectStorage | None = None,
+    publisher: Publisher | None = None,
 ) -> FastAPI:
-    """Build the app. Tests may inject a verifier and a user directory."""
+    """Build the app. Tests may inject a verifier, a user directory, and a publisher."""
     settings = settings or get_settings()
     configure_logging(settings.log_level, service="api", app_env=settings.app_env)
 
@@ -103,9 +107,16 @@ def create_app(
             app.state.db_pool = pool
             if app.state.user_directory is None:
                 app.state.user_directory = PgUserDirectory(pool)
+        broker = None
+        if app.state.publisher is None and settings.rabbitmq_url is not None:
+            # Connects on the first publish, so a broker outage never blocks API start-up.
+            broker = AmqpBroker(str(settings.rabbitmq_url))
+            app.state.publisher = broker
         try:
             yield
         finally:
+            if broker is not None:
+                await broker.close()
             if pool is not None:
                 await pool.close()
 
@@ -122,6 +133,7 @@ def create_app(
     app.state.user_directory = user_directory
     app.state.auth_admin = auth_admin or build_auth_admin(settings)
     app.state.storage = storage or build_storage(settings)
+    app.state.publisher = publisher
 
     app.add_middleware(
         CORSMiddleware,
@@ -154,6 +166,7 @@ def create_app(
     app.include_router(device.router)
     app.include_router(public_table.router)
     app.include_router(ops_attendance.router)
+    app.include_router(whatsapp_webhook.router)
 
     logger.info(
         "api configured",
@@ -161,6 +174,7 @@ def create_app(
             "timezone": settings.default_timezone,
             "db_configured": bool(settings.database_url),
             "auth_configured": app.state.token_verifier is not None,
+            "whatsapp_webhook_configured": whatsapp_webhook_ready(settings),
         },
     )
     return app
