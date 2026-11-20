@@ -1,5 +1,7 @@
 // Wireframe S7 / M5 — Stok & Pergerakan (T-020, T-022, T-069). Owner and staff.
-// Endpoints: GET /ops/outlets/{id}/stock, POST/GET /ops/outlets/{id}/stock-movements.
+// Endpoints: GET /ops/outlets/{id}/stock, POST/GET /ops/outlets/{id}/stock-movements
+// (?stock_item_id=&type=&from=&to=), GET /owner/outlets/{id}/stock-movements/export (owner only).
+// The riwayat filters and "⭳ Unduh CSV" are not drawn on S7; added on request (issue #37).
 // Stock is never edited directly: only through append-only movements.
 import { useRef, useState, type FormEvent } from 'react'
 import { useSession } from '../app/session'
@@ -9,9 +11,16 @@ import type { Movement, StockResponse, StockRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, Field, LinkButton, Loading, Select, TextInput } from '../ui/kit'
+import { RangePicker } from '../ui/RangePicker'
 
 type Filter = 'all' | 'low' | 'out'
 type MoveType = 'restock' | 'waste' | 'adjustment'
+// "Penjualan" (sale) also covers sale reversals on the server.
+type HistoryType = MoveType | 'sale'
+
+const HISTORY_TYPES: [HistoryType, string][] = [
+  ['restock', 'Restock'], ['waste', 'Waste'], ['adjustment', 'Adjustment'], ['sale', 'Penjualan'],
+]
 
 const STATUS = {
   ok: { label: '● Aman', className: 'text-success' },
@@ -37,19 +46,29 @@ function affectedText(row: StockRow): string {
 interface MovementPage { items: Movement[]; next_cursor: number | null }
 
 export default function StockPage() {
-  const { api, outlet } = useSession()
+  const { api, outlet, me } = useSession()
   const outletId = outlet?.id ?? ''
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
+  const [histItem, setHistItem] = useState('')
+  const [histType, setHistType] = useState<HistoryType | ''>('')
+  const [histRange, setHistRange] = useState<{ from: string; to: string }>()
+  const filters = new URLSearchParams()
+  if (histItem) filters.set('stock_item_id', histItem)
+  if (histType) filters.set('type', histType)
+  if (histRange) {
+    filters.set('from', histRange.from)
+    filters.set('to', histRange.to)
+  }
+  const filterQuery = filters.toString()
+  const historyPath = `/ops/outlets/${outletId}/stock-movements?limit=20${filterQuery ? `&${filterQuery}` : ''}`
   const stock = useLoad(() => api.get<StockResponse>(`/ops/outlets/${outletId}/stock`), outletId)
-  const history = useLoad(
-    () => api.get<MovementPage>(`/ops/outlets/${outletId}/stock-movements?limit=20`),
-    outletId,
-  )
-  // Older pages appended after the first 20 ("Muat lagi"); reset when the outlet or the newest page changes.
-  const [older, setOlder] = useState<{ outletId: string; items: Movement[]; cursor: number | null }>()
+  const history = useLoad(() => api.get<MovementPage>(historyPath), historyPath)
+  // Older pages appended after the first 20 ("Muat lagi"); reset when the outlet, filters, or newest page change.
+  const [older, setOlder] = useState<{ key: string; items: Movement[]; cursor: number | null }>()
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState<string>()
+  const [exportError, setExportError] = useState<string>()
   const formRef = useRef<HTMLDivElement>(null)
   const [preselect, setPreselect] = useState<string>()
 
@@ -58,9 +77,9 @@ export default function StockPage() {
     (i) => (filter === 'all' || i.status === filter) && i.name.toLowerCase().includes(q.trim().toLowerCase()),
   )
   const counts = stock.data?.counts ?? { low: 0, out: 0 }
-  // Pages loaded for another outlet are dropped, so A → B → A starts again from the newest page.
-  if (older && older.outletId !== outletId) setOlder(undefined)
-  const extra = older?.outletId === outletId ? older : undefined
+  // Pages loaded for another outlet or filter are dropped, so A → B → A starts again from the newest page.
+  if (older && older.key !== historyPath) setOlder(undefined)
+  const extra = older?.key === historyPath ? older : undefined
   const movements = [...(history.data?.items ?? []), ...(extra?.items ?? [])]
   const nextCursor = extra ? extra.cursor : (history.data?.next_cursor ?? null)
   async function loadMore() {
@@ -68,12 +87,28 @@ export default function StockPage() {
     setLoadingMore(true)
     setMoreError(undefined)
     try {
-      const page = await api.get<MovementPage>(`/ops/outlets/${outletId}/stock-movements?limit=20&cursor=${nextCursor}`)
-      setOlder({ outletId, items: [...(extra?.items ?? []), ...page.items], cursor: page.next_cursor })
+      const page = await api.get<MovementPage>(`${historyPath}&cursor=${nextCursor}`)
+      setOlder({ key: historyPath, items: [...(extra?.items ?? []), ...page.items], cursor: page.next_cursor })
     } catch (e) {
       setMoreError(errorMessage(e))
     } finally {
       setLoadingMore(false)
+    }
+  }
+  async function exportCsv() {
+    setExportError(undefined)
+    try {
+      const blob = await api.blob(
+        `/owner/outlets/${outletId}/stock-movements/export?${filterQuery ? `${filterQuery}&` : ''}format=csv`,
+      )
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `stok-movement-${histRange?.from ?? 'awal'}-${histRange?.to ?? 'sekarang'}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setExportError(errorMessage(e))
     }
   }
   const chip = (value: Filter, label: string) => (
@@ -139,6 +174,28 @@ export default function StockPage() {
           <MovementForm key={preselect ?? 'none'} items={stock.data?.items ?? []} preselect={preselect}
             onSaved={async () => { setOlder(undefined); await Promise.all([stock.reload(), history.reload()]) }} />
           <Card title="Riwayat movement (append-only)">
+            <div className="mb-3 space-y-2 text-[12px]">
+              <div className="flex gap-2">
+                <Select aria-label="Filter bahan" className="h-8 min-w-0 flex-1" value={histItem}
+                  onChange={(e) => setHistItem(e.target.value)}>
+                  <option value="">Bahan: Semua</option>
+                  {(stock.data?.items ?? []).map((i) => <option key={i.stock_item_id} value={i.stock_item_id}>{i.name}</option>)}
+                </Select>
+                <Select aria-label="Filter tipe" className="h-8 w-auto" value={histType}
+                  onChange={(e) => setHistType(e.target.value as HistoryType | '')}>
+                  <option value="">Tipe: Semua</option>
+                  {HISTORY_TYPES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </Select>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <RangePicker value={histRange} onChange={setHistRange} />
+                {histRange && <LinkButton className="text-[12px]" onClick={() => setHistRange(undefined)}>Semua tanggal</LinkButton>}
+                {me.role === 'owner' && (
+                  <Button variant="ghost" className="ml-auto h-8" onClick={() => void exportCsv()}>⭳ Unduh CSV</Button>
+                )}
+              </div>
+              {exportError && <Alert>{exportError}</Alert>}
+            </div>
             {history.error ? <Alert>{errorMessage(history.error)}</Alert> : null}
             <ul className="space-y-1.5 text-[12px]">
               {movements.map((m) => (
@@ -151,7 +208,9 @@ export default function StockPage() {
                   </span>
                 </li>
               ))}
-              {history.data && movements.length === 0 && <li className="text-text-muted">Belum ada movement.</li>}
+              {history.data && movements.length === 0 && (
+              <li className="text-text-muted">{filterQuery ? 'Tidak ada movement untuk filter ini.' : 'Belum ada movement.'}</li>
+            )}
               {history.loading && !history.data && !history.error && <li className="text-text-muted">Memuat…</li>}
             </ul>
             {moreError ? <Alert>{moreError}</Alert> : null}

@@ -5,10 +5,14 @@ availability (O6), thresholds, and stock movements with sold-out recovery (S7).
 
 from __future__ import annotations
 
+import csv as _csv
+import datetime as dt
+import io
 from collections.abc import Iterator
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -359,6 +363,82 @@ def test_stock_view_movements_and_sold_out_recovery(client, ctx) -> None:
         assert APP_URL
         with psycopg.connect(APP_URL) as conn:
             conn.execute("delete from app.stock_movements")
+
+
+def test_movement_history_filters_and_owner_csv_export(client, ctx) -> None:
+    """Issue #37: riwayat filters (type, bahan, outlet-local dates) and the owner-only CSV."""
+    base = f"/api/v1/ops/outlets/{ctx['outlet']}"
+    gula = _stock(client, ctx, "Gula aren cair")
+    for body in (
+        {"type": "restock", "quantity": "1000", "note": "=HYPERLINK(1)"},
+        {"type": "waste", "quantity": "50", "note": "tumpah"},
+    ):
+        res = client.post(
+            f"{base}/stock-movements",
+            headers=ctx["owner"],
+            json={**body, "stock_item_id": gula["stock_item_id"]},
+        )
+        assert res.status_code == 201, res.text
+    item = f"stock_item_id={gula['stock_item_id']}"
+
+    waste = client.get(f"{base}/stock-movements?{item}&type=waste", headers=ctx["staff"]).json()
+    assert [(m["type"], m["note"]) for m in waste["items"]] == [("waste", "tumpah")]
+    restocks = client.get(f"{base}/stock-movements?type=restock", headers=ctx["staff"]).json()
+    assert restocks["items"] and {m["type"] for m in restocks["items"]} == {"restock"}
+    # Day bounds use the outlet zone (WIB): everything recorded now is "today", nothing tomorrow.
+    local_today = dt.datetime.now(ZoneInfo("Asia/Jakarta")).date()
+    tomorrow = local_today + dt.timedelta(days=1)
+    same_day = client.get(
+        f"{base}/stock-movements?{item}&from={local_today}&to={local_today}", headers=ctx["staff"]
+    ).json()
+    assert len(same_day["items"]) >= 2
+    later = client.get(
+        f"{base}/stock-movements?{item}&from={tomorrow}&to={tomorrow}", headers=ctx["staff"]
+    ).json()
+    assert later["items"] == []
+    bad = client.get(
+        f"{base}/stock-movements?from={tomorrow}&to={local_today}", headers=ctx["staff"]
+    )
+    assert bad.status_code == 422 and bad.json()["error"]["details"]["field"] == "from"
+
+    export = f"/api/v1/owner/outlets/{ctx['outlet']}/stock-movements/export"
+    assert client.get(f"{export}?{item}", headers=ctx["staff"]).status_code == 403
+    res = client.get(
+        f"{export}?{item}&from={local_today}&to={local_today}&format=csv", headers=ctx["owner"]
+    )
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith("text/csv")
+    assert (
+        f'filename="stok-movement-{local_today}-{local_today}.csv"'
+        in res.headers["content-disposition"]
+    )
+    assert res.content.startswith(b"\xef\xbb\xbf")  # UTF-8 BOM for Excel
+    rows = list(_csv.reader(io.StringIO(res.content.decode("utf-8-sig"))))
+    assert rows[0] == [
+        "at",
+        "zone",
+        "type",
+        "quantity",
+        "unit",
+        "stock_item",
+        "order_no",
+        "note",
+        "actor",
+    ]
+    body = rows[1:]
+    assert [r[2] for r in body[:2]] == ["waste", "restock"]  # newest first
+    waste_row, restock_row = body[0], body[1]
+    assert waste_row[1] == "WIB" and waste_row[0].startswith(str(local_today))
+    assert Decimal(waste_row[3]) == Decimal(-50) and waste_row[4] == "ml"
+    assert waste_row[5] == "Gula aren cair" and waste_row[7] == "tumpah"
+    assert restock_row[7] == "'=HYPERLINK(1)"  # formula escaped
+    only_waste = client.get(f"{export}?{item}&type=waste", headers=ctx["owner"])
+    assert [r[2] for r in list(_csv.reader(io.StringIO(only_waste.text.lstrip("\ufeff"))))[1:]] == [
+        "waste"
+    ]
+    # Another tenant's outlet id (or a random one) is not found, not an empty file.
+    missing = f"/api/v1/owner/outlets/{UUID(int=7)}/stock-movements/export"
+    assert client.get(missing, headers=ctx["owner"]).status_code == 404
 
 
 def test_thresholds_owner_only(client, ctx) -> None:

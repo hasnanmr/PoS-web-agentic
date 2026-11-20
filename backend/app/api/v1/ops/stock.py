@@ -5,9 +5,9 @@ Stock cannot be edited directly; it changes only through append-only movements.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, status
@@ -117,12 +117,23 @@ async def list_movements(
     request: Request,
     user: TenantUser,
     stock_item_id: UUID | None = None,
+    type: stock.HistoryType | None = None,
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
     cursor: int | None = None,
     limit: int = Query(default=30, ge=1, le=100),
 ) -> MovementPage:
     async with db.transaction(request.app.state.db_pool, user.actor()) as conn:
-        await outlets.require_outlet(conn, outlet_id)
+        outlet = await outlets.require_outlet(conn, outlet_id)
+        since, until = stock.history_bounds(date_from, date_to, outlet["timezone"])
         items, next_cursor = await stock.movement_history(
-            conn, outlet_id, stock_item_id=stock_item_id, cursor=cursor, limit=limit
+            conn,
+            outlet_id,
+            stock_item_id=stock_item_id,
+            type=type,
+            since=since,
+            until=until,
+            cursor=cursor,
+            limit=limit,
         )
     return MovementPage(items=[MovementRow(**i) for i in items], next_cursor=next_cursor)

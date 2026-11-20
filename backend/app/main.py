@@ -34,6 +34,7 @@ from app.api.v1.owner import (
     outlets,
     purchase_orders,
     staff,
+    stock,
     tables,
 )
 from app.auth.principal import PgUserDirectory, UserDirectory
@@ -137,6 +138,7 @@ def create_app(
     app.include_router(staff.router)
     app.include_router(catalog.router)
     app.include_router(ops_stock.router)
+    app.include_router(stock.router)
     app.include_router(ops_orders.router)
     app.include_router(ops_bills.router)
     app.include_router(ops_proofs.router)
