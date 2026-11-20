@@ -6,7 +6,7 @@
 // "Catat pembayaran" posts the expense) plus direct expenses. PO rows cannot be reversed here
 // ("Lihat PO →" opens the PO); direct rows can ("Reversal"). "Hutang PO belum dibayar" is as of
 // today, not the period.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
@@ -48,6 +48,15 @@ export default function ExpensesPage() {
   const baseQuery = base.toString()
   const summary = useLoad(() => api.get<ExpenseSummary>(`/owner/expenses/summary?${baseQuery}`), `${baseQuery}#${version}`)
   const s = summary.data
+  // The summary resolves an unset period to month to date; the history must list the same period
+  // the KPI cards, chip counts and RangePicker show, so it always gets an explicit from/to.
+  const history = new URLSearchParams()
+  if (outletId) history.set('outlet_id', outletId)
+  if (s) {
+    history.set('from', s.from)
+    history.set('to', s.to)
+  }
+  const historyQuery = history.toString()
 
   return (
     <>
@@ -73,7 +82,7 @@ export default function ExpensesPage() {
                 caption={`${s.po_owed.count} PO${s.po_owed.overdue_count ? ` · ${s.po_owed.overdue_count} lewat jatuh tempo` : ''}`} />
             </div>
             <div className="grid gap-4 lg:grid-cols-3">
-              <History className="lg:col-span-2" baseQuery={baseQuery} source={source} onSource={setSource} summary={s} version={version}
+              <History className="lg:col-span-2" baseQuery={historyQuery} source={source} onSource={setSource} summary={s} version={version}
                 onViewPo={(id) => navigate(`/dashboard?tab=po&po=${id}`)} onChanged={() => { setVersion((v) => v + 1) }} />
               <div className="space-y-4">
                 <BySupplier summary={s} onOpen={() => navigate('/dashboard?tab=po')} />
@@ -145,31 +154,47 @@ function History({ baseQuery, source, onSource, summary, version, onViewPo, onCh
   className?: string
 }) {
   const { api } = useSession()
-  const [more, setMore] = useState<Expense[]>([])
-  const [cursor, setCursor] = useState<string | null>(null)
+  // Pages fetched with "Muat lagi", tagged with the query they belong to, so a filter change
+  // (chip, outlet, period, save/reversal) drops them and a late response for an old query is ignored.
+  const [extra, setExtra] = useState<{ key: string; items: Expense[]; cursor: string | null }>()
+  const [moreState, setMoreState] = useState<{ key: string; loading: boolean; error?: unknown }>()
   const [reversing, setReversing] = useState<number>()
   const query = new URLSearchParams(baseQuery)
   query.set('limit', '20')
   if (source !== 'all') query.set('source', source)
   const key = `${query.toString()}#${version}`
-  const first = useLoad(async () => {
-    const page = await api.get<ExpensePage>(`/owner/expenses?${query.toString()}`)
-    setMore([])
-    setCursor(page.next_cursor)
-    return page
-  }, key)
-  const items = [...(first.data?.items ?? []), ...more]
+  const keyRef = useRef(key)
+  useEffect(() => {
+    keyRef.current = key
+  })
+  const first = useLoad(() => api.get<ExpensePage>(`/owner/expenses?${query.toString()}`), key)
+  const own = extra?.key === key ? extra : undefined
+  const more = moreState?.key === key ? moreState : undefined
+  const cursor = first.data ? (own ? own.cursor : first.data.next_cursor) : null
+  const items = [...(first.data?.items ?? []), ...(own?.items ?? [])]
   const chips: [Source, string][] = [
+    // Counts come from the summary, which leaves reversed expenses out; the list still shows them.
     ['all', `Semua (${summary.total.count})`],
     ['po', `PO supplier (${summary.po.count})`],
     ['direct', `Langsung (${summary.direct.count})`],
   ]
 
   async function loadMore() {
-    if (!cursor) return
-    const page = await api.get<ExpensePage>(`/owner/expenses?${query.toString()}&cursor=${encodeURIComponent(cursor)}`)
-    setMore((m) => [...m, ...page.items])
-    setCursor(page.next_cursor)
+    if (!cursor || more?.loading) return
+    const k = key
+    setMoreState({ key: k, loading: true })
+    try {
+      const page = await api.get<ExpensePage>(`/owner/expenses?${query.toString()}&cursor=${encodeURIComponent(cursor)}`)
+      if (keyRef.current !== k) return
+      setExtra((prev) => ({
+        key: k,
+        items: [...(prev?.key === k ? prev.items : []), ...page.items],
+        cursor: page.next_cursor,
+      }))
+      setMoreState({ key: k, loading: false })
+    } catch (error) {
+      if (keyRef.current === k) setMoreState({ key: k, loading: false, error })
+    }
   }
 
   return (
@@ -238,9 +263,14 @@ function History({ baseQuery, source, onSource, summary, version, onViewPo, onCh
           </table>
         </div>
       )}
-      {cursor && <LinkButton className="mt-2 text-[12px]" onClick={() => void loadMore()}>Muat lagi</LinkButton>}
+      {more?.error ? <Alert>Halaman berikutnya belum bisa dimuat: {errorMessage(more.error)}</Alert> : null}
+      {cursor && (
+        <LinkButton className="mt-2 text-[12px]" disabled={more?.loading} onClick={() => void loadMore()}>
+          Muat lagi
+        </LinkButton>
+      )}
       <p className="mt-3 text-[11px] text-text-muted">
-        Baris PO berasal dari “Catat pembayaran” di PO (tidak bisa diedit/dibalik di sini). Pengeluaran langsung: koreksi lewat reversal.
+        Baris PO berasal dari “Catat pembayaran” di PO (tidak bisa diedit/dibalik di sini). Pengeluaran langsung: koreksi lewat reversal. Angka di filter tidak menghitung entri yang sudah di-reversal.
       </p>
     </Card>
   )

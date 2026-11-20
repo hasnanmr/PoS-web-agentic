@@ -253,8 +253,8 @@ describe('O9b Pengeluaran', () => {
   it('highlights supplier payments on staff-opened POs and links to the PO', async () => {
     const api = fakeApi({
       'GET /owner/expenses/summary?': SUMMARY,
-      'GET /owner/expenses?limit=20': { items: [PO_ROW, EXPENSES.items[0]], next_cursor: null },
-      'GET /owner/expenses?limit=20&source=po': { items: [PO_ROW], next_cursor: null },
+      'GET /owner/expenses?from=2026-11-01&to=2026-11-20&limit=20': { items: [PO_ROW, EXPENSES.items[0]], next_cursor: null },
+      'GET /owner/expenses?from=2026-11-01&to=2026-11-20&limit=20&source=po': { items: [PO_ROW], next_cursor: null },
     })
     renderO9b(api)
     expect(await screen.findByText('Rp 15.900.000')).toBeInTheDocument()
@@ -268,7 +268,7 @@ describe('O9b Pengeluaran', () => {
     expect(screen.getAllByRole('button', { name: 'Reversal' })).toHaveLength(1)
 
     await userEvent.click(screen.getByRole('button', { name: 'PO supplier (9)' }))
-    await waitFor(() => expect(api.calls.map((c) => c[1])).toContain('/owner/expenses?limit=20&source=po'))
+    await waitFor(() => expect(api.calls.map((c) => c[1])).toContain('/owner/expenses?from=2026-11-01&to=2026-11-20&limit=20&source=po'))
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Lihat PO →' })[0])
     expect(await screen.findByTestId('where')).toHaveTextContent('/dashboard?tab=po&po=po-12')
@@ -277,7 +277,7 @@ describe('O9b Pengeluaran', () => {
   it('records a direct expense with the same form as O9', async () => {
     const api = fakeApi({
       'GET /owner/expenses/summary?': SUMMARY,
-      'GET /owner/expenses?limit=20': EXPENSES,
+      'GET /owner/expenses?from=2026-11-01&to=2026-11-20&limit=20': EXPENSES,
       'POST /owner/expenses': EXPENSES.items[0],
     })
     renderO9b(api)
