@@ -1,8 +1,10 @@
 // Mobile bottom nav from M1–M6: Order, Counter, Bill, Reservasi, Stok.
 import { NavLink } from 'react-router'
 import { MOBILE_NAV } from '../app/nav'
+import { useRolePath } from '../app/session'
 
 export function MobileBottomNav() {
+  const pathFor = useRolePath()
   return (
     <nav
       aria-label="Navigasi bawah"
@@ -12,7 +14,7 @@ export function MobileBottomNav() {
         {MOBILE_NAV.map(({ label, item }) => (
           <li key={item.path}>
             <NavLink
-              to={item.path}
+              to={pathFor(item.path)}
               className={({ isActive }) =>
                 [
                   'flex h-14 flex-col items-center justify-center gap-0.5 text-[11px]',

@@ -9,7 +9,8 @@
 // from the server's allowed_actions; unpaid pay-first orders have no "Mulai siapkan".
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { useSession } from '../app/session'
+import { ROUTES } from '../app/nav'
+import { useRolePath, useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
 import type { Board, OrderCard, OrderDetail } from '../lib/types'
@@ -55,6 +56,7 @@ function paymentText(o: OrderCard): string {
 
 export default function OrderBoardPage() {
   const { api, outlet } = useSession()
+  const pathFor = useRolePath()
   const outletId = outlet?.id ?? ''
   const [channel, setChannel] = useState('')
   const [type, setType] = useState('')
@@ -160,7 +162,7 @@ export default function OrderBoardPage() {
                             </>
                           )}
                           {o.payment_status === 'proof_submitted' && (
-                            <Link to={`/payment-review?order=${o.id}`}
+                            <Link to={`${pathFor(ROUTES.paymentReview.path)}?order=${o.id}`}
                               className="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-white hover:opacity-90">
                               Cek →
                             </Link>

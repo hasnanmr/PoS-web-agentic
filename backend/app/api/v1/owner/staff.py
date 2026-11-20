@@ -60,8 +60,13 @@ def _auth_admin(request: Request) -> AuthAdmin:
 
 
 def _redirect(request: Request) -> str | None:
+    # Staff sign in on the staff area of the admin app (`/admin`); the root is the owner area.
+    # Idempotent: an ADMIN_APP_URL that already ends in `/admin` is not suffixed twice.
     url = request.app.state.settings.admin_app_url
-    return str(url) if url else None
+    if not url:
+        return None
+    base = str(url).rstrip("/")
+    return base if base.endswith("/admin") else f"{base}/admin"
 
 
 async def _staff_list(request: Request, owner: OwnerOnly) -> list[StaffMember]:

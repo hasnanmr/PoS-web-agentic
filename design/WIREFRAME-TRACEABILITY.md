@@ -17,7 +17,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | 03 · WhatsApp Customer | W1–W12 (MVP), A1–A2 (Phase 2) | [03-whatsapp-customer.png](previews/03-whatsapp-customer.png) |
 | 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
 | 05 · Tablet Absensi Outlet | K0–K4 | [05-tablet-absensi.png](previews/05-tablet-absensi.png) |
-| 06 · QR Meja Pelanggan | Q0–Q5 (table QR web page, issue #44) | [06-qr-meja-pelanggan.png](previews/06-qr-meja-pelanggan.png) |
+| 06 · QR Meja Pelanggan | Q0–Q5, Q2a, S2 kartu order web (table QR web page, issue #44) | [06-qr-meja-pelanggan.png](previews/06-qr-meja-pelanggan.png) |
 | 99 · Components | `Sidebar/Owner`, `Sidebar/Staff` (with the Thinker logo + name), "Logo Thinker · 2 opsi" (option 1 · Gelembung T chosen) | — |
 
 ## Screen → user story → task
@@ -109,13 +109,13 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | Q0 QR tidak berlaku (token diganti / tidak dikenal) | US-063 | T-134, T-135 |
-| Q1 Scan QR meja — pilih cara pesan (Pesan di sini / Pesan via WhatsApp / Lihat bill) | US-062, US-013 | T-134, T-135 |
-| Q2 Menu (harga outlet, add-on, item habis) | US-062 | T-134, T-135 |
+| Q1 Scan QR meja — pilih cara pesan (Pesan di sini / Pesan via WhatsApp) | US-062, US-013 | T-134, T-135 |
+| Q2 Menu (harga outlet, add-on, item habis; "bayar dulu via QRIS") | US-062 | T-134, T-135 |
 | Q2a Pilih add-on (dari "+" di Q2: grup wajib / opsional, jumlah, "Tambah ke pesanan") | US-062 | T-134, T-135 |
-| Q2b Menu saja — outlet pay-first sampai pembayaran online aktif ("Pesan & bayar di kasir") | US-062 | T-134, T-135 |
-| Q3 Pesanan kamu (catatan, nama opsional, PB1, kirim ke bill meja) | US-062 | T-134, T-135 |
-| Q4 Status pesanan (live, termasuk batal + alasan) | US-062 | T-134, T-135 |
-| Q5 Bill meja (live, semua kanal; tombol split bill nonaktif "Segera hadir" sampai #42; bayar #43 menyusul) | US-062 | T-134, T-135 |
+| Q3 Pesanan kamu (catatan, nama opsional, PB1, "Pesan & bayar") | US-062 | T-134, T-135 |
+| Q4 Bayar dengan QRIS outlet (QRIS statis, total, batas waktu, "Saya sudah bayar", batalkan) | US-062 | T-134, T-135 |
+| Q5 Status pesanan (live: menunggu konfirmasi staf → disiapkan → siap; ditolak/batal + alasan) | US-062 | T-134, T-135 |
+| S2 kartu order web (kolom Menunggu bayar: "Pelanggan bilang sudah bayar", Cek & konfirmasi lunas, Tolak) — drawn on page 06 | US-062 | T-135 |
 
 Role-aware navigation (`Sidebar/Owner`, `Sidebar/Staff`) covers US-003 and US-033 through T-013 and T-072.
 
@@ -179,7 +179,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-059 | O15, O17, S10 |
 | US-060 | S11, S10, O15 |
 | US-061 | O15, O17 |
-| US-062 | Q1–Q5, S2, S5 |
+| US-062 | Q1–Q5, Q2a, S2, S4 |
 | US-063 | O8 |
 | US-042 (Phase 2) | A1 |
 | US-043 (Phase 2) | A2 |
@@ -197,8 +197,8 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-052 Cart intake + add-on collection | W2, W3 |
 | T-053 Order summary, pickup/delivery, confirm | W4, W5 |
 | T-054 Table QR | W8, O8 |
-| T-134 Public table API (token-scoped) | Q1–Q5 |
-| T-135 Customer table web page | Q1–Q5, S2, S5 |
+| T-134 Public table API (token-scoped) | Q0–Q5 |
+| T-135 Customer table web page | Q0–Q5, Q2a, S2, S4 |
 | T-136 Table QR settings, download, replace token | O8 |
 | T-036 QRIS payment request + screenshot intake | W6, S4 |
 | T-034 Unpaid-order timeout | W6, W7, S2 |
@@ -242,7 +242,7 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 - Attendance is recorded only on the outlet's paired tablet (K0–K4): the staff member taps their name and takes a required selfie, so they must be at the outlet. Staff phones and the admin app only show their own history (S9, M6). No PIN is needed. Selfies are private, visible to the owner and the staff member, and deleted after 45 days; staff cannot delete them (the owner can, through the API).
 - All purchase-order screens for the owner live in their own Dashboard tab **PO & Supplier** (issue #16): O17 cards on top, the O15 list and detail below, Buka PO (O16) and Daftar supplier from the tab header. The tab has its own outlet + month filter (PRD v0.15). The month applies only to Ringkasan PO (by PO open date, FR3.12). Pembayaran supplier and PO ada selisih always show every PO that needs action (FR3.11). The list uses the status chips (FR3.10), and a Ringkasan figure opens it with exactly those POs. Each number appears once: the old O15 KPI row was merged into O17's Pembayaran supplier card. Pengeluaran (O9) is for expenses only. Staff keep S10–S12.
 - S6 / M4 add a **Selesai** action for seated reservations and walk-ins (US-026 "completed"; not drawn on the canvas, approved by the product owner on 2026-11-19) so the table is freed when the guests leave. The canvas should get the button in the next wireframe pass.
-- The table QR opens the Thinker web page `/t/<token>`, not WhatsApp directly (issue #44, PRD v0.18). From one printed QR the customer orders on the web (Q2–Q3, channel `web_table`) or continues in WhatsApp (W8, `whatsapp_table`). The owner picks web + WhatsApp, web only, or WhatsApp only on O8; while WhatsApp isn't connected the QR always goes to the web page, so O8's **⭳ Unduh** works without WhatsApp. Web and WhatsApp orders share the table's open bill. Q5 has no pay button until online payment (#43); customers pay at the counter. At pay-first outlets web ordering stays off until #43: the QR goes to WhatsApp when connected, otherwise to Q2b (menu only).
+- The table QR opens the Thinker web page `/t/<token>`, not WhatsApp directly (issue #44, PRD v0.18). From one printed QR the customer orders on the web (Q2–Q4, channel `web_table`) or continues in WhatsApp (W8, `whatsapp_table`). Web orders are always **paid first with the outlet's static QRIS**: the customer taps "Saya sudah bayar" (no screenshot) and staff confirm in S2/S4 against the merchant account; web orders never join the table's open bill and the page shows only the phone's own orders (no table bill, so no bill code). The owner picks web + WhatsApp, web only, or WhatsApp only on O8; while WhatsApp isn't connected the QR always goes to the web page. Online payment (#43) later replaces the static QRIS + staff confirmation.
 - A forgotten clock-out is flagged "perlu dikoreksi" 1 hour after closing time (default) without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
 
 ## Open points

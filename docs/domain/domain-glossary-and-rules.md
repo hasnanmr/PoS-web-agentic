@@ -83,7 +83,7 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `tenant_type` | `restaurant`, `cafe` | `dropshipper` added in Phase 3 (T-097). |
 | `user_role` | `owner`, `staff` | Stored role. The `app_role` JWT claim (T-113) is `owner`, `staff`, or `owner_pending` (invited owner, no tenant yet). |
 | `payment_mode` | `pay_first`, `open_bill` | Dine-in only. Online orders always pay first. |
-| `order_channel` | `whatsapp_online`, `whatsapp_table`, `web_table`, `counter` | FR2.8. `web_table` = order from the table QR web page (issue #44, planned). |
+| `order_channel` | `whatsapp_online`, `whatsapp_table`, `web_table`, `counter` | FR2.8. `web_table` = order from the table QR web page (issue #44, planned): always paid first with the outlet's static QRIS, never on an open bill. |
 | `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in. Counter: dine_in/takeaway. |
 | `order_status` | `pending_payment`, `confirmed`, `preparing`, `ready`, `out_for_delivery`, `served`, `completed`, `cancelled` | Flows in §5. |
 | `payment_status` | `unpaid`, `proof_submitted`, `paid`, `refunded` | `refunded` only through a reversal. |

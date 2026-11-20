@@ -167,20 +167,21 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Order mengikuti mode pembayaran dine-in outlet.
 - **Traceability:** FR2.7, FR2.10, AC2.8
 
-### US-062 — Memesan dan melihat bill dari halaman QR meja
+### US-062 — Memesan dan membayar dari halaman QR meja
 
-**Sebagai** pelanggan dine-in, **saya ingin** memesan dari HP lewat halaman web yang terbuka saat memindai QR meja, lalu melihat status pesanan dan bill meja, **sehingga** saya bisa memesan tanpa WhatsApp dan tanpa menunggu pelayan.
+**Sebagai** pelanggan dine-in, **saya ingin** memesan dari HP lewat halaman web yang terbuka saat memindai QR meja dan langsung membayar dengan QRIS outlet, **sehingga** saya bisa memesan tanpa WhatsApp dan tanpa menunggu pelayan.
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
   - Halaman menampilkan outlet dan nomor meja dari QR tanpa login; bila outlet memakai web + WhatsApp, layar pertama menawarkan "Pesan di sini" dan "Pesan via WhatsApp".
-  - Menu menampilkan foto, harga outlet, dan add-on; item habis tidak bisa ditambah; add-on wajib harus dipilih sebelum kirim.
-  - "Kirim pesanan" membuat order dine-in channel `web_table` untuk meja itu lewat fungsi order yang sama (stok, PB1, lifecycle); harga dihitung ulang di server; kirim dua kali tidak membuat order ganda.
-  - Outlet open bill: order masuk ke open bill meja yang sama dengan order WhatsApp dan kasir. Outlet pay-first: pesan di web nonaktif sampai pembayaran online (#43) aktif; QR ke WhatsApp bila terhubung, kalau tidak halaman hanya menampilkan menu dengan "Pesan & bayar di kasir".
-  - Setelah kirim, halaman menampilkan status pesanan yang diperbarui sendiri, termasuk pembatalan beserta alasannya.
-  - Halaman bill meja menampilkan semua order di open bill meja itu dari semua kanal, dengan PB1 dan total, dan tidak pernah menampilkan bill meja lain atau tamu sebelumnya.
-  - Order dari web tampil di Order Board dan Open Bills dengan label kanal web dan nama pemesan bila diisi.
-- **Traceability:** FR2.7, FR2.8, FR2.13–FR2.15, AC2.8, AC2.15–AC2.19 · wireframe Q1–Q5 · issue #44
+  - Menu menampilkan foto, harga outlet, dan add-on; item habis tidak bisa ditambah; add-on wajib harus dipilih sebelum item masuk keranjang.
+  - "Pesan & bayar" membuat order dine-in channel `web_table` untuk meja itu lewat fungsi order yang sama (stok, PB1, lifecycle) dengan status menunggu bayar; harga dihitung ulang di server; kirim dua kali tidak membuat order ganda.
+  - Order web selalu bayar dulu dengan QRIS statis outlet (di outlet open bill maupun pay-first) dan tidak pernah masuk open bill meja.
+  - Halaman bayar menampilkan QRIS statis, total, dan batas waktu; "Saya sudah bayar" menghentikan batas waktu dan meminta staf mengecek; tanpa itu, order batal otomatis di batas waktu. Tidak ada upload bukti.
+  - Staf mengonfirmasi lunas setelah menemukan transaksi di akun merchant, atau menolak dengan alasan (order batal, stok kembali).
+  - Setelah bayar, halaman menampilkan status pesanan yang diperbarui sendiri (menunggu konfirmasi, disiapkan, siap, ditolak/batal dengan alasan). Pesanan hanya bisa dibuka dari HP yang memesan; tidak ada bill meja dan HP lain tidak melihat pesanan itu.
+  - Order dari web tampil di Order Board dengan label kanal web, meja, nama pemesan bila diisi, dan tanda "Pelanggan bilang sudah bayar".
+- **Traceability:** FR2.7, FR2.8, FR2.13–FR2.15, FR10.6, AC2.8, AC2.15–AC2.19 · wireframe Q1–Q5, Q2a, S2 kartu web · issue #44
 
 ### US-063 — Mengatur tujuan dan token QR meja
 
