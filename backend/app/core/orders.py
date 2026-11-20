@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -28,7 +28,7 @@ from app.core.pricing import LineInput, PricedLine, PricedOrder, quote
 from app.core.units import NegativeQuantityError, recipe_with_addons, scale_recipe
 
 OrderType = Literal["dine_in", "takeaway", "delivery", "pickup"]
-Channel = Literal["counter", "whatsapp_online", "whatsapp_table"]
+Channel = Literal["counter", "whatsapp_online", "whatsapp_table", "web_table"]
 
 
 class SoldOutError(DomainError):
@@ -205,6 +205,10 @@ async def _event(
     )
 
 
+# Public name for other order services (table web page, T-134).
+record_event = _event
+
+
 # Create ------------------------------------------------------------------------------
 
 
@@ -320,6 +324,67 @@ async def create_counter_order(
     }
 
 
+@dataclass(frozen=True, slots=True)
+class WebOrder:
+    """Q3 "Pesan & bayar" on the customer table web page (T-134, FR2.13)."""
+
+    table_id: UUID
+    lines: list[LineInput]
+    access_key_hash: str
+    note: str | None = None
+    customer_name: str | None = None
+    expected_total: int | None = None
+
+
+async def create_web_order(
+    conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID, draft: WebOrder
+) -> dict[str, Any]:
+    """A dine-in order for one table, always paid first with the outlet's static QRIS and
+    never on the table's open bill, whatever the outlet's dine-in mode (FR2.13, FR10.6). Prices
+    and PB1 come from the server; `expected_total` (what the page showed) must still match."""
+    outlet = await _outlet(conn, outlet_id)
+    await _check_table(conn, outlet_id, draft.table_id)
+    priced = await quote(conn, outlet_id, draft.lines)
+    if draft.expected_total is not None and draft.expected_total != priced.quote.total:
+        raise ConflictError(
+            "price_changed",
+            "prices changed since the menu was loaded",
+            {
+                "quote": {
+                    "subtotal": priced.quote.subtotal,
+                    "pb1_amount": priced.quote.pb1_amount,
+                    "total": priced.quote.total,
+                }
+            },
+        )
+    order = await _insert_order(
+        conn,
+        ctx,
+        outlet,
+        priced,
+        channel="web_table",
+        type="dine_in",
+        table_id=draft.table_id,
+        bill_id=None,
+        payment_mode="pay_first",
+        status="pending_payment",
+        extra={
+            "access_key_hash": draft.access_key_hash,
+            "note": draft.note,
+            "customer_name": draft.customer_name,
+        },
+    )
+    return {
+        "id": order["id"],
+        "order_no": order_label(outlet["order_prefix"], order["order_no"]),
+        "status": order["status"],
+        "payment_status": order["payment_status"],
+        "subtotal": priced.quote.subtotal,
+        "pb1_amount": priced.quote.pb1_amount,
+        "total": priced.quote.total,
+    }
+
+
 async def _insert_order(
     conn: AsyncConnection,
     ctx: ActorContext,
@@ -332,8 +397,10 @@ async def _insert_order(
     bill_id: UUID | None,
     payment_mode: str,
     status: str,
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     order_id = uuid4()
+    extra = extra or {}
     cur = await conn.execute("select app.next_order_no(%s)", (outlet["id"],))
     order_no = (await cur.fetchone())[0]  # type: ignore[index]
     q = priced.quote
@@ -341,8 +408,8 @@ async def _insert_order(
         """
         insert into app.orders (id, tenant_id, outlet_id, order_no, channel, type, payment_mode,
           status, table_id, bill_id, subtotal, pb1_rate_bps, pb1_amount, delivery_fee, total,
-          created_by_actor, created_by_id)
-        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+          created_by_actor, created_by_id, access_key_hash, note, customer_name)
+        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             order_id,
@@ -362,6 +429,9 @@ async def _insert_order(
             q.total,
             ctx.actor_type.value,
             ctx.actor_id,
+            extra.get("access_key_hash"),
+            extra.get("note"),
+            extra.get("customer_name"),
         ),
     )
     for line in priced.lines:
@@ -416,11 +486,17 @@ select o.id, o.outlet_id, o.order_no, o.channel::text as channel, o.type::text a
        o.payment_mode::text as payment_mode, o.status::text as status,
        o.payment_status::text as payment_status, o.table_id, o.bill_id, o.subtotal,
        o.pb1_rate_bps, o.pb1_amount, o.delivery_fee, o.total, o.created_at,
-       ou.order_prefix, ou.timezone, t.name as table_name, b.guest_name
+       o.customer_name, o.note, ou.order_prefix, ou.timezone, ou.unpaid_timeout_minutes,
+       t.name as table_name, b.guest_name, pp.id as pending_proof_id,
+       pp.kind as pending_proof_kind, pp.received_at as pending_proof_at
 from app.orders o
 join app.outlets ou on ou.id = o.outlet_id
 left join app.tables t on t.id = o.table_id
 left join app.bills b on b.id = o.bill_id
+left join lateral (
+  select p.id, p.kind, p.received_at from app.payment_proofs p
+  where p.order_id = o.id and p.status = 'pending' order by p.received_at desc limit 1
+) pp on true
 """
 _ORDER_SQL = _ORDER_SELECT + "where o.id = %s"
 
@@ -701,6 +777,7 @@ def _card(
         else None
     )
     order = {**order, "qris_unchecked": qris_checked is False}
+    claimed = order.get("pending_proof_kind") == "customer_claim"
     return {
         "id": order["id"],
         "order_no": order_label(order["order_prefix"], order["order_no"]),
@@ -713,14 +790,30 @@ def _card(
         "payment_id": payment["payment_id"] if payment else None,
         "qris_checked": qris_checked,
         "table": order["table_name"],
-        "customer_name": order.get("guest_name"),
+        "customer_name": order.get("customer_name") or order.get("guest_name"),
+        "note": order.get("note"),
+        # S2 web-order card: "Pelanggan bilang sudah bayar · 12:44" → S4 review of this proof.
+        "proof_id": order.get("pending_proof_id"),
+        "payment_claimed_at": order.get("pending_proof_at") if claimed else None,
         "item_summary": _summary(items),
         "total": order["total"],
         "bill_id": order["bill_id"],
         "created_at": order["created_at"],
-        "auto_cancel_at": None,  # unpaid timeout (T-034) arrives with WhatsApp ordering
+        "auto_cancel_at": auto_cancel_at(order),
         "allowed_actions": order_flow.allowed_actions(order),
     }
+
+
+def auto_cancel_at(order: dict[str, Any]) -> datetime | None:
+    """When an unpaid web order is cancelled (FR10.4): created + the outlet's limit. The
+    WhatsApp unpaid timeout (T-034) is not built yet, so other channels have none."""
+    if (
+        order["channel"] != "web_table"
+        or order["status"] != "pending_payment"
+        or order["payment_status"] != "unpaid"
+    ):
+        return None
+    return order["created_at"] + timedelta(minutes=order["unpaid_timeout_minutes"])
 
 
 BOARD_COLUMNS = ("awaiting_payment", "confirmed", "preparing", "ready", "done_today")

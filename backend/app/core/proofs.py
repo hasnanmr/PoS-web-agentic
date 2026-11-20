@@ -40,7 +40,8 @@ def mask_phone(phone: str | None) -> str | None:
 
 _QUEUE = """
 select distinct on (p.order_id)
-       p.id as proof_id, p.order_id, p.received_at, o.order_no, ou.order_prefix, ou.timezone,
+       p.id as proof_id, p.kind, p.order_id, p.received_at, o.order_no, ou.order_prefix,
+       ou.timezone,
        o.channel::text as channel, o.type::text as order_type, t.name as table_name, o.total
 from app.payment_proofs p
 join app.orders o on o.id = p.order_id
@@ -54,6 +55,7 @@ order by p.order_id, p.received_at desc
 def _queue_row(r: dict[str, Any]) -> dict[str, Any]:
     return {
         "proof_id": r["proof_id"],
+        "kind": r["kind"],
         "order_id": r["order_id"],
         "order_no": orders.order_label(r["order_prefix"], r["order_no"]),
         "channel": r["channel"],
@@ -74,7 +76,7 @@ async def pending_queue(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str
 
 
 _PROOF_SQL = """
-select p.id, p.order_id, p.outlet_id, p.status::text as status, p.storage_path,
+select p.id, p.kind, p.order_id, p.outlet_id, p.status::text as status, p.storage_path,
        p.received_at, p.reviewed_at, p.rejection_reason, u.display_name as reviewed_by, c.phone
 from app.payment_proofs p
 join app.orders o on o.id = p.order_id
@@ -102,6 +104,7 @@ async def detail(conn: AsyncConnection, proof_id: UUID) -> dict[str, Any]:
     order = await orders.detail(conn, proof["order_id"])
     return {
         "proof_id": proof["id"],
+        "kind": proof["kind"],
         "status": proof["status"],
         "image_url": None,
         "order_id": order["id"],
