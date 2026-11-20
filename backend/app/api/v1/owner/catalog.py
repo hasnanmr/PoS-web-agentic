@@ -1,11 +1,14 @@
 """Owner catalog — wireframes O5 (Menu, Add-on & Harga Outlet) and O6 (Resep & Bahan).
 
 T-016 to T-019, T-022. Contract: docs/architecture/screen-endpoint-map.md → O5, O6.
-Photo upload (Supabase Storage) and WhatsApp catalog sync (T-051) come later.
+Menu photos (T-132) live in the private `menu-photos` bucket; responses carry a short-lived
+signed `photo_url`. WhatsApp catalog sync (T-051) comes later.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
@@ -14,8 +17,14 @@ from fastapi import APIRouter, Query, Request, Response, status
 from pydantic import BaseModel, Field, StringConstraints
 
 from app import db
+from app.api.errors import ApiError
+from app.api.photos import attach_photo_urls, storage
 from app.auth.deps import OwnerOnly
 from app.core import catalog as core
+from app.core.errors import ValidationFailedError
+from app.storage import StorageError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: catalog"])
 
@@ -35,6 +44,7 @@ class ProductRow(BaseModel):
     is_owner_pick: bool
     is_sample: bool
     has_photo: bool
+    photo_url: str | None = Field(default=None, description="Signed, short-lived")
     addon_group_count: int
     ingredient_count: int
     price: int | None
@@ -93,6 +103,7 @@ class ProductDetail(BaseModel):
     is_active: bool
     is_sample: bool
     has_photo: bool
+    photo_url: str | None = Field(default=None, description="Signed, short-lived")
     tags: list[str]
     prices: list[OutletPriceRow]
     addon_groups: list[AddonGroupRow]
@@ -104,7 +115,8 @@ class ProductCreate(BaseModel):
     category: str | None = Field(default=None, max_length=60)
     description: str | None = Field(default=None, max_length=500)
     is_owner_pick: bool = False
-    is_active: bool = True
+    # A new item has no photo yet, so it starts Nonaktif (true → 422 photo_required).
+    is_active: bool = False
     tags: list[str] = Field(default_factory=list, max_length=20)
 
 
@@ -171,6 +183,11 @@ def _pool(request: Request):  # type: ignore[no-untyped-def]
     return request.app.state.db_pool
 
 
+async def _detail(request: Request, row: dict) -> ProductDetail:  # type: ignore[type-arg]
+    await attach_photo_urls(request, [row])
+    return ProductDetail(**row)
+
+
 def _prices(items: list[OutletPriceItem]) -> list[core.OutletPrice]:
     return [core.OutletPrice(p.outlet_id, p.price) for p in items]
 
@@ -191,6 +208,7 @@ async def list_products(
         rows = await core.list_products(
             conn, price_outlet_id=price_outlet_id, q=q, category=category, status=status_filter
         )
+    await attach_photo_urls(request, rows)
     return [ProductRow(**r) for r in rows]
 
 
@@ -201,14 +219,14 @@ async def create_product(body: ProductCreate, request: Request, owner: OwnerOnly
     async with db.transaction(_pool(request), ctx) as conn:
         product_id = await core.create_product(conn, ctx, fields, body.tags)
         row = await core.get_product(conn, product_id)
-    return ProductDetail(**row)
+    return await _detail(request, row)
 
 
 @router.get("/products/{product_id}")
 async def get_product(product_id: UUID, request: Request, owner: OwnerOnly) -> ProductDetail:
     async with db.transaction(_pool(request), owner.actor()) as conn:
         row = await core.get_product(conn, product_id)
-    return ProductDetail(**row)
+    return await _detail(request, row)
 
 
 @router.patch("/products/{product_id}")
@@ -222,14 +240,83 @@ async def update_product(
     async with db.transaction(_pool(request), ctx) as conn:
         await core.update_product(conn, ctx, product_id, fields, tags)
         row = await core.get_product(conn, product_id)
-    return ProductDetail(**row)
+    return await _detail(request, row)
+
+
+@router.put(
+    "/products/{product_id}/photo",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                t: {"schema": {"type": "string", "format": "binary"}}
+                for t in ("image/jpeg", "image/png", "image/webp")
+            },
+        }
+    },
+)
+async def put_photo(product_id: UUID, request: Request, owner: OwnerOnly) -> ProductDetail:
+    """O5 "Foto * ⇪": the raw JPG/PNG/WebP as the request body (max 5 MB). Replaces the
+    current photo; the old object is removed after the change is saved."""
+    store = storage(request)
+    if store is None:
+        raise ApiError(503, "storage_not_configured", "SUPABASE_URL / SERVICE_ROLE_KEY not set")
+    data = await _read_capped(request, core.PHOTO_MAX_BYTES)
+    kind = core.validate_photo(request.headers.get("content-type", ""), data)
+    bucket = request.app.state.settings.menu_photo_bucket
+    ctx = owner.actor()
+    async with db.transaction(_pool(request), ctx) as conn:
+        await core.get_product(conn, product_id)  # 404 before uploading anything
+    path = core.photo_object_path(ctx.tenant_id, product_id, kind)  # type: ignore[arg-type]
+    try:
+        await asyncio.to_thread(store.upload, bucket, path, data, kind)
+    except StorageError as exc:
+        logger.warning("menu photo upload failed: %s", exc)
+        raise ApiError(502, "storage_failed", "the photo could not be stored") from None
+    try:
+        async with db.transaction(_pool(request), ctx) as conn:
+            old = await core.set_photo(conn, ctx, product_id, path)
+            row = await core.get_product(conn, product_id)
+    except Exception:
+        await _remove_quietly(store, bucket, [path])  # nothing points at it
+        raise
+    if old:
+        await _remove_quietly(store, bucket, [old])
+    return await _detail(request, row)
+
+
+async def _read_capped(request: Request, limit: int) -> bytes:
+    """The request body, refused as soon as it passes `limit` bytes, also when the client
+    sends no Content-Length (chunked), so a large upload is never held in memory."""
+    too_big = ValidationFailedError("the photo is larger than 5 MB", {"field": "photo"})
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        raise too_big
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise too_big
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _remove_quietly(store, bucket: str, paths: list[str]) -> None:  # type: ignore[no-untyped-def]
+    try:
+        await asyncio.to_thread(store.remove, bucket, paths)
+    except StorageError as exc:  # an orphan object is harmless; log and move on
+        logger.warning("menu photo removal failed: %s", exc)
 
 
 @router.delete("/products/{product_id}")
 async def delete_product(product_id: UUID, request: Request, owner: OwnerOnly) -> dict[str, str]:
     ctx = owner.actor()
     async with db.transaction(_pool(request), ctx) as conn:
-        outcome = await core.delete_product(conn, ctx, product_id)
+        outcome, photo = await core.delete_product(conn, ctx, product_id)
+    store = storage(request)
+    if photo and store is not None:  # nothing points at the object any more
+        await _remove_quietly(store, request.app.state.settings.menu_photo_bucket, [photo])
     return {"result": outcome}
 
 
@@ -271,7 +358,7 @@ async def _save_group(
         cur = await conn.execute("select product_id from app.addon_groups where id = %s", (gid,))
         pid = (await cur.fetchone())[0]  # type: ignore[index]
         row = await core.get_product(conn, pid)
-    return ProductDetail(**row)
+    return await _detail(request, row)
 
 
 @router.post("/products/{product_id}/addon-groups", status_code=status.HTTP_201_CREATED)

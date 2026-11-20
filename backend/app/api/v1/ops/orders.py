@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from app import db
 from app.api.errors import ApiError
+from app.api.photos import attach_photo_urls
 from app.auth.deps import TenantUser
 from app.core import catalog, idempotency, orders, outlets
 from app.core.orders import CounterOrder
@@ -229,6 +230,7 @@ async def counter_menu(
         rows = await catalog.counter_menu(
             conn, outlet_id, q=q, category=category, owner_picks=owner_picks
         )
+    await attach_photo_urls(request, rows)
     return [MenuItem(**r) for r in rows]
 
 

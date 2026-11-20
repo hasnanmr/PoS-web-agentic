@@ -1,7 +1,9 @@
 // Wireframe O5 — Menu, Add-on & Harga Outlet (T-016, T-017, T-018, T-066).
 // Endpoints: GET/POST /owner/products, GET/PATCH/DELETE /owner/products/{id},
-// PUT /owner/products/{id}/prices, add-on groups under /owner/products/{id}/addon-groups.
-// Not yet here: photo upload (Supabase Storage) and WhatsApp catalog sync (T-051).
+// PUT /owner/products/{id}/prices, add-on groups under /owner/products/{id}/addon-groups,
+// PUT /owner/products/{id}/photo (T-132: "Foto *", JPG/PNG/WebP max 5 MB, private bucket, signed
+// photo_url). Every item needs a photo (FR2.11): a new item starts Nonaktif and the server refuses
+// to activate an item without one (photo_required). Not yet here: WhatsApp catalog sync (T-051).
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useSession } from '../app/session'
@@ -10,8 +12,13 @@ import { errorMessage } from '../lib/api'
 import { formatDelta, formatRupiah } from '../lib/format'
 import type { AddonGroup, ProductDetail, ProductRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
+import { usePhotoRefresh } from '../lib/usePhotoRefresh'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, FieldRow, LinkButton, Loading, Select, TextInput } from '../ui/kit'
+import { Photo } from '../ui/Photo'
+
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024
 
 const STATUS_LABEL: Record<ProductRow['status'], string> = { active: 'Aktif', sold_out: 'Sold out', inactive: 'Nonaktif' }
 
@@ -29,6 +36,7 @@ export default function MenuPage() {
     () => api.get<ProductRow[]>(priceOutlet ? `/owner/products?price_outlet_id=${priceOutlet}` : '/owner/products'),
     priceOutlet,
   )
+  usePhotoRefresh(products.reload)
   const all = products.data ?? []
   const categories = [...new Set(all.map((p) => p.category).filter(Boolean))] as string[]
   const rows = all.filter((p) =>
@@ -71,7 +79,7 @@ export default function MenuPage() {
                 <li key={p.id}>
                   <button type="button" onClick={() => setSelected(p.id)}
                     className={`flex w-full items-center gap-3 rounded-md px-2 py-2 text-left ${current === p.id ? 'bg-primary-soft' : 'hover:bg-page'}`}>
-                    <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded bg-page" />
+                    <Photo src={p.photo_url} className="block h-10 w-10 shrink-0 rounded" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold">
                         {p.name}{p.is_owner_pick ? '  ★' : ''}{p.is_sample ? <span className="font-normal text-text-muted">  · sample</span> : null}
@@ -94,7 +102,7 @@ export default function MenuPage() {
           {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
           {current === 'new' ? (
             <NewProduct onCreated={async (id) => {
-              setNotice({ tone: 'success', text: 'Item menu dibuat. Lengkapi harga, add-on, dan resep.' })
+              setNotice({ tone: 'success', text: 'Item menu dibuat (Nonaktif). Tambahkan foto, harga, add-on, dan resep, lalu aktifkan.' })
               await products.reload()
               setSelected(id)
             }} onCancel={() => setSelected(undefined)} />
@@ -175,13 +183,38 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
   const [busy, setBusy] = useState(false)
   const [editingGroup, setEditingGroup] = useState<AddonGroup | 'new'>()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // A photo upload saves at once and must not reset unsaved edits in the form.
+  const [photo, setPhoto] = useState<{ url: string | null; has: boolean }>()
+  const [uploading, setUploading] = useState(false)
   if (detail.data !== shown) {
     setShown(detail.data)
     setDraft(detail.data ? toDraft(detail.data) : undefined)
+    setPhoto(undefined)
   }
   if (!detail.data || !draft) return detail.error ? <Alert>{errorMessage(detail.error)}</Alert> : <Loading />
   const p = detail.data
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value })
+  const photoUrl = photo ? photo.url : p.photo_url
+  const hasPhoto = photo ? photo.has : p.has_photo
+  // Switching on needs a photo; an item that is already active may stay on (sample menu).
+  const canActivate = hasPhoto || p.is_active
+
+  async function uploadPhoto(file: File) {
+    if (!PHOTO_TYPES.includes(file.type) || file.size > PHOTO_MAX_BYTES) {
+      onError('Foto harus JPG, PNG, atau WebP, maks 5 MB.')
+      return
+    }
+    setUploading(true)
+    try {
+      const saved = await api.upload<ProductDetail>(`/owner/products/${productId}/photo`, file, file.type)
+      setPhoto({ url: saved.photo_url, has: saved.has_photo })
+      await onChanged(hasPhoto ? 'Foto diganti.' : 'Foto disimpan.')
+    } catch (e) {
+      onError(`Foto belum tersimpan: ${errorMessage(e)}`)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function save() {
     if (!draft) return
@@ -220,10 +253,20 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
   return (
     <Card title={`Edit: ${p.name}`}>
       <div className="flex gap-4">
-        <div className="hidden h-28 w-28 shrink-0 items-center justify-center rounded-md bg-page text-[11px] text-text-muted sm:flex"
-          title="Upload foto menyusul (Supabase Storage)">
-          Foto * ⇪
-        </div>
+        <label className={`relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-[#B8C2D0] bg-page text-[11px] text-text-muted hover:border-primary ${uploading ? 'opacity-60' : ''}`}>
+          {photoUrl ? (
+            <>
+              <Photo src={photoUrl} alt={`Foto ${p.name}`} className="block h-full w-full" />
+              <span className="absolute inset-x-0 bottom-0 bg-black/50 py-0.5 text-center text-[10px] text-white">Ganti foto ⇪</span>
+            </>
+          ) : (uploading ? 'Mengunggah…' : 'Foto * ⇪')}
+          <input type="file" accept={PHOTO_TYPES.join(',')} aria-label="Foto menu" className="sr-only" disabled={uploading}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) void uploadPhoto(file)
+            }} />
+        </label>
         <div className="min-w-0 flex-1">
           <FieldRow label="Nama *" htmlFor="p-name">
             <TextInput id="p-name" value={draft.name} onChange={(e) => set('name', e.target.value)} />
@@ -245,9 +288,11 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
           </FieldRow>
           <FieldRow label="Status">
             <label className="flex items-center gap-2">
-              <input type="checkbox" role="switch" checked={draft.is_active} onChange={(e) => set('is_active', e.target.checked)} />
+              <input type="checkbox" role="switch" checked={draft.is_active} disabled={!draft.is_active && !canActivate}
+                onChange={(e) => set('is_active', e.target.checked)} />
               {draft.is_active ? 'Aktif' : 'Nonaktif'}
             </label>
+            {!canActivate && <p className="mt-1 text-[11px] text-text-muted">Tambahkan foto untuk mengaktifkan item ini.</p>}
           </FieldRow>
         </div>
       </div>
