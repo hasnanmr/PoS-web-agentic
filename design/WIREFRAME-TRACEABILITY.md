@@ -27,7 +27,8 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | O1 Login (invite-only) & Buat Bisnis | US-001, US-002, US-003, US-008 | T-006, T-010, T-011, T-024, T-066 |
-| O2 Dashboard — tab Ringkasan + keramaian (busy/quiet hours, busyness map, current crowd, item terlaris); header tabs Ringkasan · PO & Supplier | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
+| O2 Dashboard — tab Ringkasan + keramaian (busy/quiet hours, busyness map, current crowd, item terlaris); header tabs Ringkasan · PO & Supplier; periode Hari ini · Minggu · Bulan · Rentang | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
+| O2b Dashboard — drawer detail Revenue / Order (dari tile Revenue, tile Order, bar Order per jam, baris Item terlaris): ringkasan, per outlet, daftar order → S3 | US-032, US-056 | T-071, T-124 |
 | O3 Bisnis & Outlet (PB1, payment mode, QRIS, cash drawers, attendance tablets, grace period) | US-002, US-017, US-018, US-019, US-020, US-053, US-055 | T-011, T-014, T-039, T-066, T-118, T-121 |
 | O4 Staf & Akses (staff invitation, access matrix) | US-003, US-033 | T-006, T-012, T-013, T-066 |
 | O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
@@ -161,7 +162,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-029 | W9, O7 |
 | US-030 | O9, S8 |
 | US-031 | O9, O15 |
-| US-032 | O2, O9 |
+| US-032 | O2, O2b, O9 |
 | US-033 | O2, O4, sidebars |
 | US-034 | S1, M2 |
 | US-035 | M1–M6 |
@@ -220,7 +221,7 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-057 Tables and reservation rules | O8 |
 | T-062, T-063, T-064 Staff reservation board, walk-ins, no-show hold (Wave 6) | S6, M4 |
 | T-070 Reservation/table view and cashier shift | S6, S8, M4 |
-| T-071 Owner dashboard | O2 |
+| T-071 Owner dashboard | O2, O2b |
 | T-128 Dashboard PO figures (tab PO & Supplier) | O17, O15 |
 | T-130 PO screens | O15, O16, O17, S10, S11, S12 |
 | T-123, T-124 Busyness queries and dashboard views | O2 |

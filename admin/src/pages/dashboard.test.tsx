@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import { hourRanges } from '../lib/format'
-import type { DashboardSummary, TopItems } from '../lib/types'
+import type { DashboardOrders, DashboardSummary, OrderDetail, TopItems } from '../lib/types'
 import { fakeApi, fakeSession } from '../test/fakes'
 import { WithSession } from '../test/session'
 import DashboardPage from './DashboardPage'
@@ -11,8 +11,8 @@ import DashboardPage from './DashboardPage'
 const TODAY: TopItems = {
   period: 'day',
   top_items: [
-    { name: 'Es Kopi Susu Senja', quantity_sold: 42, revenue: 1050000 },
-    { name: 'Croissant Butter', quantity_sold: 31, revenue: 806000 },
+    { product_id: 'p-kopi', name: 'Es Kopi Susu Senja', quantity_sold: 42, revenue: 1050000 },
+    { product_id: 'p-croissant', name: 'Croissant Butter', quantity_sold: 31, revenue: 806000 },
   ],
 }
 
@@ -26,7 +26,7 @@ describe('O2 Dashboard · Item terlaris', () => {
       'GET /owner/dashboard/top-items?period=day': TODAY,
       'GET /owner/dashboard/top-items?period=year': { period: 'year', top_items: [] },
       'GET /owner/dashboard/top-items?period=year&outlet_id=o-riau': {
-        period: 'year', top_items: [{ name: 'Americano', quantity_sold: 1200, revenue: 26400000 }],
+        period: 'year', top_items: [{ product_id: 'p-americano', name: 'Americano', quantity_sold: 1200, revenue: 26400000 }],
       },
     })
     renderO2(api)
@@ -65,6 +65,8 @@ const QUIET = [8, 9, 15, 16, 21]
 function summary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
   return {
     period: 'today',
+    from: '2026-11-19',
+    to: '2026-11-19',
     hours: 'all',
     as_of: '2026-11-19T05:40:00Z',
     kpis: {
@@ -190,5 +192,173 @@ describe('O2 Dashboard · Ringkasan', () => {
   it('shows an error when the summary cannot load', async () => {
     renderO2(fakeApi({ 'GET /owner/dashboard?period=today&hours=all': new Error('boom') }))
     expect(await screen.findByText(/Ringkasan belum bisa dimuat/)).toBeInTheDocument()
+  })
+})
+
+function orders(overrides: Partial<DashboardOrders> = {}): DashboardOrders {
+  return {
+    period: 'today',
+    summary: { orders: 109, revenue_excl_pb1: 12450000, cash_count: 38, qris_count: 71 },
+    item: null,
+    by_outlet: [
+      { outlet_id: 'o-dago', name: 'Bandung – Dago', orders: 79, revenue_excl_pb1: 9040000 },
+      { outlet_id: 'o-riau', name: 'Bandung – Riau', orders: 30, revenue_excl_pb1: 3410000 },
+    ],
+    orders: [
+      { id: 'ord-1', order_no: '#A-1036', outlet_id: 'o-dago', outlet: 'Bandung – Dago', timezone: 'Asia/Jakarta',
+        created_at: '2026-11-19T05:41:00Z', channel: 'whatsapp_table', type: 'dine_in', table: 'Meja 4', customer_name: null,
+        payment_method: 'qris', item_summary: '2× Es Kopi Susu Senja, 1× Croissant Butter', revenue_excl_pb1: 86000, total: 94600 },
+      { id: 'ord-2', order_no: '#R-0412', outlet_id: 'o-riau', outlet: 'Bandung – Riau', timezone: 'Asia/Jakarta',
+        created_at: '2026-11-19T05:38:00Z', channel: 'counter', type: 'takeaway', table: null, customer_name: null,
+        payment_method: 'cash', item_summary: '1× Americano', revenue_excl_pb1: 22000, total: 24200 },
+    ],
+    next_cursor: 'c1',
+    ...overrides,
+  }
+}
+
+const DRAWER_TODAY = '/owner/dashboard/orders?period=today&hours=all&limit=30'
+
+describe('O2b Dashboard · drawer detail Revenue / Order', () => {
+  it('opens from the Revenue tile with the summary, per outlet, list, chips, paging, and S3', async () => {
+    const more = orders({
+      orders: [{ ...orders().orders[1], id: 'ord-3', order_no: '#R-0411', item_summary: '1× Matcha Latte' }],
+      next_cursor: null,
+    })
+    const detail = {
+      id: 'ord-1', order_no: '#A-1036', channel: 'whatsapp_table', type: 'dine_in', payment_mode: 'pay_first',
+      status: 'completed', payment_status: 'paid', payment_method: 'qris', payment_id: 'pay-1', qris_checked: true,
+      table: 'Meja 4', customer_name: null, note: null, proof_id: null, payment_claimed_at: null, item_summary: '',
+      total: 94600, bill_id: null, created_at: '2026-11-19T05:41:00Z', auto_cancel_at: null, allowed_actions: [],
+      items: [], subtotal: 86000, pb1_rate_bps: 1000, pb1_amount: 8600, delivery_fee: 0, timezone: 'Asia/Jakarta', events: [],
+    } as unknown as OrderDetail
+    const api = fakeApi({
+      'GET /owner/dashboard?period=today&hours=all': summary(),
+      [`GET ${DRAWER_TODAY}`]: orders(),
+      [`GET ${DRAWER_TODAY}&cursor=c1`]: more,
+      'GET /owner/dashboard/orders?period=today&hours=all&method=cash&limit=30': orders({ orders: [orders().orders[1]], next_cursor: null }),
+      'GET /ops/orders/ord-1': detail,
+    })
+    renderO2(api)
+    await userEvent.click(await screen.findByRole('button', { name: /Revenue hari ini \(excl\. PB1\)/ }))
+    const drawer = await screen.findByRole('dialog', { name: 'Revenue · Hari ini' })
+    expect(within(drawer).getByText(/^Semua outlet · .* · Semua jam$/)).toBeInTheDocument()
+    expect(await within(drawer).findByText('Revenue (excl. PB1)')).toBeInTheDocument()
+    expect(within(drawer).getByText('Rp 12.450.000')).toBeInTheDocument()
+    expect(within(drawer).getByText('▲ 8% vs kemarin')).toBeInTheDocument()
+    expect(within(drawer).getByText('rata-rata Rp 114.220')).toBeInTheDocument()
+    const perOutlet = within(drawer).getByRole('region', { name: 'Per outlet' })
+    expect(within(perOutlet).getByText('Rp 3.410.000 · 30 order')).toBeInTheDocument()
+    expect(within(drawer).getByText('#A-1036 · Meja 4')).toBeInTheDocument()
+    expect(within(drawer).getByText('12.41 · WhatsApp meja (QR) · Bandung – Dago')).toBeInTheDocument()
+    expect(within(drawer).getByText('#R-0412 · Takeaway')).toBeInTheDocument()
+    expect(within(drawer).getByText('Menampilkan 2 dari 109')).toBeInTheDocument()
+
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Muat lagi' }))
+    expect(await within(drawer).findByText('#R-0411 · Takeaway')).toBeInTheDocument()
+    expect(within(drawer).queryByRole('button', { name: 'Muat lagi' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Cash 38' }))
+    await waitFor(() => expect(within(drawer).queryByText('#A-1036 · Meja 4')).not.toBeInTheDocument())
+    expect(within(drawer).getByText('Menampilkan 1 dari 38')).toBeInTheDocument()
+    expect(within(drawer).getByRole('button', { name: 'Semua 109' })).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Semua 109' }))
+    await userEvent.click(await within(drawer).findByText('#A-1036 · Meja 4'))
+    expect(await within(drawer).findByRole('heading', { name: /^#A-1036 · Dine-in · Meja 4/ })).toBeInTheDocument()
+    await userEvent.click(within(drawer).getByRole('button', { name: '← Kembali' }))
+    expect(await within(drawer).findByText('Menampilkan 3 dari 109')).toBeInTheDocument() // the loaded page stays
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('opens the Order tile, a bar of Order per jam, and an Item terlaris row with their filters', async () => {
+    const api = fakeApi({
+      'GET /owner/dashboard?period=today&hours=busy': summary({ hours: 'busy' }),
+      'GET /owner/dashboard?period=today&hours=all': summary(),
+      'GET /owner/dashboard/orders?period=today&hours=busy&limit=30': orders(),
+      'GET /owner/dashboard/orders?period=today&hours=all&hour=12&limit=30': orders({ summary: { orders: 14, revenue_excl_pb1: 1600000, cash_count: 4, qris_count: 10 } }),
+      'GET /owner/dashboard/top-items?period=day': TODAY,
+      'GET /owner/dashboard/top-items?period=month': TODAY,
+      'GET /owner/dashboard/orders?period=month&hours=all&product_id=p-kopi&limit=30': orders({
+        item: { product_id: 'p-kopi', name: 'Es Kopi Susu Senja', quantity: 42, revenue: 1050000 },
+      }),
+    })
+    renderO2(api)
+    await userEvent.click(await screen.findByRole('button', { name: 'Jam ramai' }))
+    await userEvent.click(await screen.findByRole('button', { name: /^Order\s*109/ }))
+    let drawer = await screen.findByRole('dialog', { name: 'Order · Hari ini' })
+    expect(within(drawer).getByText(/· Jam ramai$/)).toBeInTheDocument()
+    expect(await within(drawer).findByText('revenue excl. PB1')).toBeInTheDocument()
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Tutup' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Semua jam' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Lihat order jam 12:00' }))
+    drawer = await screen.findByRole('dialog', { name: 'Order · jam 12.00–12.59 · Hari ini' })
+    expect(await within(drawer).findByRole('button', { name: 'Semua 14' })).toBeInTheDocument()
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Tutup drawer' }))
+
+    const card = screen.getByRole('region', { name: 'Item terlaris' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Bulan ini' }))
+    await userEvent.click(await within(card).findByRole('button', { name: 'Es Kopi Susu Senja' }))
+    drawer = await screen.findByRole('dialog', { name: 'Es Kopi Susu Senja · Bulan ini' })
+    expect(await within(drawer).findByText('Terjual')).toBeInTheDocument()
+    expect(within(drawer).getByText('42')).toBeInTheDocument()
+    expect(within(drawer).getByText('dari 109 order')).toBeInTheDocument()
+    await waitFor(() => expect(api.calls.map((c) => c[1]).filter((u) => u.startsWith('/owner/dashboard/orders'))).toEqual([
+      '/owner/dashboard/orders?period=today&hours=busy&limit=30',
+      '/owner/dashboard/orders?period=today&hours=all&hour=12&limit=30',
+      '/owner/dashboard/orders?period=month&hours=all&product_id=p-kopi&limit=30',
+    ]))
+  })
+
+  it('searches by order number and shows the empty state', async () => {
+    const api = fakeApi({
+      'GET /owner/dashboard?period=today&hours=all': summary(),
+      [`GET ${DRAWER_TODAY}`]: orders(),
+      'GET /owner/dashboard/orders?period=today&hours=all&q=9999&limit=30': orders({ orders: [], next_cursor: null }),
+    })
+    renderO2(api)
+    await userEvent.click(await screen.findByRole('button', { name: /Revenue hari ini/ }))
+    const drawer = await screen.findByRole('dialog', { name: 'Revenue · Hari ini' })
+    await userEvent.type(await within(drawer).findByLabelText('Cari no. order'), '9999')
+    expect(await within(drawer).findByText('Belum ada order di periode ini.')).toBeInTheDocument()
+    expect(within(drawer).getByText('Rp 12.450.000')).toBeInTheDocument() // the summary ignores the search
+  })
+})
+
+describe('O2 Dashboard · Rentang', () => {
+  it('sends a custom range and labels the tiles with it', async () => {
+    const ranged = summary({ period: 'range', from: '2026-11-01', to: '2026-11-17', kpis: { ...summary().kpis, change_pct: 12 } })
+    const api = fakeApi({
+      'GET /owner/dashboard?period=today&hours=all': summary(),
+      'GET /owner/dashboard?period=range&from=2026-11-01&to=2026-11-17&hours=all': ranged,
+      'GET /owner/dashboard/orders?period=range&from=2026-11-01&to=2026-11-17&hours=all&limit=30': orders({ period: 'range' }),
+    })
+    renderO2(api)
+    await screen.findByText('▲ 8% vs kemarin')
+    const group = screen.getByRole('group', { name: 'Periode' })
+    await userEvent.click(within(group).getByRole('button', { name: 'Rentang ▾' }))
+    await userEvent.type(screen.getByLabelText('Dari tanggal'), '2026-11-01')
+    await userEvent.type(screen.getByLabelText('Sampai tanggal'), '2026-11-17')
+    await userEvent.click(screen.getByRole('button', { name: 'Terapkan' }))
+    expect(await screen.findByText('Revenue 1–17 Nov (excl. PB1)')).toBeInTheDocument()
+    expect(screen.getByText('▲ 12% vs periode sebelumnya')).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: '1–17 Nov ▾' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(group).getByRole('button', { name: 'Hari ini' })).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(screen.getByRole('button', { name: /Revenue 1–17 Nov/ }))
+    const drawer = await screen.findByRole('dialog', { name: 'Revenue · 1–17 Nov' })
+    expect(within(drawer).getByText('Semua outlet · 1–17 Nov 2026 · Semua jam')).toBeInTheDocument()
+  })
+
+  it('refuses a range longer than 92 days', async () => {
+    renderO2(fakeApi({ 'GET /owner/dashboard?period=today&hours=all': summary() }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Rentang ▾' }))
+    await userEvent.type(screen.getByLabelText('Dari tanggal'), '2026-01-01')
+    await userEvent.type(screen.getByLabelText('Sampai tanggal'), '2026-06-30')
+    expect(screen.getByText('Maksimal 92 hari.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Terapkan' })).toBeDisabled()
   })
 })

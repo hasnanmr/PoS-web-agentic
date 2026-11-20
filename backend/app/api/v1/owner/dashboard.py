@@ -5,12 +5,12 @@ Contract: docs/architecture/screen-endpoint-map.md → O2.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from app import db
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/v1/owner", tags=["owner: dashboard"])
 
 
 class TopItem(BaseModel):
+    product_id: UUID
     name: str
     quantity_sold: int
     revenue: int = Field(
@@ -100,8 +101,57 @@ class MethodTotal(BaseModel):
     transactions: int
 
 
+class DrillSummary(BaseModel):
+    orders: int
+    revenue_excl_pb1: int = Field(description="Sum of order subtotals, excl. PB1 and delivery")
+    cash_count: int
+    qris_count: int
+
+
+class DrillItem(BaseModel):
+    product_id: UUID
+    name: str
+    quantity: int
+    revenue: int = Field(description="Sum of the item's line totals incl. add-ons, excl. PB1")
+
+
+class DrillOutlet(BaseModel):
+    outlet_id: UUID
+    name: str
+    orders: int
+    revenue_excl_pb1: int
+
+
+class DrillOrder(BaseModel):
+    id: UUID
+    order_no: str
+    outlet_id: UUID
+    outlet: str
+    timezone: str
+    created_at: datetime
+    channel: dashboard.OrderChannel
+    type: Literal["dine_in", "takeaway", "delivery", "pickup"]
+    table: str | None
+    customer_name: str | None
+    payment_method: dashboard.PaymentMethod | None
+    item_summary: str
+    revenue_excl_pb1: int = Field(description="Order subtotal, excl. PB1 and delivery fee")
+    total: int
+
+
+class DashboardOrders(BaseModel):
+    period: dashboard.OrdersPeriod
+    summary: DrillSummary
+    item: DrillItem | None
+    by_outlet: list[DrillOutlet]
+    orders: list[DrillOrder]
+    next_cursor: str | None
+
+
 class Dashboard(BaseModel):
     period: dashboard.DashboardPeriod
+    from_: date = Field(alias="from", description="First day used (first selected outlet)")
+    to: date = Field(description="Last day used (first selected outlet)")
     hours: dashboard.HoursFilter
     as_of: datetime
     kpis: Kpis
@@ -113,6 +163,8 @@ class Dashboard(BaseModel):
     low_stock: list[LowStock]
     channel_mix: list[ChannelShare]
     payment_methods: list[MethodTotal]
+
+    model_config = {"populate_by_name": True}
 
 
 def _pool(request: Request) -> Any:
@@ -126,14 +178,24 @@ async def summary(
     outlet_id: UUID | None = None,
     period: dashboard.DashboardPeriod = "today",
     hours: dashboard.HoursFilter = "all",
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
 ) -> Dashboard:
     """O2 tab Ringkasan: KPI tiles, peta keramaian, keramaian outlet sekarang, order per jam,
     stok rendah & sold out, komposisi per kanal, and metode bayar. The busyness map, current
-    crowd, and low stock ignore `period` and `hours`."""
+    crowd, and low stock ignore `period` and `hours`. `period=range` ("Rentang") needs `from`
+    and `to` (at most 92 days, `to` not after today)."""
     async with db.transaction(_pool(request), user.actor()) as conn:
         if outlet_id:
             await outlets.require_outlet(conn, outlet_id)
-        body = await dashboard.summary(conn, outlet_id=outlet_id, period=period, hours=hours)
+        body = await dashboard.summary(
+            conn,
+            outlet_id=outlet_id,
+            period=period,
+            hours=hours,
+            date_from=date_from,
+            date_to=date_to,
+        )
     return Dashboard(**body)
 
 
@@ -150,3 +212,46 @@ async def top_items(
             await outlets.require_outlet(conn, outlet_id)
         rows = await dashboard.top_items(conn, outlet_id=outlet_id, period=period)
     return TopItems(period=period, top_items=[TopItem(**r) for r in rows])
+
+
+@router.get("/dashboard/orders")
+async def drill_orders(
+    request: Request,
+    user: OwnerOnly,
+    outlet_id: UUID | None = None,
+    period: dashboard.OrdersPeriod = "today",
+    hours: dashboard.HoursFilter = "all",
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
+    hour: Annotated[int | None, Query(ge=0, le=23)] = None,
+    product_id: UUID | None = None,
+    method: dashboard.PaymentMethod | None = None,
+    channel: dashboard.OrderChannel | None = None,
+    q: Annotated[str | None, Query(max_length=40)] = None,
+    cursor: str | None = None,
+    limit: Annotated[
+        int, Query(ge=1, le=dashboard.ORDERS_LIMIT_MAX)
+    ] = dashboard.ORDERS_LIMIT_DEFAULT,
+) -> DashboardOrders:
+    """O2b drawer: the paid orders behind the Revenue / Order tile, an Order per jam bar
+    (`hour`), or an Item terlaris row (`product_id`). `summary`, `by_outlet`, and `item` ignore
+    the chip (`method`), Kanal (`channel`), and search (`q`); the list applies every filter."""
+    async with db.transaction(_pool(request), user.actor()) as conn:
+        if outlet_id:
+            await outlets.require_outlet(conn, outlet_id)
+        body = await dashboard.drill_orders(
+            conn,
+            outlet_id=outlet_id,
+            period=period,
+            hours=hours,
+            date_from=date_from,
+            date_to=date_to,
+            hour=hour,
+            product_id=product_id,
+            method=method,
+            channel=channel,
+            q=q,
+            cursor=cursor,
+            limit=limit,
+        )
+    return DashboardOrders(**body)

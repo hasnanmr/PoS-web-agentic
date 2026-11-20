@@ -510,6 +510,7 @@ export interface QrisStatus {
 export type TopItemsPeriod = 'day' | 'month' | 'year'
 
 export interface TopItem {
+  product_id: string
   name: string
   quantity_sold: number
   revenue: number
@@ -544,7 +545,7 @@ export interface AuditPage {
 }
 
 // O2 tab Ringkasan — GET /owner/dashboard (T-071, T-123) ---------------------------------
-export type DashboardPeriod = 'today' | 'week' | 'month'
+export type DashboardPeriod = 'today' | 'week' | 'month' | 'range'
 export type HoursFilter = 'all' | 'busy' | 'quiet'
 export type CrowdLevel = 'ramai' | 'normal' | 'sepi'
 
@@ -567,6 +568,9 @@ export interface HourSummary {
 
 export interface DashboardSummary {
   period: DashboardPeriod
+  /** The days used (first selected outlet's zone), "YYYY-MM-DD". */
+  from: string
+  to: string
   hours: HoursFilter
   as_of: string
   kpis: DashboardKpis
@@ -595,6 +599,35 @@ export interface DashboardSummary {
   }[]
   channel_mix: { channel: 'whatsapp_online' | 'whatsapp_table' | 'counter'; orders: number; share_pct: number }[]
   payment_methods: { method: 'cash' | 'qris'; amount: number; transactions: number }[]
+}
+
+// O2b drawer detail Revenue / Order — GET /owner/dashboard/orders ------------------------
+export type DrillPeriod = DashboardPeriod | 'year'
+
+export interface DashboardOrderRow {
+  id: string
+  order_no: string
+  outlet_id: string
+  outlet: string
+  timezone: string
+  created_at: string
+  channel: OrderCard['channel']
+  type: OrderCard['type']
+  table: string | null
+  customer_name: string | null
+  payment_method: 'cash' | 'qris' | null
+  item_summary: string
+  revenue_excl_pb1: number
+  total: number
+}
+
+export interface DashboardOrders {
+  period: DrillPeriod
+  summary: { orders: number; revenue_excl_pb1: number; cash_count: number; qris_count: number }
+  item: { product_id: string; name: string; quantity: number; revenue: number } | null
+  by_outlet: { outlet_id: string; name: string; orders: number; revenue_excl_pb1: number }[]
+  orders: DashboardOrderRow[]
+  next_cursor: string | null
 }
 
 // Purchase orders — Dashboard tab "PO & Supplier" (O15–O17), O16/S12, S10, S11 -----------

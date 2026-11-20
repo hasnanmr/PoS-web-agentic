@@ -3,13 +3,13 @@
 // Endpoint: GET /owner/dashboard?outlet_id=&period=today|week|month&hours=all|busy|quiet
 // (docs/architecture/screen-endpoint-map.md → O2). The map, current crowd, and low stock ignore
 // the header period and hours; "Item terlaris" is its own card (DashboardPage).
+// The Revenue and Order tiles and each bar of "Order per jam" open the O2b drawer (OrdersDrawer).
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { circularHours, formatNumber, formatQty, formatRupiah, formatTime, hourRanges, WEEKDAYS, ZONE_LABEL } from '../../lib/format'
-import type { CrowdLevel, DashboardPeriod, DashboardSummary, HourSummary } from '../../lib/types'
+import type { CrowdLevel, DashboardSummary, HourSummary } from '../../lib/types'
+import { periodWord, revenueChange } from './period'
 
-const PERIOD_WORD: Record<DashboardPeriod, string> = { today: 'hari ini', week: 'minggu ini', month: 'bulan ini' }
-const PREVIOUS: Record<DashboardPeriod, string> = { today: 'kemarin', week: 'minggu lalu', month: 'bulan lalu' }
 
 // Wireframe colours: map scale light → peak, the channel/method bars, and the crowd badges.
 const MAP_SCALE = ['bg-[#E8EFFB]', 'bg-[#B9CDF0]', 'bg-[#5F86CF]', 'bg-primary', 'bg-accent-orange']
@@ -46,34 +46,44 @@ function Panel({ title, subtitle, actions, children, className = '', id }: {
   )
 }
 
-export function KpiTiles({ data }: { data: DashboardSummary }) {
+export function KpiTiles({ data, onOpen }: { data: DashboardSummary; onOpen: (kind: 'revenue' | 'orders') => void }) {
   const k = data.kpis
-  const change = k.change_pct
   const tiles = [
-    { label: 'Order', value: formatNumber(k.orders), note: `${formatNumber(k.cash_count)} cash · ${formatNumber(k.qris_count)} QRIS`, accent: 'bg-primary' },
+    { label: 'Order', value: formatNumber(k.orders), note: `${formatNumber(k.cash_count)} cash · ${formatNumber(k.qris_count)} QRIS`, accent: 'bg-primary', open: true },
     { label: 'PB1 terkumpul', value: formatRupiah(k.pb1_collected), note: 'Terpisah dari revenue', accent: 'bg-[#CFD4DA]' },
     { label: 'Delivery fee', value: formatRupiah(k.delivery_fee), note: `${formatNumber(k.delivery_orders)} order delivery`, accent: 'bg-[#CFD4DA]' },
   ]
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div className="rounded-lg bg-primary px-4 py-3.5 text-white">
-        <p className="text-[12px] text-[#DCE7FA]">Revenue {PERIOD_WORD[data.period]} (excl. PB1)</p>
-        <p className="mt-1 text-[20px] font-bold">{formatRupiah(k.revenue_excl_pb1)}</p>
-        <p className="mt-0.5 text-[11px] text-[#DCE7FA]">
-          {change === null ? `Belum ada data ${PREVIOUS[data.period]}`
-            : `${change < 0 ? '▼' : '▲'} ${Math.abs(change)}% vs ${PREVIOUS[data.period]}`}
-        </p>
-      </div>
-      {tiles.map((t) => (
-        <div key={t.label} className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3.5">
-          <span aria-hidden="true" className={`h-14 w-1 shrink-0 rounded ${t.accent}`} />
-          <div className="min-w-0">
-            <p className="text-[12px] text-text-muted">{t.label}</p>
-            <p className="mt-1 text-[20px] font-bold text-text">{t.value}</p>
-            <p className="mt-0.5 text-[11px] text-text-muted">{t.note}</p>
-          </div>
-        </div>
-      ))}
+      <button type="button" onClick={() => onOpen('revenue')} title="Lihat detail revenue"
+        className="flex items-center justify-between gap-2 rounded-lg bg-primary px-4 py-3.5 text-left text-white transition hover:bg-[#1A4590] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+        <span className="min-w-0">
+          <span className="block text-[12px] text-[#DCE7FA]">Revenue {periodWord(data)} (excl. PB1)</span>
+          <span className="mt-1 block text-[20px] font-bold">{formatRupiah(k.revenue_excl_pb1)}</span>
+          <span className="mt-0.5 block text-[11px] text-[#DCE7FA]">{revenueChange(data)}</span>
+        </span>
+        <span aria-hidden="true" className="text-[22px] font-semibold text-[#DCE7FA]">›</span>
+      </button>
+      {tiles.map((t) => {
+        const body = (
+          <>
+            <span aria-hidden="true" className={`h-14 w-1 shrink-0 rounded ${t.accent}`} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12px] text-text-muted">{t.label}</span>
+              <span className="mt-1 block text-[20px] font-bold text-text">{t.value}</span>
+              <span className="mt-0.5 block text-[11px] text-text-muted">{t.note}</span>
+            </span>
+          </>
+        )
+        const box = 'flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3.5'
+        return t.open ? (
+          <button key={t.label} type="button" onClick={() => onOpen('orders')} title="Lihat daftar order"
+            className={`${box} text-left transition hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}>
+            {body}
+            <span aria-hidden="true" className="text-[22px] font-semibold text-text-muted">›</span>
+          </button>
+        ) : <div key={t.label} className={box}>{body}</div>
+      })}
     </div>
   )
 }
@@ -171,12 +181,12 @@ function summaryLine(label: string, s: HourSummary): string {
   return s.hours.length ? `${label} ${hourRanges(s.hours)} · ${s.orders} order (${s.share_pct}%)` : `Belum ada ${label.toLowerCase()}`
 }
 
-export function OrdersPerHour({ data }: { data: DashboardSummary }) {
+export function OrdersPerHour({ data, onHour }: { data: DashboardSummary; onHour: (hour: number) => void }) {
   const series = data.orders_per_hour
   const max = Math.max(1, ...series.map((s) => s.orders))
   const peak = Math.max(0, ...series.map((s) => s.orders))
   return (
-    <Panel id="o2-hours" title={`Order per jam · ${PERIOD_WORD[data.period]}`} subtitle="Ramai ≥ 130% rata-rata per jam · sepi ≤ 60%">
+    <Panel id="o2-hours" title={`Order per jam · ${periodWord(data)}`} subtitle="Ramai ≥ 130% rata-rata per jam · sepi ≤ 60% · klik bar untuk daftar order">
       {series.length === 0 ? (
         <p className="py-8 text-center text-[13px] text-text-muted">Belum ada order di periode ini.</p>
       ) : (
@@ -184,12 +194,16 @@ export function OrdersPerHour({ data }: { data: DashboardSummary }) {
           <div className="flex h-[180px] items-end gap-1 border-b border-border" role="list" aria-label="Order per jam">
             {series.map((s) => (
               <div key={s.hour} role="listitem" aria-label={`${pad(s.hour)}:00 ${s.orders} order${s.mark === 'busy' ? ', jam ramai' : s.mark === 'quiet' ? ', jam sepi' : ''}`}
-                className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
-                {s.orders === peak && peak > 0 && (
-                  <span className={`text-[10px] font-semibold ${s.mark === 'busy' ? 'text-[#9A3412]' : 'text-text-muted'}`}>{s.orders}</span>
-                )}
-                <div className={`w-full max-w-[15px] rounded-t-sm ${s.mark === 'busy' ? 'bg-accent-orange' : s.mark === 'quiet' ? 'bg-[#B9CDF0]' : 'bg-primary'}`}
-                  style={{ height: `${(s.orders / max) * 150}px` }} />
+                className="h-full min-w-0 flex-1">
+                <button type="button" disabled={s.orders === 0} onClick={() => onHour(s.hour)}
+                  aria-label={`Lihat order jam ${pad(s.hour)}:00`} title={`${pad(s.hour)}:00 · ${s.orders} order`}
+                  className="group flex h-full w-full flex-col items-center justify-end rounded-t-sm enabled:hover:bg-primary-soft/60 disabled:cursor-default">
+                  {s.orders === peak && peak > 0 && (
+                    <span className={`text-[10px] font-semibold ${s.mark === 'busy' ? 'text-[#9A3412]' : 'text-text-muted'}`}>{s.orders}</span>
+                  )}
+                  <span className={`block w-full max-w-[15px] rounded-t-sm group-enabled:group-hover:opacity-80 ${s.mark === 'busy' ? 'bg-accent-orange' : s.mark === 'quiet' ? 'bg-[#B9CDF0]' : 'bg-primary'}`}
+                    style={{ height: `${(s.orders / max) * 150}px` }} />
+                </button>
               </div>
             ))}
           </div>
@@ -254,7 +268,7 @@ function StackedBar({ parts, label }: { parts: number[]; label: string }) {
 export function ChannelsAndMethods({ data }: { data: DashboardSummary }) {
   const methods = data.payment_methods
   return (
-    <Panel id="o2-channels" title="Komposisi per kanal" subtitle={`${formatNumber(data.kpis.orders)} order ${PERIOD_WORD[data.period]}`}
+    <Panel id="o2-channels" title="Komposisi per kanal" subtitle={`${formatNumber(data.kpis.orders)} order ${periodWord(data)}`}
       className="flex flex-col">
       <StackedBar parts={data.channel_mix.map((c) => c.orders)} label="Komposisi per kanal" />
       <ul className="mt-3 space-y-2 text-[12px]">

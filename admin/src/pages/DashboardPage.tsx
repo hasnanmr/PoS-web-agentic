@@ -9,18 +9,24 @@
 //   ini, default Hari ini) and follows only the header outlet filter; top 5 by quantity sold (ties:
 //   higher revenue); paid orders only; revenue excl. PB1 and delivery fee; empty → "Belum ada item
 //   terjual di periode ini."
+//   Header "Rentang ▾" (period=range&from=&to=): a custom range of at most 92 days up to today.
+// - O2b drawer (./dashboard/OrdersDrawer, GET /owner/dashboard/orders): opened by the Revenue and
+//   Order tiles, a bar of "Order per jam", or a row of "Item terlaris".
 // - Tab PO & Supplier (O17 cards + O15 list/detail, ./po/PoTab): its own outlet + month filter,
 //   Daftar supplier, + Buka PO (O16, ./po/PoForm, breadcrumb "Dashboard › PO & Supplier").
 // The tab and the O16 view live in the URL (?tab=po, ?tab=po&view=new) so they can be linked.
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatNumber, formatRupiah, todayIn } from '../lib/format'
-import type { DashboardPeriod, DashboardSummary, HoursFilter, TopItems, TopItemsPeriod } from '../lib/types'
+import type { DashboardPeriod, DashboardSummary, DrillPeriod, HoursFilter, TopItem, TopItems, TopItemsPeriod } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Loading, Select } from '../ui/kit'
+import { RangePicker } from '../ui/RangePicker'
+import { OrdersDrawer, type Drill } from './dashboard/OrdersDrawer'
+import { MAX_RANGE_DAYS, revenueChange, type DayRange } from './dashboard/period'
 import { BusynessMap, ChannelsAndMethods, CurrentCrowd, KpiTiles, LowStock, OrdersPerHour } from './dashboard/Summary'
 import { SupplierDialog } from './po/dialogs'
 import { PoForm } from './po/PoForm'
@@ -32,6 +38,8 @@ const PERIODS: { key: TopItemsPeriod; label: string }[] = [
   { key: 'month', label: 'Bulan ini' },
   { key: 'year', label: 'Tahun ini' },
 ]
+
+const ITEM_PERIOD: Record<TopItemsPeriod, DrillPeriod> = { day: 'today', month: 'month', year: 'year' }
 
 const HEADER_PERIODS: { key: DashboardPeriod; label: string }[] = [
   { key: 'today', label: 'Hari ini' },
@@ -45,20 +53,25 @@ const HOURS: { key: HoursFilter; label: string }[] = [
 ]
 
 /** Header toggle (O2 "Hari ini | Minggu | Bulan", "Semua jam | Jam ramai | Jam sepi"). */
-function Segmented<T extends string>({ label, options, value, onChange }: {
+const segment = (on: boolean) =>
+  `h-full rounded px-2.5 ${on ? 'border border-primary bg-surface font-semibold text-primary' : 'text-[#444444]'}`
+
+/** Header toggle (O2 "Hari ini | Minggu | Bulan | Rentang ▾", "Semua jam | Jam ramai | Jam sepi"). */
+function Segmented<T extends string>({ label, options, value, onChange, children }: {
   label: string
   options: { key: T; label: string }[]
   value: T
   onChange: (v: T) => void
+  children?: ReactNode
 }) {
   return (
     <div role="group" aria-label={label} className="flex h-8 rounded-md border border-border bg-[#EEF2F8] p-0.5 text-[12px]">
       {options.map((o) => (
-        <button key={o.key} type="button" aria-pressed={value === o.key} onClick={() => onChange(o.key)}
-          className={`rounded px-2.5 ${value === o.key ? 'border border-primary bg-surface font-semibold text-primary' : 'text-[#444444]'}`}>
+        <button key={o.key} type="button" aria-pressed={value === o.key} onClick={() => onChange(o.key)} className={segment(value === o.key)}>
           {o.label}
         </button>
       ))}
+      {children}
     </div>
   )
 }
@@ -70,7 +83,9 @@ export default function DashboardPage() {
   const creating = tab === 'po' && search.get('view') === 'new'
   const [outletId, setOutletId] = useState('')
   const [period, setPeriod] = useState<DashboardPeriod>('today')
+  const [range, setRange] = useState<DayRange>()
   const [hours, setHours] = useState<HoursFilter>('all')
+  const [drill, setDrill] = useState<Drill>()
   const [poOutletId, setPoOutletId] = useState('')
   const tz = me.outlets.find((o) => o.id === poOutletId)?.timezone ?? 'Asia/Jakarta'
   const currentMonth = todayIn(tz).slice(0, 7)
@@ -150,27 +165,44 @@ export default function DashboardPage() {
       <PageHeader title="Dashboard" tabs={tabs} actions={
         <div className="flex flex-wrap items-center gap-2">
           {outletSelect(outletId, setOutletId)}
-          <Segmented label="Periode" options={HEADER_PERIODS} value={period} onChange={setPeriod} />
+          <Segmented label="Periode" options={HEADER_PERIODS} value={period} onChange={setPeriod}>
+            <RangePicker label="Rentang" withYear={false} align="right" pressed={period === 'range'}
+              value={period === 'range' ? range : undefined} buttonClassName={segment(period === 'range')}
+              max={todayIn(me.outlets.find((o) => o.id === outletId)?.timezone ?? 'Asia/Jakarta')} maxDays={MAX_RANGE_DAYS}
+              onChange={(r) => {
+                setRange(r)
+                setPeriod('range')
+              }} />
+          </Segmented>
           <Segmented label="Jam" options={HOURS} value={hours} onChange={setHours} />
         </div>
       } />
       <div className="space-y-4 p-4 md:p-6">
-        <SummaryCards outletId={outletId} period={period} hours={hours}
-          outletCount={outletId ? 1 : me.outlets.length} />
-        <TopItemsCard outletId={outletId} />
+        <SummaryCards outletId={outletId} period={period} range={range} hours={hours}
+          outletCount={outletId ? 1 : me.outlets.length} onDrill={setDrill} />
+        <TopItemsCard outletId={outletId}
+          onItem={(item, p) => setDrill({ kind: 'item', outletId, period: ITEM_PERIOD[p], hours: 'all', item })} />
       </div>
+      {drill && <OrdersDrawer drill={drill} outletCount={me.outlets.length} onClose={() => setDrill(undefined)} />}
     </>
   )
 }
 
-function SummaryCards({ outletId, period, hours, outletCount }: {
+function SummaryCards({ outletId, period, range, hours, outletCount, onDrill }: {
   outletId: string
   period: DashboardPeriod
+  range: DayRange | undefined
   hours: HoursFilter
   outletCount: number
+  onDrill: (drill: Drill) => void
 }) {
   const { api } = useSession()
-  const params = new URLSearchParams({ period, hours })
+  const params = new URLSearchParams({ period })
+  if (period === 'range' && range) {
+    params.set('from', range.from)
+    params.set('to', range.to)
+  }
+  params.set('hours', hours)
   if (outletId) params.set('outlet_id', outletId)
   const query = params.toString()
   const result = useLoad(() => api.get<DashboardSummary>(`/owner/dashboard?${query}`), query)
@@ -180,13 +212,13 @@ function SummaryCards({ outletId, period, hours, outletCount }: {
   return (
     <>
       {result.error ? <Alert>Ringkasan belum bisa dimuat: {errorMessage(result.error)}</Alert> : null}
-      <KpiTiles data={data} />
+      <KpiTiles data={data} onOpen={(kind) => onDrill({ kind, outletId, period, range, hours, change: revenueChange(data) })} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[640fr_356fr]">
         <BusynessMap data={data} />
         <CurrentCrowd data={data} />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <OrdersPerHour data={data} />
+        <OrdersPerHour data={data} onHour={(hour) => onDrill({ kind: 'hour', outletId, period, range, hours: 'all', hour })} />
         <LowStock data={data} outletCount={outletCount} />
         <ChannelsAndMethods data={data} />
       </div>
@@ -194,7 +226,7 @@ function SummaryCards({ outletId, period, hours, outletCount }: {
   )
 }
 
-function TopItemsCard({ outletId }: { outletId: string }) {
+function TopItemsCard({ outletId, onItem }: { outletId: string; onItem: (item: TopItem, period: TopItemsPeriod) => void }) {
   const { api } = useSession()
   const [period, setPeriod] = useState<TopItemsPeriod>('day')
   const params = new URLSearchParams({ period })
@@ -209,7 +241,7 @@ function TopItemsCard({ outletId }: { outletId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 id="top-items-title" className="text-[14px] font-bold text-text">Item terlaris</h2>
-          <p className="mt-0.5 text-[11px] text-text-muted">Top 5 menurut jumlah terjual · ikut filter outlet</p>
+          <p className="mt-0.5 text-[11px] text-text-muted">Top 5 menurut jumlah terjual · ikut filter outlet · klik item untuk daftar order</p>
         </div>
         <div role="group" aria-label="Periode item terlaris" className="flex rounded-md bg-[#EEF2F8] p-0.5 text-[12px]">
           {PERIODS.map((p) => (
@@ -241,9 +273,13 @@ function TopItemsCard({ outletId }: { outletId: string }) {
           </thead>
           <tbody>
             {items.map((item, i) => (
-              <tr key={`${i}-${item.name}`} className="border-b border-border last:border-0">
+              <tr key={`${i}-${item.product_id}`} onClick={() => onItem(item, period)}
+                className="cursor-pointer border-b border-border last:border-0 hover:bg-page">
                 <td className="py-2 font-semibold text-text-muted">{i + 1}</td>
-                <td className="py-2 font-semibold text-text">{item.name}</td>
+                <td className="py-2 font-semibold text-text">
+                  <button type="button" className="text-left hover:text-primary hover:underline"
+                    onClick={(e) => { e.stopPropagation(); onItem(item, period) }}>{item.name}</button>
+                </td>
                 <td className="hidden w-[180px] py-2 sm:table-cell">
                   <div className="h-2 rounded bg-primary-soft">
                     <div className="h-2 rounded bg-primary" style={{ width: `${(item.quantity_sold / maxQty) * 100}%` }} />

@@ -24,6 +24,8 @@ What counts (one time basis for every card, product owner decision 2026-11-20):
 
 from __future__ import annotations
 
+import base64
+import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -34,6 +36,10 @@ from zoneinfo import ZoneInfo
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
+from app.core.errors import NotFoundError, ValidationFailedError
+from app.core.orders import _items as order_items
+from app.core.orders import _summary as item_summary
+from app.core.orders import order_label
 from app.core.reports import change_pct, previous_period
 from app.core.stock import stock_status
 
@@ -45,7 +51,8 @@ TOP_ITEMS_LIMIT = 5
 # Add-on variants are grouped under their menu item; `line_total` already includes add-ons
 # and excludes PB1 and the delivery fee.
 _TOP_ITEMS_SQL = """
-select p.name, sum(oi.quantity)::int as quantity_sold, sum(oi.line_total)::bigint as revenue
+select p.id as product_id, p.name, sum(oi.quantity)::int as quantity_sold,
+       sum(oi.line_total)::bigint as revenue
 from app.order_items oi
 join app.orders o on o.id = oi.order_id and o.outlet_id = oi.outlet_id
 join app.outlets ol on ol.id = o.outlet_id
@@ -56,7 +63,7 @@ where o.payment_status = 'paid'
   and o.created_at >= (
     date_trunc(%(unit)s, now() at time zone ol.timezone) at time zone ol.timezone
   )
-group by oi.product_id, p.name
+group by p.id, p.name
 order by quantity_sold desc, revenue desc, p.name
 limit %(limit)s
 """
@@ -76,7 +83,9 @@ async def top_items(
 
 # --- O2 tab Ringkasan: GET /owner/dashboard ------------------------------------------------
 
-DashboardPeriod = Literal["today", "week", "month"]
+DashboardPeriod = Literal["today", "week", "month", "range"]
+# O2b drill-down: the header periods plus "year" (an Item terlaris row with "Tahun ini").
+OrdersPeriod = Literal["today", "week", "month", "year", "range"]
 HoursFilter = Literal["all", "busy", "quiet"]
 CrowdLevel = Literal["ramai", "normal", "sepi"]
 
@@ -91,26 +100,64 @@ MAP_WEEKS = 4  # busyness map: average over the last 4 complete weeks
 # than 12 hours are left out, so a table nobody closed does not keep an outlet "Ramai" for days.
 ACTIVE_STATUSES = ("confirmed", "preparing", "ready", "out_for_delivery")
 ACTIVE_WINDOW = timedelta(hours=12)
+MAX_RANGE_DAYS = 92  # "Rentang": at most about three months, so the queries stay bounded
 
 
-def period_range(today: date, period: DashboardPeriod) -> tuple[date, date]:
-    """Today, this week (from Monday), or this month, up to and including today."""
+def period_range(
+    today: date, period: OrdersPeriod, custom: tuple[date, date] | None = None
+) -> tuple[date, date]:
+    """Today, this week (from Monday), this month, or this year, up to and including today;
+    or the custom range ("Rentang") as given."""
+    if period == "range":
+        if custom is None:  # check_range runs first
+            raise ValidationFailedError("from and to are required for period=range")
+        return custom
     if period == "week":
         return today - timedelta(days=today.weekday()), today
     if period == "month":
         return today.replace(day=1), today
+    if period == "year":
+        return today.replace(month=1, day=1), today
     return today, today
 
 
-def previous_range(today: date, period: DashboardPeriod) -> tuple[date, date]:
-    """What the revenue tile compares with: yesterday, the same days of last week, or the
-    same days of last month ("▲ 8% vs kemarin")."""
+def previous_range(
+    today: date, period: DashboardPeriod, custom: tuple[date, date] | None = None
+) -> tuple[date, date]:
+    """What the revenue tile compares with: yesterday, the same days of last week, the same
+    days of last month ("▲ 8% vs kemarin"), or for a custom range the O9 rule
+    (`previous_period`)."""
+    if period == "range":
+        return previous_period(*period_range(today, period, custom))
     if period == "week":
         start, end = period_range(today, period)
         return start - timedelta(days=7), end - timedelta(days=7)
     if period == "month":
         return previous_period(*period_range(today, period))
     return today - timedelta(days=1), today - timedelta(days=1)
+
+
+def check_range(
+    period: str, date_from: date | None, date_to: date | None, latest_today: date
+) -> tuple[date, date] | None:
+    """`period=range` needs `from` and `to`: from <= to, at most MAX_RANGE_DAYS days, and `to`
+    not after today (the latest outlet-local today among the selected outlets). Other
+    periods ignore both."""
+    if period != "range":
+        return None
+    if date_from is None:
+        raise ValidationFailedError("from is required for period=range", {"field": "from"})
+    if date_to is None:
+        raise ValidationFailedError("to is required for period=range", {"field": "to"})
+    if date_from > date_to:
+        raise ValidationFailedError("from must not be after to", {"field": "from"})
+    if date_to > latest_today:
+        raise ValidationFailedError("to must not be after today", {"field": "to"})
+    if (date_to - date_from).days + 1 > MAX_RANGE_DAYS:
+        raise ValidationFailedError(
+            f"a range covers at most {MAX_RANGE_DAYS} days", {"field": "from"}
+        )
+    return date_from, date_to
 
 
 def open_hours(rows: Iterable[Mapping[str, Any]]) -> dict[int, set[int]]:
@@ -485,26 +532,51 @@ async def _low_stock(conn: AsyncConnection, outlets: list[dict[str, Any]]) -> li
     return rows
 
 
+def _set_ranges(
+    outlets: list[dict[str, Any]],
+    period: OrdersPeriod,
+    date_from: date | None,
+    date_to: date | None,
+    now: datetime,
+) -> None:
+    """Each outlet's own today, current hour, and period range (validated for "range")."""
+    for o in outlets:
+        local = now.astimezone(ZoneInfo(o["timezone"]))
+        o["today"], o["now_hour"] = local.date(), local.hour
+    custom = check_range(period, date_from, date_to, max(o["today"] for o in outlets))
+    for o in outlets:
+        today = o["today"]
+        o["range"] = period_range(today, period, custom)
+        if period != "year":
+            o["prev_range"] = previous_range(today, period, custom)
+        o["map_range"] = (today - timedelta(weeks=MAP_WEEKS), today - timedelta(days=1))
+
+
+def _fallback_range(
+    period: OrdersPeriod, date_from: date | None, date_to: date | None, now: datetime
+) -> tuple[date, date]:
+    """The range shown when no outlet is selected (a business without active outlets): WIB."""
+    today = now.astimezone(ZoneInfo("Asia/Jakarta")).date()
+    return period_range(today, period, check_range(period, date_from, date_to, today))
+
+
 async def summary(
     conn: AsyncConnection,
     *,
     outlet_id: UUID | None,
     period: DashboardPeriod,
     hours: HoursFilter,
+    date_from: date | None = None,
+    date_to: date | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """O2 tab Ringkasan: every card except "Item terlaris" (its own endpoint)."""
     now = now or datetime.now(UTC)
     outlets = await _load_outlets(conn, outlet_id)
     if not outlets:
-        return _empty_summary(period, hours, now)
-    for o in outlets:
-        local = now.astimezone(ZoneInfo(o["timezone"]))
-        today = local.date()
-        o["today"], o["now_hour"] = today, local.hour
-        o["range"] = period_range(today, period)
-        o["prev_range"] = previous_range(today, period)
-        o["map_range"] = (today - timedelta(weeks=MAP_WEEKS), today - timedelta(days=1))
+        start, end = _fallback_range(period, date_from, date_to, now)
+        return {**_empty_summary(period, hours, now), "from": start, "to": end}
+    _set_ranges(outlets, period, date_from, date_to, now)
 
     series = await _orders_per_hour(conn, outlets, "range")
     hour_set = None if hours == "all" else [s["hour"] for s in series if s["mark"] == hours]
@@ -513,6 +585,8 @@ async def summary(
     k, pk = cur["kpis"], prev["kpis"]
     return {
         "period": period,
+        "from": outlets[0]["range"][0],
+        "to": outlets[0]["range"][1],
         "hours": hours,
         "as_of": now,
         "kpis": {
@@ -565,4 +639,204 @@ def _empty_summary(period: str, hours: str, now: datetime) -> dict[str, Any]:
         "payment_methods": [
             {"method": m, "amount": 0, "transactions": 0} for m in ("cash", "qris")
         ],
+    }
+
+
+# --- O2b drawer detail Revenue / Order: GET /owner/dashboard/orders -------------------------
+
+# web_table: the table QR web page (#44); channel_mix on O2 does not split it out yet.
+OrderChannel = Literal["whatsapp_online", "whatsapp_table", "web_table", "counter"]
+PaymentMethod = Literal["cash", "qris"]
+ORDERS_LIMIT_DEFAULT = 30
+ORDERS_LIMIT_MAX = 100
+_ORDER_NO = re.compile(r"#?\s*(?:([A-Za-z]+)\s*-?\s*)?(\d+)")
+
+# The paid orders behind an O2 figure: same basis as the KPI tiles (outlet-local creation
+# time; payment method of the order or, for an open-bill order, of its bill).
+_SCOPE = f"""
+select o.id, o.outlet_id, o.order_no, o.channel::text as channel, o.type::text as type,
+       o.subtotal, o.total, o.created_at, o.customer_name, ol.name as outlet, ol.timezone,
+       ol.order_prefix, t.name as table_name, b.guest_name,
+       coalesce(p.method, bp.method)::text as method
+from app.orders o
+join app.outlets ol on ol.id = o.outlet_id
+join {_RANGES} on r.outlet_id = o.outlet_id
+left join app.tables t on t.id = o.table_id
+left join app.bills b on b.id = o.bill_id
+left join app.payments p on p.order_id = o.id
+left join app.payments bp on bp.bill_id = o.bill_id
+where {_PAID} and {_LOCAL_DATE} between r.d_from and r.d_to
+  and (%(hours)s::int[] is null or {_LOCAL_HOUR} = any(%(hours)s::int[]))
+  and (%(hour)s::int is null or {_LOCAL_HOUR} = %(hour)s::int)
+  and (%(product)s::uuid is null or exists (
+    select 1 from app.order_items oi where oi.order_id = o.id and oi.product_id = %(product)s))
+"""  # noqa: S608 - constant SQL fragments only
+
+
+def _encode_order_cursor(row: Mapping[str, Any]) -> str:
+    raw = f"{row['created_at'].isoformat()}|{row['id']}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_order_cursor(cursor: str) -> tuple[datetime, UUID]:
+    try:
+        at, order_id = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
+        return datetime.fromisoformat(at), UUID(order_id)
+    except (ValueError, UnicodeDecodeError):
+        raise ValidationFailedError("invalid cursor", {"field": "cursor"}) from None
+
+
+def parse_order_no(q: str) -> tuple[str | None, int] | None:
+    """Search box: "1036", "A-1036", "#A-1036" → (prefix or None, 1036); else None."""
+    m = _ORDER_NO.fullmatch(q.strip())
+    if not m:
+        return None
+    return (m.group(1).upper() if m.group(1) else None), int(m.group(2))
+
+
+async def drill_orders(
+    conn: AsyncConnection,
+    *,
+    outlet_id: UUID | None,
+    period: OrdersPeriod,
+    hours: HoursFilter = "all",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    hour: int | None = None,
+    product_id: UUID | None = None,
+    method: PaymentMethod | None = None,
+    channel: OrderChannel | None = None,
+    q: str | None = None,
+    cursor: str | None = None,
+    limit: int = ORDERS_LIMIT_DEFAULT,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """O2b: the paid orders behind the Revenue / Order tile, an Order per jam bar, or an
+    Item terlaris row. `summary`, `by_outlet`, and `item` follow the period, hours, hour, and
+    product; the list also applies the chip (`method`), Kanal (`channel`), and search (`q`)."""
+    now = now or datetime.now(UTC)
+    after = _decode_order_cursor(cursor) if cursor else None
+    cur = conn.cursor(row_factory=dict_row)
+    item: dict[str, Any] | None = None
+    if product_id:
+        await cur.execute("select id, name from app.products where id = %s", (product_id,))
+        product = await cur.fetchone()
+        if product is None:
+            raise NotFoundError("product")
+        item = {"product_id": product["id"], "name": product["name"], "quantity": 0, "revenue": 0}
+
+    outlets = await _load_outlets(conn, outlet_id)
+    empty = {"orders": 0, "revenue_excl_pb1": 0, "cash_count": 0, "qris_count": 0}
+    if not outlets:
+        _fallback_range(period, date_from, date_to, now)  # still validates the range
+        return {"period": period, "summary": empty, "item": item, "by_outlet": [], "orders": [],
+                "next_cursor": None}  # fmt: skip
+    _set_ranges(outlets, period, date_from, date_to, now)
+    hour_set = None
+    if hours != "all":
+        series = await _orders_per_hour(conn, outlets, "range")
+        hour_set = [s["hour"] for s in series if s["mark"] == hours]
+    params: dict[str, Any] = {
+        **_range_params(outlets, "range"),
+        "hours": hour_set,
+        "hour": hour,
+        "product": product_id,
+    }
+
+    await cur.execute(
+        f"""
+        with scope as ({_SCOPE})
+        select outlet_id, outlet, count(*)::int as orders,
+               coalesce(sum(subtotal), 0)::bigint as revenue_excl_pb1,
+               (count(*) filter (where method = 'cash'))::int as cash_count,
+               (count(*) filter (where method = 'qris'))::int as qris_count
+        from scope group by outlet_id, outlet
+        order by revenue_excl_pb1 desc, outlet
+        """,  # noqa: S608 - constant SQL fragments only
+        params,
+    )
+    per_outlet = await cur.fetchall()
+    summary = {
+        key: sum(int(r[key]) for r in per_outlet)
+        for key in ("orders", "revenue_excl_pb1", "cash_count", "qris_count")
+    }
+    by_outlet = [
+        {
+            "outlet_id": r["outlet_id"],
+            "name": r["outlet"],
+            "orders": r["orders"],
+            "revenue_excl_pb1": int(r["revenue_excl_pb1"]),
+        }
+        for r in per_outlet
+    ]
+    if item is not None:
+        await cur.execute(
+            f"""
+            with scope as ({_SCOPE})
+            select coalesce(sum(oi.quantity), 0)::int as quantity,
+                   coalesce(sum(oi.line_total), 0)::bigint as revenue
+            from app.order_items oi join scope s on s.id = oi.order_id
+            where oi.product_id = %(product)s
+            """,  # noqa: S608 - constant SQL fragments only
+            params,
+        )
+        sold = await cur.fetchone() or {"quantity": 0, "revenue": 0}
+        item = {**item, "quantity": sold["quantity"], "revenue": int(sold["revenue"])}
+
+    number = parse_order_no(q) if q and q.strip() else None
+    await cur.execute(
+        f"""
+        with scope as ({_SCOPE})
+        select * from scope
+        where (%(method)s::text is null or method = %(method)s::text)
+          and (%(channel)s::text is null or channel = %(channel)s::text)
+          and (not %(search)s or (order_no = %(no)s::int
+               and (%(prefix)s::text is null or upper(order_prefix) = %(prefix)s::text)))
+          and (%(after_at)s::timestamptz is null
+               or (created_at, id) < (%(after_at)s::timestamptz, %(after_id)s::uuid))
+        order by created_at desc, id desc
+        limit %(limit)s
+        """,  # noqa: S608 - constant SQL fragments only
+        {
+            **params,
+            "method": method,
+            "channel": channel,
+            # Text that is not an order number matches nothing.
+            "search": bool(q and q.strip()),
+            "no": number[1] if number else -1,
+            "prefix": number[0] if number else None,
+            "after_at": after[0] if after else None,
+            "after_id": after[1] if after else None,
+            "limit": limit + 1,
+        },
+    )
+    rows = await cur.fetchall()
+    more = len(rows) > limit
+    rows = rows[:limit]
+    lines = await order_items(conn, [r["id"] for r in rows])
+    return {
+        "period": period,
+        "summary": summary,
+        "item": item,
+        "by_outlet": by_outlet,
+        "orders": [
+            {
+                "id": r["id"],
+                "order_no": order_label(r["order_prefix"], r["order_no"]),
+                "outlet_id": r["outlet_id"],
+                "outlet": r["outlet"],
+                "timezone": r["timezone"],
+                "created_at": r["created_at"],
+                "channel": r["channel"],
+                "type": r["type"],
+                "table": r["table_name"],
+                "customer_name": r["customer_name"] or r["guest_name"],
+                "payment_method": r["method"],
+                "item_summary": item_summary(lines.get(r["id"], [])),
+                "revenue_excl_pb1": int(r["subtotal"]),
+                "total": int(r["total"]),
+            }
+            for r in rows
+        ],
+        "next_cursor": _encode_order_cursor(rows[-1]) if more and rows else None,
     }
