@@ -110,7 +110,10 @@ select l.id, l.business_date, l.outlet_id, o.name as outlet_name, l.description,
        l.payment_method::text as method, l.purchase_order_id,
        po.po_no, o.order_prefix, po.payment_term::text as po_term,
        s.id as supplier_id, s.name as supplier_name, pu.display_name as po_created_by,
-       pu.role::text as po_creator_role, po.payment_status::text as po_payment_status
+       pu.role::text as po_creator_role, po.amount_payable as po_payable,
+       (select coalesce(sum(pp.amount), 0) from app.purchase_order_payments pp
+         where pp.purchase_order_id = l.purchase_order_id
+           and pp.ledger_entry_id <= l.id)::bigint as po_paid_through
 from app.ledger_entries l
 join app.outlets o on o.id = l.outlet_id
 left join app.users u on u.id = l.actor_id
@@ -123,6 +126,9 @@ where l.type = 'expense'
 
 
 def _expense_out(row: dict[str, Any]) -> dict[str, Any]:
+    # Local import: purchase_orders imports this module (it posts the payment entries).
+    from app.core.purchase_orders import _payment_status, po_label
+
     return {
         "id": row["id"],
         "business_date": row["business_date"],
@@ -137,12 +143,14 @@ def _expense_out(row: dict[str, Any]) -> dict[str, Any]:
         "payment_method": row["method"],
         "purchase_order": {
             "id": row["purchase_order_id"],
-            "number": f"PO-{row['order_prefix']}-{row['po_no']:04d}",
+            "number": po_label(row["order_prefix"], row["po_no"]),
             "supplier": {"id": row["supplier_id"], "name": row["supplier_name"]},
             "created_by": row["po_created_by"],
             "created_by_role": row["po_creator_role"],
             "payment_term": row["po_term"],
-            "payment_status": row["po_payment_status"],
+            # As it stood right after this payment (payments are never reversed, US-058), so
+            # the first instalment of a PO paid off later still reads "partially_paid".
+            "payment_status": _payment_status(row["po_paid_through"], row["po_payable"]),
         }
         if row["purchase_order_id"]
         else None,
@@ -248,13 +256,19 @@ async def expense_summary(
     """
     await cur.execute(
         "select (l.purchase_order_id is not null) as is_po,"  # noqa: S608
-        " coalesce(sum(-l.amount), 0)::bigint as amount, count(*)::int as count"
+        " coalesce(sum(-l.amount), 0)::bigint as amount, count(*)::int as count,"
+        " count(distinct l.purchase_order_id)::int as po_count"
         " from app.ledger_entries l" + where + " group by 1",
         params,
     )
     split = {bool(r["is_po"]): r for r in await cur.fetchall()}
     po, direct = split.get(True), split.get(False)
-    po_out = {"amount": po["amount"] if po else 0, "count": po["count"] if po else 0}
+    # `count` = payment rows (matches the list and its chip); `po_count` = distinct POs paid.
+    po_out = {
+        "amount": po["amount"] if po else 0,
+        "count": po["count"] if po else 0,
+        "po_count": po["po_count"] if po else 0,
+    }
     direct_out = {
         "amount": direct["amount"] if direct else 0,
         "count": direct["count"] if direct else 0,

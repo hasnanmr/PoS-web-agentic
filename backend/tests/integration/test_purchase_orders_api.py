@@ -279,13 +279,17 @@ def test_pengeluaran_lists_payments_of_staff_opened_pos(client, ctx) -> None:
         if e["purchase_order"]["id"] == po["id"]
     ]
     assert by_po == []  # opening a PO posts nothing
+    today = {"from": str(_today()), "to": str(_today())}
 
+    def summary_po() -> dict:
+        return client.get(
+            "/api/v1/owner/expenses/summary", headers=ctx["owner"], params=today
+        ).json()["po"]
+
+    before = summary_po()
+    pay_url = f"/api/v1/owner/purchase-orders/{po['id']}/payments"
     pay = {"paid_on": str(_today()), "amount": 150000, "method": "transfer"}
-    res = client.post(
-        f"/api/v1/owner/purchase-orders/{po['id']}/payments",
-        headers={**ctx["owner"], **_key()},
-        json=pay,
-    )
+    res = client.post(pay_url, headers={**ctx["owner"], **_key()}, json=pay)
     assert res.status_code == 201, res.text
 
     items = client.get(
@@ -311,6 +315,28 @@ def test_pengeluaran_lists_payments_of_staff_opened_pos(client, ctx) -> None:
     spend = next(x for x in summary["by_supplier"] if x["supplier"]["id"] == ctx["supplier"])
     assert spend["amount"] >= 150000
     assert set(summary["po_owed"]) == {"amount", "count", "overdue_count"}
+
+    # Pay the rest: two payment rows for one PO. The KPI counts POs (po_count), the chip counts
+    # rows (count); each row keeps the payment state it had when it was made.
+    rest = {"paid_on": str(_today()), "amount": po["total"] - 150000, "method": "cash"}
+    res = client.post(pay_url, headers={**ctx["owner"], **_key()}, json=rest)
+    assert res.status_code == 201, res.text
+    after = summary_po()
+    assert after["count"] - before["count"] == 2
+    assert after["po_count"] - before["po_count"] == 1
+    rows = sorted(
+        (
+            e
+            for e in client.get(
+                "/api/v1/owner/expenses",
+                headers=ctx["owner"],
+                params={"source": "po", "limit": 100},
+            ).json()["items"]
+            if e["purchase_order"]["id"] == po["id"]
+        ),
+        key=lambda e: e["id"],
+    )
+    assert [e["purchase_order"]["payment_status"] for e in rows] == ["partially_paid", "paid"]
 
 
 def test_scheme_2_pay_in_advance_must_be_paid_before_close(client, ctx) -> None:

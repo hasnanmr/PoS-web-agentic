@@ -417,6 +417,7 @@ export interface Expense {
     created_by: string | null
     created_by_role: 'owner' | 'staff' | null
     payment_term: 'pay_later' | 'pay_in_advance'
+    /** Right after this payment, not today's PO state. */
     payment_status: 'unpaid' | 'partially_paid' | 'paid'
   } | null
 }
@@ -425,7 +426,8 @@ export interface ExpenseSummary {
   from: string
   to: string
   total: { amount: number; count: number }
-  po: { amount: number; count: number }
+  /** `count` = payments (list rows); `po_count` = distinct POs paid. */
+  po: { amount: number; count: number; po_count: number }
   direct: { amount: number; count: number }
   by_supplier: { supplier: { id: string; name: string }; amount: number; count: number }[]
   po_owed: { amount: number; count: number; overdue_count: number }

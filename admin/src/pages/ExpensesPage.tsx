@@ -12,7 +12,7 @@ import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatDay, formatRange, formatRupiah, shortOutlet } from '../lib/format'
 import type { Expense, ExpensePage, ExpenseSummary } from '../lib/types'
-import { useLoad } from '../lib/useLoad'
+import { useKept, useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Card, LinkButton, Loading, Select } from '../ui/kit'
 import { RangePicker } from '../ui/RangePicker'
@@ -47,16 +47,22 @@ export default function ExpensesPage() {
   }
   const baseQuery = base.toString()
   const summary = useLoad(() => api.get<ExpenseSummary>(`/owner/expenses/summary?${baseQuery}`), `${baseQuery}#${version}`)
-  const s = summary.data
+  // While a save, reversal, outlet or period change reloads the summary, keep showing the last one
+  // so the page (and the form's "tersimpan" message) stays put; a failed reload clears it.
+  const s = useKept(summary.data, !summary.error)
+  const refreshing = summary.loading && !summary.data
   // The summary resolves an unset period to month to date; the history must list the same period
-  // the KPI cards, chip counts and RangePicker show, so it always gets an explicit from/to.
+  // the KPI cards, chip counts and RangePicker show, so it gets the summary's from/to (or the
+  // picked range if the summary failed). It waits for the first summary to avoid a double fetch.
   const history = new URLSearchParams()
   if (outletId) history.set('outlet_id', outletId)
-  if (s) {
-    history.set('from', s.from)
-    history.set('to', s.to)
+  const period = s ?? range
+  if (period) {
+    history.set('from', period.from)
+    history.set('to', period.to)
   }
   const historyQuery = history.toString()
+  const historyReady = Boolean(s) || Boolean(summary.error)
 
   return (
     <>
@@ -70,30 +76,30 @@ export default function ExpensesPage() {
           <RangePicker value={s ? { from: s.from, to: s.to } : range} onChange={setRange} />
         </div>
         {summary.error ? <Alert>Ringkasan belum bisa dimuat: {errorMessage(summary.error)}</Alert> : null}
-        {!s ? (summary.loading ? <Loading /> : null) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Kpi label="Total pengeluaran" amount={s.total.amount} caption={`${s.total.count} entri · ${formatRange(s.from, s.to, false)}`} accent="border-l-action" />
-              <Kpi label="Pembayaran PO (supplier)" amount={s.po.amount} highlight
-                caption={`${pct(s.po.amount, s.total.amount)}% dari total · ${s.po.count} PO`} />
-              <Kpi label="Pengeluaran langsung" amount={s.direct.amount} accent="border-l-text-muted"
-                caption={`${pct(s.direct.amount, s.total.amount)}% dari total · ${s.direct.count} entri`} />
-              <Kpi label="Hutang PO belum dibayar" amount={s.po_owed.amount} tone="warning" accent="border-l-warning"
-                caption={`${s.po_owed.count} PO${s.po_owed.overdue_count ? ` · ${s.po_owed.overdue_count} lewat jatuh tempo` : ''}`} />
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <History className="lg:col-span-2" baseQuery={historyQuery} source={source} onSource={setSource} summary={s} version={version}
-                onViewPo={(id) => navigate(`/dashboard?tab=po&po=${id}`)} onChanged={() => { setVersion((v) => v + 1) }} />
-              <div className="space-y-4">
-                <BySupplier summary={s} onOpen={() => navigate('/dashboard?tab=po')} />
-                <ExpenseForm defaultOutletId={outletId || me.outlets[0]?.id || ''} onSaved={() => setVersion((v) => v + 1)} />
-                <p className="rounded-md bg-primary-soft p-3 text-[11px] text-primary">
-                  Pembayaran PO tidak dicatat di sini — pakai “Catat pembayaran” di Dashboard › PO &amp; Supplier.
-                </p>
-              </div>
-            </div>
-          </>
-        )}
+        {s ? (
+          <div aria-busy={refreshing} className={`grid gap-3 transition-opacity sm:grid-cols-2 xl:grid-cols-4 ${refreshing ? 'opacity-60' : ''}`}>
+            <Kpi label="Total pengeluaran" amount={s.total.amount} caption={`${s.total.count} entri · ${formatRange(s.from, s.to, false)}`} accent="border-l-action" />
+            <Kpi label="Pembayaran PO (supplier)" amount={s.po.amount} highlight
+              caption={`${pct(s.po.amount, s.total.amount)}% dari total · ${s.po.po_count} PO`} />
+            <Kpi label="Pengeluaran langsung" amount={s.direct.amount} accent="border-l-text-muted"
+              caption={`${pct(s.direct.amount, s.total.amount)}% dari total · ${s.direct.count} entri`} />
+            <Kpi label="Hutang PO belum dibayar" amount={s.po_owed.amount} tone="warning" accent="border-l-warning"
+              caption={`${s.po_owed.count} PO${s.po_owed.overdue_count ? ` · ${s.po_owed.overdue_count} lewat jatuh tempo` : ''}`} />
+          </div>
+        ) : summary.loading ? <Loading /> : null}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {historyReady ? (
+            <History className="lg:col-span-2" baseQuery={historyQuery} source={source} onSource={setSource} summary={s} version={version}
+              onViewPo={(id) => navigate(`/dashboard?tab=po&po=${id}`)} onChanged={() => { setVersion((v) => v + 1) }} />
+          ) : <div className="lg:col-span-2" />}
+          <div className="space-y-4">
+            {s && <BySupplier summary={s} onOpen={() => navigate('/dashboard?tab=po')} />}
+            <ExpenseForm defaultOutletId={outletId || me.outlets[0]?.id || ''} onSaved={() => setVersion((v) => v + 1)} />
+            <p className="rounded-md bg-primary-soft p-3 text-[11px] text-primary">
+              Pembayaran PO tidak dicatat di sini — pakai “Catat pembayaran” di Dashboard › PO &amp; Supplier.
+            </p>
+          </div>
+        </div>
       </div>
     </>
   )
@@ -147,7 +153,7 @@ function History({ baseQuery, source, onSource, summary, version, onViewPo, onCh
   baseQuery: string
   source: Source
   onSource: (s: Source) => void
-  summary: ExpenseSummary
+  summary: ExpenseSummary | undefined
   version: number
   onViewPo: (poId: string) => void
   onChanged: () => void
@@ -168,15 +174,19 @@ function History({ baseQuery, source, onSource, summary, version, onViewPo, onCh
     keyRef.current = key
   })
   const first = useLoad(() => api.get<ExpensePage>(`/owner/expenses?${query.toString()}`), key)
+  // Keep the last rows on screen while a reload runs; "Muat lagi" waits for the fresh page.
+  const shown = useKept(first.data, !first.error)
   const own = extra?.key === key ? extra : undefined
   const more = moreState?.key === key ? moreState : undefined
   const cursor = first.data ? (own ? own.cursor : first.data.next_cursor) : null
-  const items = [...(first.data?.items ?? []), ...(own?.items ?? [])]
+  const items = [...(shown?.items ?? []), ...(own?.items ?? [])]
+  const count = (n: number | undefined) => (n === undefined ? '' : ` (${n})`)
   const chips: [Source, string][] = [
     // Counts come from the summary, which leaves reversed expenses out; the list still shows them.
-    ['all', `Semua (${summary.total.count})`],
-    ['po', `PO supplier (${summary.po.count})`],
-    ['direct', `Langsung (${summary.direct.count})`],
+    // The PO chip counts payments (= rows), not POs.
+    ['all', `Semua${count(summary?.total.count)}`],
+    ['po', `PO supplier${count(summary?.po.count)}`],
+    ['direct', `Langsung${count(summary?.direct.count)}`],
   ]
 
   async function loadMore() {
@@ -209,8 +219,8 @@ function History({ baseQuery, source, onSource, summary, version, onViewPo, onCh
         ))}
       </div>
       {first.error ? <Alert>Riwayat belum bisa dimuat: {errorMessage(first.error)}</Alert> : null}
-      {first.loading && !first.data ? <Loading /> : (
-        <div className="overflow-x-auto">
+      {!shown ? (first.loading ? <Loading /> : null) : (
+        <div aria-busy={first.loading} className={`overflow-x-auto transition-opacity ${first.loading ? 'opacity-60' : ''}`}>
           <table className="w-full text-left text-[12px]">
             <thead className="text-[11px] uppercase text-text-muted">
               <tr>

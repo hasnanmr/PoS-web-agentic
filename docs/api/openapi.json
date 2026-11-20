@@ -2105,6 +2105,7 @@
             "type": "string"
           },
           "payment_status": {
+            "description": "The PO's payment state right after this payment, not today's",
             "enum": [
               "unpaid",
               "partially_paid",
@@ -2197,7 +2198,7 @@
             "type": "string"
           },
           "po": {
-            "$ref": "#/components/schemas/AmountCount"
+            "$ref": "#/components/schemas/PoSpend"
           },
           "po_owed": {
             "$ref": "#/components/schemas/PoOwed"
@@ -5489,6 +5490,31 @@
           "created_by"
         ],
         "title": "PoRow",
+        "type": "object"
+      },
+      "PoSpend": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "count": {
+            "description": "Supplier payments (list rows), not POs",
+            "title": "Count",
+            "type": "integer"
+          },
+          "po_count": {
+            "description": "Distinct purchase orders those payments were for",
+            "title": "Po Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "amount",
+          "count",
+          "po_count"
+        ],
+        "title": "PoSpend",
         "type": "object"
       },
       "PoSummary": {

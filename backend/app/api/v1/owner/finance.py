@@ -48,7 +48,9 @@ class ExpensePO(BaseModel):
     created_by: str | None
     created_by_role: Literal["owner", "staff"] | None
     payment_term: Literal["pay_later", "pay_in_advance"]
-    payment_status: Literal["unpaid", "partially_paid", "paid"]
+    payment_status: Literal["unpaid", "partially_paid", "paid"] = Field(
+        description="The PO's payment state right after this payment, not today's"
+    )
 
 
 class Expense(BaseModel):
@@ -71,6 +73,12 @@ class AmountCount(BaseModel):
     count: int
 
 
+class PoSpend(BaseModel):
+    amount: int
+    count: int = Field(description="Supplier payments (list rows), not POs")
+    po_count: int = Field(description="Distinct purchase orders those payments were for")
+
+
 class SupplierSpend(BaseModel):
     supplier: SupplierRef
     amount: int
@@ -87,7 +95,7 @@ class ExpenseSummary(BaseModel):
     from_: date = Field(alias="from")
     to: date
     total: AmountCount
-    po: AmountCount
+    po: PoSpend
     direct: AmountCount
     by_supplier: list[SupplierSpend]
     po_owed: PoOwed

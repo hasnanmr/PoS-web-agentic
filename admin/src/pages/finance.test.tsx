@@ -170,6 +170,22 @@ describe('O9 Laporan Cashflow & Pengeluaran', () => {
     expect(await screen.findByRole('button', { name: 'Buat entry reversal' })).toBeInTheDocument()
   })
 
+  it('offers no reversal on supplier payments (the backend refuses them)', async () => {
+    const po = { ...EXPENSES.items[0], id: 11, description: 'PO-A-0012 · Toko Susu Segar', source: 'po' as const,
+      payment_method: 'transfer' as const,
+      purchase_order: { id: 'po-12', number: 'PO-A-0012', supplier: { id: 'sup1', name: 'Toko Susu Segar' }, created_by: 'Rina',
+        created_by_role: 'staff' as const, payment_term: 'pay_later' as const, payment_status: 'paid' as const } }
+    const api = fakeApi({
+      'GET /owner/reports/cashflow?granularity=daily': CASHFLOW,
+      'GET /owner/expenses?limit=5': { items: [po, EXPENSES.items[0]], next_cursor: null },
+      'GET /owner/expenses?limit=20': { items: [po, EXPENSES.items[0]], next_cursor: null },
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><CashflowPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: 'Lihat semua →' }))
+    expect(await screen.findByText('PO-A-0012 · Toko Susu Segar')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Buat entry reversal' })).toHaveLength(1)
+  })
+
   it('reverses an expense from the full list with a reason', async () => {
     const api = fakeApi({
       'GET /owner/reports/cashflow?granularity=daily': CASHFLOW,
@@ -226,7 +242,7 @@ const PO_ROW: ExpensePage['items'][number] = {
 
 const SUMMARY: ExpenseSummary = {
   from: '2026-11-01', to: '2026-11-20',
-  total: { amount: 24800000, count: 23 }, po: { amount: 15900000, count: 9 }, direct: { amount: 8900000, count: 14 },
+  total: { amount: 24800000, count: 23 }, po: { amount: 15900000, count: 9, po_count: 6 }, direct: { amount: 8900000, count: 14 },
   by_supplier: [{ supplier: { id: 'sup1', name: 'Toko Susu Segar' }, amount: 6600000, count: 3 }],
   po_owed: { amount: 4200000, count: 3, overdue_count: 1 },
 }
@@ -258,7 +274,8 @@ describe('O9b Pengeluaran', () => {
     })
     renderO9b(api)
     expect(await screen.findByText('Rp 15.900.000')).toBeInTheDocument()
-    expect(screen.getByText('64% dari total · 9 PO')).toBeInTheDocument()
+    // The KPI counts distinct POs; the chip counts payment rows.
+    expect(screen.getByText('64% dari total · 6 PO')).toBeInTheDocument()
     expect(screen.getByText('Rp 24.800.000')).toBeInTheDocument()
     expect(screen.getByText('3 PO · 1 lewat jatuh tempo')).toBeInTheDocument()
     expect(await screen.findByText('PO-A-0012 · Toko Susu Segar')).toBeInTheDocument()
@@ -366,5 +383,45 @@ describe('O9b Pengeluaran', () => {
     await waitFor(() => expect(api.calls.find((c) => c[0] === 'POST' && c[1] === '/owner/expenses')?.[2])
       .toMatchObject({ amount: 350000, description: 'Beli es batu & gas' }))
     expect(screen.getByText(/pakai “Catat pembayaran” di Dashboard/)).toBeInTheDocument()
+  })
+
+  it('keeps the summary, history and "tersimpan" message on screen while it reloads after a save', async () => {
+    let release!: (v: ExpenseSummary) => void
+    let calls = 0
+    const api = fakeApi({
+      'GET /owner/expenses?from=2026-11-01&to=2026-11-20&limit=20': EXPENSES,
+      'POST /owner/expenses': EXPENSES.items[0],
+    })
+    const get = api.get
+    api.get = ((path: string) => {
+      if (path !== '/owner/expenses/summary?') return get(path)
+      api.calls.push(['GET', path, undefined])
+      return ++calls === 1 ? Promise.resolve(SUMMARY) : new Promise<ExpenseSummary>((r) => { release = r })
+    }) as typeof api.get
+    renderO9b(api)
+    await userEvent.type(await screen.findByLabelText('Nominal'), '350000')
+    await userEvent.type(screen.getByLabelText('Deskripsi'), 'Beli es batu & gas')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan pengeluaran' }))
+    expect(await screen.findByText('Pengeluaran tersimpan di ledger.')).toBeInTheDocument()
+    await waitFor(() => expect(calls).toBe(2))
+    // Summary reload still pending: old figures, history and the message stay.
+    expect(screen.getByText('Rp 15.900.000')).toBeInTheDocument()
+    expect(screen.getByText('Beli es batu & gas')).toBeInTheDocument()
+    expect(screen.getByText('Pengeluaran tersimpan di ledger.')).toBeInTheDocument()
+    release({ ...SUMMARY, total: { amount: 25150000, count: 24 } })
+    expect(await screen.findByText('Rp 25.150.000')).toBeInTheDocument()
+    expect(screen.getByText('Pengeluaran tersimpan di ledger.')).toBeInTheDocument()
+  })
+
+  it('still shows the form and history when the summary fails', async () => {
+    const api = fakeApi({
+      'GET /owner/expenses/summary?': new Error('Koneksi terputus'),
+      'GET /owner/expenses?limit=20': EXPENSES,
+    })
+    renderO9b(api)
+    expect(await screen.findByText(/Ringkasan belum bisa dimuat/)).toBeInTheDocument()
+    expect(await screen.findByText('Beli es batu & gas')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Semua' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Simpan pengeluaran' })).toBeInTheDocument()
   })
 })

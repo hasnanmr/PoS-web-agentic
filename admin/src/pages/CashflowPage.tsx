@@ -283,7 +283,7 @@ function RecentExpenses({ outletId, version, all, onShowAll, onChanged }: {
               </div>
               {e.reversed ? (
                 <p className="text-[11px] text-text-muted">Di-reversal: {e.reversal_reason}</p>
-              ) : all && (reversing === e.id ? (
+              ) : all && !e.purchase_order && (reversing === e.id ? (
                 <ReversalForm expense={e} onCancel={() => setReversing(undefined)}
                   onDone={() => { setReversing(undefined); onChanged() }} />
               ) : (
