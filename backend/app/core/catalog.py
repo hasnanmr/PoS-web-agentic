@@ -567,26 +567,53 @@ async def create_stock_item(
     return item_id
 
 
+async def _stock_item_usage(conn: AsyncConnection, item_id: UUID) -> dict[str, bool]:
+    cur = await conn.execute(
+        """
+        select exists (select 1 from app.recipe_items where stock_item_id = %(i)s),
+               exists (select 1 from app.stock_movements where stock_item_id = %(i)s),
+               exists (select 1 from app.purchase_order_lines where stock_item_id = %(i)s)
+        """,
+        {"i": item_id},
+    )
+    row = await cur.fetchone() or (False, False, False)
+    return {"recipe": row[0], "movements": row[1], "purchase_orders": row[2]}
+
+
 async def update_stock_item(
     conn: AsyncConnection, ctx: ActorContext, item_id: UUID, fields: dict[str, Any]
 ) -> None:
     if not fields:
         return
-    assignments = ", ".join(f"{f} = %s" for f in fields)
-    try:
-        async with conn.transaction():
-            cur = await conn.execute(
-                f"update app.stock_items set {assignments} where id = %s",  # noqa: S608
-                (*fields.values(), item_id),
-            )
-    except errors.UniqueViolation:
-        raise ConflictError(
-            "stock_item_name_taken", "an ingredient with this name exists"
-        ) from None
-    except errors.CheckViolation as exc:
-        raise _stock_item_check_error(exc) from None
-    if cur.rowcount == 0:
-        raise NotFoundError("stock item")
+    async with conn.transaction():
+        cur = await conn.execute(
+            "select unit::text from app.stock_items where id = %s and is_active for update",
+            (item_id,),
+        )
+        row = await cur.fetchone()
+        if row is None:
+            raise NotFoundError("stock item")
+        if "unit" in fields and fields["unit"] != row[0]:
+            # A new base unit would silently change what recorded quantities mean (500 g → 500 pcs).
+            if any((await _stock_item_usage(conn, item_id)).values()):
+                raise ConflictError(
+                    "stock_item_unit_locked",
+                    "the base unit cannot change once the ingredient has stock, recipes or POs",
+                )
+            fields.setdefault("display_unit", None)
+        assignments = ", ".join(f"{f} = %s" for f in fields)
+        try:
+            async with conn.transaction():
+                await conn.execute(
+                    f"update app.stock_items set {assignments} where id = %s",  # noqa: S608
+                    (*fields.values(), item_id),
+                )
+        except errors.UniqueViolation:
+            raise ConflictError(
+                "stock_item_name_taken", "an ingredient with this name exists"
+            ) from None
+        except errors.CheckViolation as exc:
+            raise _stock_item_check_error(exc) from None
     await record_audit(
         conn,
         ctx,
@@ -594,6 +621,31 @@ async def update_stock_item(
         entity_type="stock_item",
         entity_id=item_id,
         data={"fields": sorted(fields)},
+    )
+
+
+async def archive_stock_item(conn: AsyncConnection, ctx: ActorContext, item_id: UUID) -> None:
+    """Delete = archive: hidden everywhere, history kept. Refused while a recipe still uses it."""
+    async with conn.transaction():
+        cur = await conn.execute(
+            "select name from app.stock_items where id = %s and is_active for update", (item_id,)
+        )
+        row = await cur.fetchone()
+        if row is None:
+            raise NotFoundError("stock item")
+        if (await _stock_item_usage(conn, item_id))["recipe"]:
+            raise ConflictError(
+                "stock_item_in_recipe",
+                "this ingredient is still used in a recipe; remove it from the recipe first",
+            )
+        await conn.execute("update app.stock_items set is_active = false where id = %s", (item_id,))
+    await record_audit(
+        conn,
+        ctx,
+        action="stock_item.archived",
+        entity_type="stock_item",
+        entity_id=item_id,
+        data={"name": row[0]},
     )
 
 
@@ -665,6 +717,12 @@ async def set_recipe(
         if any(q == 0 for _, q in lines):
             raise ValidationFailedError("quantities must not be zero", {"field": "quantity"})
         column, target, entity = "addon_option_id", option_id, "addon_option"
+    if ids:
+        cur = await conn.execute(
+            "select count(*) from app.stock_items where id = any(%s) and is_active", (ids,)
+        )
+        if (await cur.fetchone())[0] != len(ids):  # type: ignore[index]
+            raise ValidationFailedError("unknown ingredient", {"field": "stock_item_id"})
     await conn.execute(f"delete from app.recipe_items where {column} = %s", (target,))  # noqa: S608
     try:
         for stock_item_id, quantity in lines:

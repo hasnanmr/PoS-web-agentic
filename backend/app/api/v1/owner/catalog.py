@@ -158,6 +158,7 @@ class StockItemCreate(BaseModel):
 
 class StockItemPatch(BaseModel):
     name: Name120 | None = None
+    unit: Unit | None = None
     display_unit: DisplayUnit | None = None
 
 
@@ -472,10 +473,19 @@ async def update_stock_item(
 ) -> Response:
     ctx = owner.actor()
     fields = body.model_dump(exclude_unset=True)
-    if fields.get("name") is None:
-        fields.pop("name", None)
+    for required in ("name", "unit"):
+        if fields.get(required) is None:
+            fields.pop(required, None)
     async with db.transaction(_pool(request), ctx) as conn:
         await core.update_stock_item(conn, ctx, item_id, fields)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/stock-items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def archive_stock_item(item_id: UUID, request: Request, owner: OwnerOnly) -> Response:
+    ctx = owner.actor()
+    async with db.transaction(_pool(request), ctx) as conn:
+        await core.archive_stock_item(conn, ctx, item_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
