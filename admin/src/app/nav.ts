@@ -4,63 +4,182 @@
  * Labels are copied verbatim from the wireframe; do not rename without updating the design.
  */
 
-export type Role = 'owner' | 'staff'
+import {
+  Armchair,
+  BadgeCheck,
+  Banknote,
+  Building2,
+  CalendarClock,
+  ChefHat,
+  ClipboardList,
+  Clock,
+  Fingerprint,
+  History,
+  LayoutDashboard,
+  MessageCircle,
+  Package,
+  ReceiptText,
+  ShoppingCart,
+  Star,
+  TrendingUp,
+  Truck,
+  UserCheck,
+  Users,
+  UtensilsCrossed,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+
+export type Role = "owner" | "staff";
 
 export interface NavItem {
-  label: string
-  path: string
+  label: string;
+  path: string;
   /** Wireframe screen code that this route will implement. */
-  screen: string
-  /** Glyph used in the wireframe sidebar. */
-  icon: string
+  screen: string;
+  /**
+   * Line icon shown before the label in the sidebar and mobile bottom nav. Each page has its own
+   * icon so it can be spotted at a glance (the wireframe drew placeholder glyphs ▦ ☰ ⊞ …).
+   */
+  icon: LucideIcon;
 }
 
 export interface NavGroup {
-  heading: string
-  items: NavItem[]
+  heading: string;
+  items: NavItem[];
 }
 
 export const ROUTES = {
-  dashboard: { label: 'Dashboard', path: '/dashboard', screen: 'O2', icon: '▦' },
-  orderBoard: { label: 'Order Board', path: '/orders', screen: 'S2', icon: '≡' },
-  counter: { label: 'Counter / POS', path: '/counter', screen: 'S1', icon: '⊞' },
-  openBills: { label: 'Open Bills', path: '/open-bills', screen: 'S5', icon: '⊟' },
-  paymentReview: { label: 'Review Pembayaran', path: '/payment-review', screen: 'S4', icon: '◎' },
-  reservations: { label: 'Reservasi & Meja', path: '/reservations', screen: 'S6', icon: '▣' },
-  stock: { label: 'Stok', path: '/stock', screen: 'S7', icon: '▥' },
-  purchaseOrders: { label: 'Purchase Order', path: '/purchase-orders', screen: 'S10', icon: '▧' },
-  shifts: { label: 'Shift Kasir', path: '/shifts', screen: 'S8', icon: '◷' },
-  myAttendance: { label: 'Absensi Saya', path: '/my-attendance', screen: 'S9', icon: '⏱' },
-  menu: { label: 'Menu & Add-on', path: '/catalog/menu', screen: 'O5', icon: '◫' },
-  recipes: { label: 'Resep & Bahan', path: '/catalog/recipes', screen: 'O6', icon: '⚗' },
+  dashboard: {
+    label: "Dashboard",
+    path: "/dashboard",
+    screen: "O2",
+    icon: LayoutDashboard,
+  },
+  orderBoard: {
+    label: "Order Board",
+    path: "/orders",
+    screen: "S2",
+    icon: ClipboardList,
+  },
+  counter: {
+    label: "Counter / POS",
+    path: "/counter",
+    screen: "S1",
+    icon: ShoppingCart,
+  },
+  openBills: {
+    label: "Open Bills",
+    path: "/open-bills",
+    screen: "S5",
+    icon: ReceiptText,
+  },
+  paymentReview: {
+    label: "Review Pembayaran",
+    path: "/payment-review",
+    screen: "S4",
+    icon: BadgeCheck,
+  },
+  reservations: {
+    label: "Reservasi & Meja",
+    path: "/reservations",
+    screen: "S6",
+    icon: CalendarClock,
+  },
+  stock: { label: "Stok", path: "/stock", screen: "S7", icon: Package },
+  purchaseOrders: {
+    label: "Purchase Order",
+    path: "/purchase-orders",
+    screen: "S10",
+    icon: Truck,
+  },
+  shifts: { label: "Shift Kasir", path: "/shifts", screen: "S8", icon: Clock },
+  myAttendance: {
+    label: "Absensi Saya",
+    path: "/my-attendance",
+    screen: "S9",
+    icon: Fingerprint,
+  },
+  menu: {
+    label: "Menu & Add-on",
+    path: "/catalog/menu",
+    screen: "O5",
+    icon: UtensilsCrossed,
+  },
+  recipes: {
+    label: "Resep & Bahan",
+    path: "/catalog/recipes",
+    screen: "O6",
+    icon: ChefHat,
+  },
   recommendations: {
-    label: 'Rekomendasi',
-    path: '/catalog/recommendations',
-    screen: 'O7',
-    icon: '★',
+    label: "Rekomendasi",
+    path: "/catalog/recommendations",
+    screen: "O7",
+    icon: Star,
   },
-  cashflow: { label: 'Laporan Cashflow', path: '/finance/cashflow', screen: 'O9', icon: '↗' },
-  expenses: { label: 'Pengeluaran', path: '/finance/expenses', screen: 'O9b', icon: '−' },
-  cashCount: { label: 'Laporan Cash Count', path: '/finance/cash-count', screen: 'O10', icon: '≣' },
-  auditLog: { label: 'Audit Log', path: '/finance/audit-log', screen: 'O11', icon: '⌕' },
-  business: { label: 'Bisnis & Outlet', path: '/settings/business', screen: 'O3', icon: '○' },
-  staff: { label: 'Staf & Akses', path: '/settings/staff', screen: 'O4', icon: '☺' },
+  cashflow: {
+    label: "Laporan Cashflow",
+    path: "/finance/cashflow",
+    screen: "O9",
+    icon: TrendingUp,
+  },
+  expenses: {
+    label: "Pengeluaran",
+    path: "/finance/expenses",
+    screen: "O9b",
+    icon: Wallet,
+  },
+  cashCount: {
+    label: "Laporan Cash Count",
+    path: "/finance/cash-count",
+    screen: "O10",
+    icon: Banknote,
+  },
+  auditLog: {
+    label: "Audit Log",
+    path: "/finance/audit-log",
+    screen: "O11",
+    icon: History,
+  },
+  business: {
+    label: "Bisnis & Outlet",
+    path: "/settings/business",
+    screen: "O3",
+    icon: Building2,
+  },
+  staff: {
+    label: "Staf & Akses",
+    path: "/settings/staff",
+    screen: "O4",
+    icon: Users,
+  },
   staffAttendance: {
-    label: 'Kehadiran Staf',
-    path: '/settings/attendance',
-    screen: 'O14',
-    icon: '⏱',
+    label: "Kehadiran Staf",
+    path: "/settings/attendance",
+    screen: "O14",
+    icon: UserCheck,
   },
-  tables: { label: 'Meja & Reservasi', path: '/settings/tables', screen: 'O8', icon: '◻' },
-  whatsapp: { label: 'WhatsApp Setup', path: '/settings/whatsapp', screen: 'O12', icon: '✆' },
-} as const satisfies Record<string, NavItem>
+  tables: {
+    label: "Meja & Reservasi",
+    path: "/settings/tables",
+    screen: "O8",
+    icon: Armchair,
+  },
+  whatsapp: {
+    label: "WhatsApp Setup",
+    path: "/settings/whatsapp",
+    screen: "O12",
+    icon: MessageCircle,
+  },
+} as const satisfies Record<string, NavItem>;
 
-const R = ROUTES
+const R = ROUTES;
 
 export const NAV: Record<Role, NavGroup[]> = {
   owner: [
     {
-      heading: 'OPERASIONAL',
+      heading: "OPERASIONAL",
       items: [
         R.dashboard,
         R.orderBoard,
@@ -72,16 +191,19 @@ export const NAV: Record<Role, NavGroup[]> = {
         R.shifts,
       ],
     },
-    { heading: 'KATALOG', items: [R.menu, R.recipes, R.recommendations] },
-    { heading: 'KEUANGAN (OWNER)', items: [R.cashflow, R.expenses, R.cashCount, R.auditLog] },
+    { heading: "KATALOG", items: [R.menu, R.recipes, R.recommendations] },
     {
-      heading: 'PENGATURAN',
+      heading: "KEUANGAN (OWNER)",
+      items: [R.cashflow, R.expenses, R.cashCount, R.auditLog],
+    },
+    {
+      heading: "PENGATURAN",
       items: [R.business, R.staff, R.staffAttendance, R.tables, R.whatsapp],
     },
   ],
   staff: [
     {
-      heading: 'OPERASIONAL',
+      heading: "OPERASIONAL",
       items: [
         R.orderBoard,
         R.counter,
@@ -95,19 +217,20 @@ export const NAV: Record<Role, NavGroup[]> = {
       ],
     },
   ],
-}
+};
 
 /** Footer note under the staff sidebar (wireframe S1–S9). */
-export const STAFF_SIDEBAR_NOTE = 'Menu, harga, laporan & pengaturan hanya untuk owner.'
+export const STAFF_SIDEBAR_NOTE =
+  "Menu, harga, laporan & pengaturan hanya untuk owner.";
 
 /** Mobile bottom nav (M1–M6). Same five tabs for both roles. */
 export const MOBILE_NAV: { label: string; item: NavItem }[] = [
-  { label: 'Order', item: R.orderBoard },
-  { label: 'Counter', item: R.counter },
-  { label: 'Bill', item: R.openBills },
-  { label: 'Reservasi', item: R.reservations },
-  { label: 'Stok', item: R.stock },
-]
+  { label: "Order", item: R.orderBoard },
+  { label: "Counter", item: R.counter },
+  { label: "Bill", item: R.openBills },
+  { label: "Reservasi", item: R.reservations },
+  { label: "Stok", item: R.stock },
+];
 
 /**
  * Each role has its own URL area so owner and staff can be signed in on the same device at once
@@ -115,26 +238,26 @@ export const MOBILE_NAV: { label: string; item: NavItem }[] = [
  * are area-relative; always resolve them with `rolePath` before linking or routing.
  */
 export const AREA_BASE: Record<Role, string> = {
-  owner: '',
-  staff: '/admin',
-}
+  owner: "",
+  staff: "/admin",
+};
 
 /** The role whose app owns this URL: `/admin` and below is staff, everything else owner. */
 export function areaForPath(pathname: string): Role {
-  return /^\/admin(\/|$)/.test(pathname) ? 'staff' : 'owner'
+  return /^\/admin(\/|$)/.test(pathname) ? "staff" : "owner";
 }
 
 export function rolePath(role: Role, path: string): string {
-  return AREA_BASE[role] + path
+  return AREA_BASE[role] + path;
 }
 
 export const HOME_PATH: Record<Role, string> = {
-  owner: rolePath('owner', R.dashboard.path),
-  staff: rolePath('staff', R.orderBoard.path),
-}
+  owner: rolePath("owner", R.dashboard.path),
+  staff: rolePath("staff", R.orderBoard.path),
+};
 
 export function navItemsFor(role: Role): NavItem[] {
-  return NAV[role].flatMap((group) => group.items)
+  return NAV[role].flatMap((group) => group.items);
 }
 
 /**
@@ -142,12 +265,12 @@ export function navItemsFor(role: Role): NavItem[] {
  * when that role has it (e.g. a staff account at `/orders` → `/admin/orders`), else its home.
  */
 export function ownAreaPath(role: Role, pathname: string): string {
-  const relative = pathname.replace(/^\/admin(?=\/|$)/, '') || '/'
-  const target = rolePath(role, relative)
-  return canAccess(role, target) ? target : HOME_PATH[role]
+  const relative = pathname.replace(/^\/admin(?=\/|$)/, "") || "/";
+  const target = rolePath(role, relative);
+  return canAccess(role, target) ? target : HOME_PATH[role];
 }
 
 /** `path` is a full URL path (area prefix included). */
 export function canAccess(role: Role, path: string): boolean {
-  return navItemsFor(role).some((item) => rolePath(role, item.path) === path)
+  return navItemsFor(role).some((item) => rolePath(role, item.path) === path);
 }

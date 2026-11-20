@@ -125,6 +125,22 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 
 Role-aware navigation (`Sidebar/Owner`, `Sidebar/Staff`) covers US-003 and US-033 through T-013 and T-072.
 
+**Nav icons.** The sidebars and the mobile bottom nav draw placeholder glyphs (▦ ☰ ⊞ ▤ …). The app replaces them with line icons from `lucide-react`, one distinct icon per page so it can be spotted at a glance; the mapping lives in `admin/src/app/nav.ts` (`ROUTES[*].icon`). Labels, order and grouping still follow the wireframe.
+
+| Menu | Icon | Menu | Icon |
+|---|---|---|---|
+| Dashboard | LayoutDashboard | Menu & Add-on | UtensilsCrossed |
+| Order Board | ClipboardList | Resep & Bahan | ChefHat |
+| Counter / POS | ShoppingCart | Rekomendasi | Star |
+| Open Bills | ReceiptText | Laporan Cashflow | TrendingUp |
+| Review Pembayaran | BadgeCheck | Pengeluaran | Wallet |
+| Reservasi & Meja | CalendarClock | Laporan Cash Count | Banknote |
+| Stok | Package | Audit Log | History |
+| Purchase Order | Truck | Bisnis & Outlet | Building2 |
+| Shift Kasir | Clock | Staf & Akses | Users |
+| Absensi Saya | Fingerprint | Kehadiran Staf | UserCheck |
+| Meja & Reservasi | Armchair | WhatsApp Setup | MessageCircle |
+
 ## User story → screens
 
 Every MVP story has at least one screen, except the backend-only stories marked "—".

@@ -72,11 +72,11 @@ describe('app shell', () => {
     renderAt('/admin/orders', 'staff')
     const bottom = screen.getByRole('navigation', { name: 'Navigasi bawah' })
     expect(within(bottom).getAllByRole('link').map((a) => a.textContent)).toEqual([
-      '≡Order',
-      '⊞Counter',
-      '⊟Bill',
-      '▣Reservasi',
-      '▥Stok',
+      'Order',
+      'Counter',
+      'Bill',
+      'Reservasi',
+      'Stok',
     ])
   })
 })
