@@ -888,3 +888,27 @@ export interface TableQrSettings {
   target: TableQrTarget
   whatsapp_connected: boolean
 }
+
+// O7 · Rekomendasi (T-073) -----------------------------------------------------------------------
+export interface OwnerPick {
+  product_id: string
+  name: string
+  category: string | null
+  is_active: boolean
+  tags: string[]
+}
+
+export interface PreviewItem {
+  product_id: string
+  name: string
+  /** Place in the customer's list (picks and best sellers share one count); null when skipped. */
+  position: number | null
+  skipped_reason: 'sold_out' | 'duplicate' | 'unavailable' | null
+}
+
+export interface RecommendationPreview {
+  picks: PreviewItem[]
+  best_sellers: (PreviewItem & { units_30d: number })[]
+  listed_count: number
+  max_items: number
+}

@@ -99,13 +99,14 @@ No migration: `orders`, `order_items`, and `payments` hold everything (payment m
 | Daftar bahan | `GET/POST /owner/stock-items`, `PATCH /owner/stock-items/{id}`, `DELETE /owner/stock-items/{id}` ✅ | `name, unit: g\|ml\|pcs, display_unit`. Per-row **Edit** (dialog: nama, satuan dasar) and **Hapus** (confirm dialog); owner only. `PATCH` may change `name`, `unit`, `display_unit`; changing `unit` is `409 stock_item_unit_locked` once the item has stock movements, recipe lines or PO lines (a changed unit resets `display_unit`). `DELETE` archives (`is_active=false`, `204`): `409 stock_item_in_recipe` while any menu/add-on recipe uses it, `404` when already archived. Archived items disappear from lists, S7/M5, PO pickers and recipe pickers; history and audit keep them. Name is unique among active items only (migration `20261120000200`). Name clash → `409 stock_item_name_taken`. Not drawn in the wireframe — requested as an enhancement (owner only; staff unchanged). |
 | Threshold per outlet | `PUT /owner/stock-items/{id}/thresholds` ✅ | `[{outlet_id, low_threshold}]`. |
 
-### O7 · Rekomendasi (T-073, T-074)
+### O7 · Rekomendasi (T-073, T-074) ✅ (T-073; "Tambah ke cart" T-074 is the WhatsApp side)
 
 | Action | Endpoint | Fields |
 |---|---|---|
-| Owner's picks (all outlets) | `GET/PUT /owner/owner-picks` | Ordered `[{product_id}]` (drag to reorder). |
-| Tags | `GET /owner/tags`, tags edited on the product (O5) | |
-| Preview menu Rekomendasi per outlet | `GET /owner/outlets/{id}/recommendation-preview` | `picks:[{product, skipped_reason?}]`, `best_sellers:[{product, units_30d, skipped_reason?: sold_out\|duplicate}]`, max 30. Uses the same function as the WhatsApp flow. |
+| Owner's picks (all outlets) | `GET /owner/owner-picks` ✅ | Ordered `[{product_id, name, category, is_active, tags}]` (drag order, then name). Owner only. |
+| Simpan urutan / ✕ / + Tambah owner's pick | `PUT /owner/owner-picks` ✅ | `{product_ids: [...]}`, the whole list in order (max 30, no duplicates, `422` for an unknown product); products not in the list stop being picks (the O5 "Owner's pick" flag follows). `204`. Audit `owner_picks.updated` (only when the list changed). The picker lists products from `GET /owner/products`. |
+| Tags | `GET /owner/tags` ✅, tags edited on the product (O5) | `["coffee", "sweet", ...]` distinct tags of the tenant, A–Z. The "+ tag baru" of the wireframe is the tag field on O5. |
+| Preview menu Rekomendasi per outlet | `GET /owner/outlets/{id}/recommendation-preview` ✅ | `picks:[{product_id, name, position, skipped_reason?: sold_out\|unavailable}]`, `best_sellers:[{product_id, name, units_30d, position, skipped_reason?: sold_out\|duplicate}]`, `listed_count`, `max_items` (30). `position` is the place in the customer's list (picks and best sellers share one count) and is `null` when skipped. `unavailable` = the pick is inactive or hidden/unpriced at this outlet. Best sellers = paid, non-cancelled units of the last 30 days at this outlet; items the outlet does not offer are left out silently; once 30 are listed the rest are dropped. Uses `core.recommendations.recommendation_list`, the function the WhatsApp flow (W9) will call. |
 
 ### O8 · Meja & Aturan Reservasi (T-054, T-057, T-136) — QR ✅ (T-136)
 
