@@ -2,7 +2,7 @@
 
 This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME-POS-Wireframe.figcraft) to the user stories in [User-Stories-SME-Automation-Platform.md](../User-Stories-SME-Automation-Platform.md) and the tasks in [Task-Breakdown-SME-Automation-Platform.md](../Task-Breakdown-SME-Automation-Platform.md).
 
-- **Baseline:** PRD v0.18, US-001–US-063, T-001–T-136.
+- **Baseline:** PRD v0.19, US-001–US-064, T-001–T-138.
 - **Open the file:** FigCraft (`figcraft SME-POS-Wireframe.figcraft`). PNG previews of each page are in [`previews/`](previews/).
 - **Labels:** every screen on the canvas has a label above it in the form `Code · Name — US-xxx · T-xxx`, matching the tables below.
 - **Fidelity:** low-to-mid fidelity wireframes. The colours follow the agreed reference (light sidebar, navy primary `#1E4FA3`, light-blue background `#F3F6FB`). Copy is in Bahasa Indonesia, as in the product.
@@ -55,7 +55,8 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | S2 Order Board | US-013, US-014, US-015, US-016 | T-030, T-031, T-068 |
 | S3 Detail Order & Reversal | US-004, US-016, US-021 | T-031, T-032, T-068 |
 | S4 Review Pembayaran QRIS | US-017, US-021 | T-036, T-037, T-068 |
-| S5 Open Bills | US-013, US-020 | T-033, T-068 |
+| S5 Open Bills (+ "⇄ Split per item"; bayar penuh atau split) | US-013, US-020, US-064 | T-033, T-068, T-138 |
+| S5a Split bill per item (dialog dari S5: pilih item / porsi, bagian lunas + "Batalkan…", total bagian dengan PB1 kumulatif, sisa, Cash / QRIS → popup S1) | US-064, US-020 | T-137, T-138 |
 | S6 Reservasi & Meja (today) | US-024, US-026, US-027 | T-062, T-063, T-064, T-070 |
 | S7 Stok & Pergerakan | US-006, US-007 | T-020, T-022, T-069 |
 | S8 Shift Kasir & Blind Count | US-018, US-030 | T-039, T-040, T-070 |
@@ -89,7 +90,8 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 |---|---|---|
 | M1 Order Board | US-016, US-035 | T-068, T-072 |
 | M2 Counter | US-034, US-035 | T-067, T-072 |
-| M3 Open Bill | US-020, US-035 | T-068, T-072 |
+| M3 Open Bill (+ "⇄ Split per item") | US-020, US-035, US-064 | T-068, T-072, T-138 |
+| M3a Split bill per item (mobile, sama dengan S5a, bar bawah "Bayar bagian …") | US-064, US-035 | T-138 |
 | M4 Reservasi hari ini | US-026, US-027, US-035 | T-070, T-072 |
 | M5 Stok | US-006, US-007, US-035 | T-069, T-072 |
 | M6 Absensi Saya (own history) | US-035, US-053 | T-072, T-117 |
@@ -144,7 +146,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-017 | W6, S4, O3 |
 | US-018 | S1, S8, O3, O10 |
 | US-019 | O3, S1, W5 |
-| US-020 | S5, W8, S1, O3, M3 |
+| US-020 | S5, S5a, W8, S1, O3, M3 |
 | US-021 | S3, S4, W6, W7, O11 |
 | US-022 | O8 |
 | US-023 | W10 |
@@ -181,6 +183,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-061 | O15, O17 |
 | US-062 | Q1–Q5, Q2a, S2, S4 |
 | US-063 | O8 |
+| US-064 | S5, S5a, M3, M3a |
 | US-042 (Phase 2) | A1 |
 | US-043 (Phase 2) | A2 |
 | US-044, US-045 (Phase 2) | Not drawn yet |
@@ -208,6 +211,8 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-066 Owner onboarding, settings, staff, menu, recipe, prices | O1, O3, O4, O5, O6 |
 | T-067 Counter order screen | S1, M2 |
 | T-068 Order board, payment review, reversal, open bills | S2, S3, S4, S5, M1, M3 |
+| T-137 Split bill per item (domain + API) | S5, S5a, M3a |
+| T-138 Split bill per item (admin UI) | S5, S5a, M3, M3a |
 | T-069 Stock screens | S7, M5 |
 | T-057 Tables and reservation rules | O8 |
 | T-062, T-063, T-064 Staff reservation board, walk-ins, no-show hold (Wave 6) | S6, M4 |
@@ -243,6 +248,7 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 - All purchase-order screens for the owner live in their own Dashboard tab **PO & Supplier** (issue #16): O17 cards on top, the O15 list and detail below, Buka PO (O16) and Daftar supplier from the tab header. The tab has its own outlet + month filter (PRD v0.15). The month applies only to Ringkasan PO (by PO open date, FR3.12). Pembayaran supplier and PO ada selisih always show every PO that needs action (FR3.11). The list uses the status chips (FR3.10), and a Ringkasan figure opens it with exactly those POs. Each number appears once: the old O15 KPI row was merged into O17's Pembayaran supplier card. Pengeluaran (O9) is for expenses only. Staff keep S10–S12.
 - S6 / M4 add a **Selesai** action for seated reservations and walk-ins (US-026 "completed"; not drawn on the canvas, approved by the product owner on 2026-11-19) so the table is freed when the guests leave. The canvas should get the button in the next wireframe pass.
 - The table QR opens the Thinker web page `/t/<token>`, not WhatsApp directly (issue #44, PRD v0.18). From one printed QR the customer orders on the web (Q2–Q4, channel `web_table`) or continues in WhatsApp (W8, `whatsapp_table`). Web orders are always **paid first with the outlet's static QRIS**: the customer taps "Saya sudah bayar" (no screenshot) and staff confirm in S2/S4 against the merchant account; web orders never join the table's open bill and the page shows only the phone's own orders (no table bill, so no bill code). The owner picks web + WhatsApp, web only, or WhatsApp only on O8; while WhatsApp isn't connected the QR always goes to the web page. Online payment (#43) later replaces the static QRIS + staff confirmation.
+- Open bills can be **split per item** (issue #42, PRD v0.19): staff only (S5a, M3a); the table QR web page still shows no bill. PB1 per part is cumulative (PB1 on everything paid so far minus PB1 already paid), so the parts add up to the bill total; a paid part is undone only with a reason while the bill is open.
 - A forgotten clock-out is flagged "perlu dikoreksi" 1 hour after closing time (default) without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
 
 ## Open points
