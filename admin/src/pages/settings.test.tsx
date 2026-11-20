@@ -44,6 +44,49 @@ describe('O3 Bisnis & Outlet', () => {
   })
 })
 
+describe('O3 Tablet absensi (T-121)', () => {
+  it('lists active tablets, creates a pairing code and revokes a tablet', async () => {
+    const recent = new Date(Date.now() - 2 * 60000).toISOString()
+    const api = fakeApi({
+      'GET /owner/outlets/o-dago': DAGO,
+      'GET /owner/outlets/o-dago/drawers': [],
+      'GET /owner/outlets/o-dago/attendance-devices': [
+        { id: 'dev1', name: 'Kasir Dago', paired_at: recent, last_seen_at: recent, revoked_at: null },
+        { id: 'dev0', name: 'Tablet lama', paired_at: recent, last_seen_at: null, revoked_at: recent },
+      ],
+      'POST /owner/outlets/o-dago/attendance-pairing-codes': {
+        code: '482913', expires_at: new Date(Date.now() + 10 * 60000).toISOString() },
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><BusinessPage /></WithSession>)
+    expect(await screen.findByText(/Kasir Dago · aktif 2 menit lalu/)).toBeInTheDocument()
+    expect(screen.queryByText(/Tablet lama/)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Tenggang lupa clock out (jam)')).toHaveValue('1')
+
+    await userEvent.click(screen.getByRole('button', { name: '+ Pairing tablet baru → kode 6 digit' }))
+    expect(await screen.findByLabelText('Kode pairing')).toHaveTextContent('482913')
+
+    // Once a tablet pairs with the code, it disappears and the button is offered again.
+    ;(api.get as unknown as { mockImplementation: (f: (p: string) => Promise<unknown>) => void }).mockImplementation(
+      async (path: string) => {
+        if (path === '/owner/outlets/o-dago/attendance-devices') {
+          return [
+            { id: 'dev1', name: 'Kasir Dago', paired_at: recent, last_seen_at: recent, revoked_at: null },
+            { id: 'dev2', name: 'Tablet 2', paired_at: new Date().toISOString(), last_seen_at: new Date().toISOString(),
+              revoked_at: null },
+          ]
+        }
+        if (path === '/owner/outlets/o-dago') return DAGO
+        return []
+      })
+    expect(await screen.findByText(/Tablet 2 · aktif/, {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Kode pairing')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Pairing tablet baru → kode 6 digit' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Cabut' })[0])
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/owner/attendance-devices/dev1/revoke', undefined]))
+  })
+})
+
 describe('O3 QRIS statis outlet (PoC)', () => {
   it('uploads a PNG and refuses other files', async () => {
     const api = fakeApi({

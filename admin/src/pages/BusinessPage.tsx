@@ -2,13 +2,15 @@
 // Endpoints: GET/POST /owner/outlets, GET/PATCH /owner/outlets/{id},
 // PUT /owner/outlets/{id}/opening-hours, drawers under /owner/outlets/{id}/drawers.
 // QRIS statis card (T-014, PoC demo): PUT/GET /owner/outlets/{id}/qris, image from
-// GET /ops/outlets/{id}/qris/image. Not yet here: tablet pairing (T-121).
-import { useState, type ReactNode } from 'react'
+// GET /ops/outlets/{id}/qris/image. Tablet absensi (T-121): GET /owner/outlets/{id}/attendance-devices,
+// POST /owner/outlets/{id}/attendance-pairing-codes, POST /owner/attendance-devices/{id}/revoke.
+import { useEffect, useState, type ReactNode } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatDay, hhmm, localDay, summarizeHours, timeAgo, WEEKDAYS } from '../lib/format'
-import { TIMEZONE_LABEL, type Drawer, type OpeningHours, type OutletDetail, type QrisStatus, type Timezone } from '../lib/types'
+import { TIMEZONE_LABEL, type AttendanceDevice, type Drawer, type PairingCode, type OpeningHours, type OutletDetail, type QrisStatus, type Timezone } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
+import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { useQrisImage } from '../lib/useQrisImage'
 import { Alert, Button, Card, FieldRow, LinkButton, Loading, Select, StatusDot, TextInput } from '../ui/kit'
@@ -397,7 +399,8 @@ function DrawerCard({ outletId, grace, onGrace }: { outletId: string; grace: num
 
       <div className="mt-5 border-t border-border pt-3">
         <div className="mb-1 text-[13px] font-semibold">Tablet absensi</div>
-        <label className="flex flex-wrap items-center gap-2">
+        <AttendanceTablets outletId={outletId} />
+        <label className="mt-3 flex flex-wrap items-center gap-2">
           Tenggang lupa clock out:
           <TextInput aria-label="Tenggang lupa clock out (jam)" className="h-8 w-14" inputMode="numeric"
             value={String(Math.round(grace / 60))}
@@ -406,6 +409,80 @@ function DrawerCard({ outletId, grace, onGrace }: { outletId: string; grace: num
         </label>
       </div>
     </Card>
+  )
+}
+
+function AttendanceTablets({ outletId }: { outletId: string }) {
+  const { api } = useSession()
+  const devices = useLoad(() => api.get<AttendanceDevice[]>(`/owner/outlets/${outletId}/attendance-devices`), outletId)
+  const [code, setCode] = useState<PairingCode & { outletId: string; createdAt: number }>()
+  const [error, setError] = useState<string>()
+  const [busy, setBusy] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  const active = (devices.data ?? []).filter((d) => !d.revoked_at)
+  // The one-time code disappears once a tablet used it (a device paired after it was created)
+  // or when it expires, so "+ Pairing tablet baru" is offered again for the next tablet.
+  const used = code !== undefined && active.some((d) => new Date(d.paired_at).getTime() >= code.createdAt - 5000)
+  const live = code !== undefined && new Date(code.expires_at).getTime() > now
+  const shownCode = code?.outletId === outletId && live && !used ? code : undefined
+  usePolling(devices, shownCode ? 3000 : 60_000)
+  useEffect(() => {
+    if (!code) return
+    const id = setTimeout(() => setNow(Date.now()), Math.max(0, new Date(code.expires_at).getTime() - code.createdAt))
+    return () => clearTimeout(id)
+  }, [code])
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true)
+    setError(undefined)
+    try {
+      await action()
+      await devices.reload()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {active.length === 0 && !devices.loading && (
+        <p className="text-[12px] text-text-muted">Belum ada tablet terhubung.</p>
+      )}
+      <ul className="space-y-1.5">
+        {active.map((d) => (
+          <li key={d.id} className="flex items-center gap-3">
+            <span>
+              <span className={d.last_seen_at ? 'text-success' : 'text-text-muted'}>●</span> {d.name}
+              {' · '}{d.last_seen_at ? `aktif ${timeAgo(d.last_seen_at)}` : 'belum aktif'}
+            </span>
+            <LinkButton className="text-danger" disabled={busy}
+              onClick={() => void run(() => api.post(`/owner/attendance-devices/${d.id}/revoke`))}>Cabut</LinkButton>
+          </li>
+        ))}
+      </ul>
+      {shownCode ? (
+        <div className="rounded-md bg-primary-soft px-3 py-2">
+          <div className="text-[12px] text-text-muted">Kode pairing (sekali pakai)</div>
+          <div className="font-mono text-[20px] font-bold tracking-[0.3em] text-primary" aria-label="Kode pairing">
+            {shownCode.code}
+          </div>
+          <div className="text-[11px] text-text-muted">
+            Masukkan di tablet (buka /tablet). Berlaku sampai {new Date(shownCode.expires_at).toLocaleTimeString('id-ID',
+              { hour: '2-digit', minute: '2-digit' })}.
+          </div>
+        </div>
+      ) : (
+        <LinkButton disabled={busy} onClick={() => void run(async () => {
+          const created = await api.post<PairingCode>(`/owner/outlets/${outletId}/attendance-pairing-codes`)
+          const at = Date.now()
+          setNow(at)
+          setCode({ ...created, outletId, createdAt: at })
+        })}>+ Pairing tablet baru → kode 6 digit</LinkButton>
+      )}
+      {error && <Alert>{error}</Alert>}
+    </div>
   )
 }
 

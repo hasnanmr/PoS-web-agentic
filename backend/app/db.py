@@ -28,6 +28,7 @@ select set_config('app.tenant_id', %s, true),
        set_config('app.user_id', %s, true),
        set_config('app.actor', %s, true),
        set_config('app.device_outlet_id', %s, true),
+       set_config('app.device_id', %s, true),
        set_config('app.correlation_id', %s, true)
 """
 
@@ -62,6 +63,7 @@ async def set_context(conn: psycopg.AsyncConnection, ctx: ActorContext) -> None:
             s["app.user_id"],
             s["app.actor"],
             s["app.device_outlet_id"],
+            s["app.device_id"],
             s["app.correlation_id"],
         ),
     )

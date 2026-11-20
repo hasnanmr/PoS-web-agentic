@@ -232,6 +232,83 @@
         "title": "AffectedProduct",
         "type": "object"
       },
+      "AttendanceIn": {
+        "properties": {
+          "action": {
+            "description": "What K2/K3 showed; `state_changed` (409) when the record says otherwise",
+            "enum": [
+              "clock_in",
+              "clock_out"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "selfie_id": {
+            "description": "Reuse the same selfie when retrying: the save is idempotent",
+            "format": "uuid",
+            "title": "Selfie Id",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "selfie_id",
+          "action"
+        ],
+        "title": "AttendanceIn",
+        "type": "object"
+      },
+      "AttendanceOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "clock_in",
+              "clock_out"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clock out: \"8 j 32 mnt\"",
+            "title": "Duration Minutes"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "display_name",
+          "at",
+          "duration_minutes",
+          "timezone"
+        ],
+        "title": "AttendanceOut",
+        "type": "object"
+      },
       "AuditActor": {
         "properties": {
           "id": {
@@ -1480,6 +1557,58 @@
           "payment_methods"
         ],
         "title": "Dashboard",
+        "type": "object"
+      },
+      "DeviceOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "\"aktif 2 menit lalu\"",
+            "title": "Last Seen At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "paired_at": {
+            "format": "date-time",
+            "title": "Paired At",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "paired_at",
+          "last_seen_at",
+          "revoked_at"
+        ],
+        "title": "DeviceOut",
         "type": "object"
       },
       "Drawer": {
@@ -3647,6 +3776,24 @@
         "title": "OutletIds",
         "type": "object"
       },
+      "OutletInfo": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "timezone"
+        ],
+        "title": "OutletInfo",
+        "type": "object"
+      },
       "OutletPatch": {
         "description": "O3 \"Simpan perubahan\": only the fields sent are changed.",
         "properties": {
@@ -3927,6 +4074,65 @@
           "is_active"
         ],
         "title": "OutletSummary",
+        "type": "object"
+      },
+      "PairIn": {
+        "properties": {
+          "code": {
+            "description": "6-digit one-time code from O3",
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "PairIn",
+        "type": "object"
+      },
+      "PairOut": {
+        "properties": {
+          "device_name": {
+            "title": "Device Name",
+            "type": "string"
+          },
+          "device_token": {
+            "description": "Keep on the tablet; send as `Authorization: Bearer`",
+            "title": "Device Token",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/OutletInfo"
+          }
+        },
+        "required": [
+          "device_token",
+          "device_name",
+          "outlet"
+        ],
+        "title": "PairOut",
+        "type": "object"
+      },
+      "PairingCodeOut": {
+        "properties": {
+          "code": {
+            "description": "6 digits, shown once, one-time",
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "10 minutes after it was created",
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "title": "PairingCodeOut",
         "type": "object"
       },
       "PaymentBuckets": {
@@ -6345,6 +6551,20 @@
         "title": "ReversalOut",
         "type": "object"
       },
+      "SelfieOut": {
+        "properties": {
+          "selfie_id": {
+            "format": "uuid",
+            "title": "Selfie Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selfie_id"
+        ],
+        "title": "SelfieOut",
+        "type": "object"
+      },
       "SeriesPoint": {
         "properties": {
           "cash_in": {
@@ -6604,6 +6824,31 @@
         "title": "ShortLine",
         "type": "object"
       },
+      "StaffList": {
+        "properties": {
+          "device_name": {
+            "title": "Device Name",
+            "type": "string"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/OutletInfo"
+          },
+          "staff": {
+            "items": {
+              "$ref": "#/components/schemas/StaffOut"
+            },
+            "title": "Staff",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outlet",
+          "device_name",
+          "staff"
+        ],
+        "title": "StaffList",
+        "type": "object"
+      },
       "StaffMember": {
         "properties": {
           "display_name": {
@@ -6644,6 +6889,54 @@
           "status"
         ],
         "title": "StaffMember",
+        "type": "object"
+      },
+      "StaffOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "first_time": {
+            "description": "Never clocked in before: K3 shows the privacy notice",
+            "title": "First Time",
+            "type": "boolean"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "\"Bekerja sejak 07:30\" (open record here)",
+            "title": "Since"
+          },
+          "status": {
+            "enum": [
+              "not_clocked_in",
+              "working"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "display_name",
+          "status",
+          "since",
+          "first_time"
+        ],
+        "title": "StaffOut",
         "type": "object"
       },
       "StaffOutlet": {
@@ -7776,6 +8069,151 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/device/attendance": {
+      "post": {
+        "description": "K3 \"Simpan clock in\" / \"Simpan clock out\". The server decides which (working → out).",
+        "operationId": "record_api_v1_device_attendance_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record",
+        "tags": [
+          "attendance tablet (K0-K4)"
+        ]
+      }
+    },
+    "/api/v1/device/pair": {
+      "post": {
+        "description": "K0 \"Hubungkan tablet\". `pairing_code_invalid` (400) for a wrong, used, or expired code.",
+        "operationId": "pair_api_v1_device_pair_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pair",
+        "tags": [
+          "attendance tablet (K0-K4)"
+        ]
+      }
+    },
+    "/api/v1/device/selfies": {
+      "post": {
+        "description": "K3 \"Simpan\": the raw JPEG/WebP photo as the body (max 2 MB). PoC: stored in the database.",
+        "operationId": "upload_selfie_api_v1_device_selfies_post",
+        "requestBody": {
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelfieOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Upload Selfie",
+        "tags": [
+          "attendance tablet (K0-K4)"
+        ]
+      }
+    },
+    "/api/v1/device/staff": {
+      "get": {
+        "description": "K1 \"Tap nama kamu untuk clock in / clock out\": only staff assigned to this outlet.",
+        "operationId": "staff_api_v1_device_staff_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Staff",
+        "tags": [
+          "attendance tablet (K0-K4)"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "me_api_v1_me_get",
@@ -10286,6 +10724,50 @@
         ]
       }
     },
+    "/api/v1/owner/attendance-devices/{device_id}/revoke": {
+      "post": {
+        "description": "O3 \"Cabut\": the tablet is refused on its next request and goes back to K0.",
+        "operationId": "revoke_device_api_v1_owner_attendance_devices__device_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Device",
+        "tags": [
+          "owner: attendance"
+        ]
+      }
+    },
     "/api/v1/owner/audit-log": {
       "get": {
         "description": "O11 rows: reversals, status changes, and payment changes of orders, newest first, 50 per\npage. Default range: month to date in each outlet's own zone; `date_from`/`date_to` in the\nresponse are the outlet's (WIB for all outlets) and only label the range picker.",
@@ -11142,6 +11624,98 @@
         "summary": "Update Outlet",
         "tags": [
           "owner: outlets"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/attendance-devices": {
+      "get": {
+        "description": "Paired tablets of the outlet, active ones first (revoked ones keep `revoked_at`).",
+        "operationId": "list_devices_api_v1_owner_outlets__outlet_id__attendance_devices_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceOut"
+                  },
+                  "title": "Response List Devices Api V1 Owner Outlets  Outlet Id  Attendance Devices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Devices",
+        "tags": [
+          "owner: attendance"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/attendance-pairing-codes": {
+      "post": {
+        "description": "O3 \"+ Pairing tablet baru → kode 6 digit\"; the tablet enters it on K0.",
+        "operationId": "create_pairing_code_api_v1_owner_outlets__outlet_id__attendance_pairing_codes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairingCodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Pairing Code",
+        "tags": [
+          "owner: attendance"
         ]
       }
     },

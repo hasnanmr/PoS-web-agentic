@@ -43,14 +43,16 @@ language sql as $$
   select set_config('app.tenant_id', coalesce(p_tenant::text, ''), true),
          set_config('app.user_id', coalesce(p_user::text, ''), true),
          set_config('app.actor', 'user', true),
-         set_config('app.device_outlet_id', '', true);
+         set_config('app.device_outlet_id', '', true),
+         set_config('app.device_id', '', true);
 $$;
 create function pg_temp.as_device(p_tenant uuid, p_outlet uuid) returns void
 language sql as $$
   select set_config('app.tenant_id', p_tenant::text, true),
          set_config('app.user_id', '', true),
          set_config('app.actor', 'device', true),
-         set_config('app.device_outlet_id', p_outlet::text, true);
+         set_config('app.device_outlet_id', p_outlet::text, true),
+         set_config('app.device_id', '', true);
 $$;
 grant execute on all functions in schema pg_temp to app_backend;
 
@@ -197,6 +199,15 @@ select pg_temp.check((select count(*) = 0 from app.orders), 'deactivated staff s
 
 select pg_temp.as_device('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a1');
 select pg_temp.check((select count(*) = 1 from app.outlets), 'attendance tablet sees only its outlet');
+select pg_temp.check((select count(*) = 0 from app.orders), 'attendance tablet cannot read its outlet''s orders (T-121)');
+select pg_temp.check((select count(*) = 0 from app.users), 'attendance tablet cannot read users');
+select pg_temp.check((select count(*) = 0 from app.attendance_devices), 'attendance tablet cannot read the device list');
+select pg_temp.check(
+  (select count(*) = 0 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'app' and c.relkind = 'r' and c.relrowsecurity
+      and c.relname not in ('outlets', 'attendance_records', 'attendance_events', 'attendance_selfies')
+      and not exists (select 1 from pg_policy p where p.polrelid = c.oid and p.polname = 'no_device')),
+  'every other RLS table refuses the device actor (add policy no_device to new tables)');
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-0000000000f9');
 select pg_temp.check((select count(*) = 1 from app.orders), 'owner B sees only tenant B');
