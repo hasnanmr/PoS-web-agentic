@@ -7,6 +7,9 @@
 // transaction is in the receiving account, with the S4 merchant-account step.
 // Behavior notes: order status and payment status are separate badges; buttons come only
 // from the server's allowed_actions; unpaid pay-first orders have no "Mulai siapkan".
+// Web orders from the table QR page (page 06 · "S2 kartu order web", #44): channel "web", table,
+// name and kitchen note; once the customer taps "Saya sudah bayar" the card shows "Pelanggan
+// bilang sudah bayar · 12:44" with "Cek & konfirmasi lunas →" and "Tolak", both opening S4.
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { ROUTES } from '../app/nav'
@@ -43,6 +46,7 @@ const POLL_MS = 10_000
 
 function where(o: OrderCard): string {
   const base = TYPE_LABEL[o.type]
+  if (o.channel === 'web_table') return `${base} · ${o.table}${o.customer_name ? ` · ${o.customer_name}` : ''}`
   if (o.table) return `${base} · ${o.table}${o.channel === 'whatsapp_table' ? ` · ${o.payment_mode === 'open_bill' ? 'open bill' : 'pay-first'}` : ''}`
   if (o.customer_name) return `${base} · ${o.customer_name}`
   return base
@@ -97,6 +101,7 @@ export default function OrderBoardPage() {
           <option value="counter">counter</option>
           <option value="whatsapp_online">whatsapp_online</option>
           <option value="whatsapp_table">whatsapp_table</option>
+          <option value="web_table">web (QR meja)</option>
         </Select>
         <Select aria-label="Tipe" className="h-8 w-auto" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="">Tipe: Semua</option>
@@ -146,9 +151,10 @@ export default function OrderBoardPage() {
                       return (
                         <li key={o.id} className="rounded-md border border-border bg-surface p-2.5 text-[12px]">
                           <button type="button" className="w-full text-left" onClick={() => setOpenId(o.id)}>
-                            <div className="font-semibold">{o.order_no} · {o.channel}</div>
+                            <div className="font-semibold">{o.order_no} · {o.channel === 'web_table' ? 'web' : o.channel}</div>
                             <div>{where(o)}</div>
                             <div className="truncate text-text-muted">{o.item_summary}</div>
+                            {o.note && <div className="truncate text-text-muted">Catatan: {o.note}</div>}
                             <div>{formatRupiah(o.total)}{o.payment_status !== 'unpaid' || o.bill_id ? ` · ${paymentText(o)}` : ''}</div>
                             {o.auto_cancel_at && <div className="text-warning">⏱ Auto-cancel {formatTime(o.auto_cancel_at, outlet.timezone)}</div>}
                           </button>
@@ -161,10 +167,21 @@ export default function OrderBoardPage() {
                               <Button variant="ghost" className="mt-2 h-8 w-full" onClick={() => setChecking(o)}>Cek →</Button>
                             </>
                           )}
+                          {o.payment_claimed_at && (
+                            <span className="mt-1 ml-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-semibold text-warning">
+                              Pelanggan bilang sudah bayar · {formatTime(o.payment_claimed_at, outlet.timezone)}
+                            </span>
+                          )}
                           {o.payment_status === 'proof_submitted' && (
                             <Link to={`${pathFor(ROUTES.paymentReview.path)}?order=${o.id}`}
                               className="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-white hover:opacity-90">
-                              Cek →
+                              {o.payment_claimed_at ? 'Cek & konfirmasi lunas →' : 'Cek →'}
+                            </Link>
+                          )}
+                          {o.payment_claimed_at && (
+                            <Link to={`${pathFor(ROUTES.paymentReview.path)}?order=${o.id}#tolak`}
+                              className="mt-1 block text-[11px] font-semibold text-danger hover:underline">
+                              Tolak (pembayaran tidak ditemukan)
                             </Link>
                           )}
                           {forward && (

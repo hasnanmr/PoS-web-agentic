@@ -93,7 +93,7 @@ Staff calling it → `403` (AC7.7).
 | Tags | `GET /owner/tags`, tags edited on the product (O5) | |
 | Preview menu Rekomendasi per outlet | `GET /owner/outlets/{id}/recommendation-preview` | `picks:[{product, skipped_reason?}]`, `best_sellers:[{product, units_30d, skipped_reason?: sold_out\|duplicate}]`, max 30. Uses the same function as the WhatsApp flow. |
 
-### O8 · Meja & Aturan Reservasi (T-054, T-057, T-136) — QR backend ✅ (T-136)
+### O8 · Meja & Aturan Reservasi (T-054, T-057, T-136) — QR ✅ (T-136)
 
 | Action | Endpoint | Fields |
 |---|---|---|
@@ -324,7 +324,7 @@ Admin app route `/tablet` (full screen, no sidebar, no Supabase sign-in). The ta
 | K3 Simpan | `POST /device/attendance` ✅ | `user_id, selfie_id` (uploaded by this tablet in the last 10 minutes), `action: clock_in\|clock_out` (what K2/K3 showed). The server refuses a mismatch with its record (`state_changed`, 409: the tablet reloads K1) instead of storing the opposite. **Idempotent per selfie:** the tablet uploads one selfie per K3 screen and reuses it on retry; a selfie already linked returns the stored result. Response: `{action, display_name, at, duration_minutes?, timezone}`. Clock in needs an assignment; clock out works for anyone with an open record here. |
 | K4 errors | error codes | `selfie_required` (422), `device_revoked` / `device_unpaired` (401 → back to K0), `not_assigned` (403), `open_elsewhere` (409: still clocked in at another outlet), `state_changed` (409). Offline is detected client-side; nothing is queued; "Absen belum tercatat…" appears only for a failed save (other screens say there is no connection). |
 
-## Customer table web page (Q0–Q5) — backend ✅ (#44, T-133, T-134); screens T-135
+## Customer table web page (Q0–Q5) — backend ✅ (#44, T-133, T-134), screens ✅ (T-135)
 
 Public route `/t/{token}` in the admin app (separate entry like `/tablet`, no sidebar, no sign-in). Every call carries the table token in the path; the server resolves it to one outlet + table and refuses everything else. Unknown or replaced token → `table_qr_invalid` (404) and the page Q0 "QR ini sudah tidak berlaku. Minta QR baru ke staf." Rate-limited per token and client address (`too_many_requests`, 429). No customer personal data is collected (name is free text, optional). **Web orders are always paid first with the outlet's static QRIS and never join the table's open bill**; there is no table-bill endpoint. Each order is read with the access key returned when it was placed, so a phone sees only its own orders.
 

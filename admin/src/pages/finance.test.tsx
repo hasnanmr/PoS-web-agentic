@@ -12,14 +12,14 @@ import PaymentReviewPage from './PaymentReviewPage'
 import ShiftsPage from './ShiftsPage'
 
 const QUEUE: ProofQueueItem[] = [
-  { proof_id: 'pr1', order_id: 'o1', order_no: '#A-1043', channel: 'whatsapp_table', order_type: 'dine_in', table: 'Meja 07',
+  { proof_id: 'pr1', kind: 'screenshot', order_id: 'o1', order_no: '#A-1043', channel: 'whatsapp_table', order_type: 'dine_in', table: 'Meja 07',
     total: 30800, received_at: '2026-11-18T03:21:00Z', timezone: 'Asia/Jakarta' },
-  { proof_id: 'pr2', order_id: 'o2', order_no: '#A-1044', channel: 'whatsapp_online', order_type: 'delivery', table: null,
+  { proof_id: 'pr2', kind: 'screenshot', order_id: 'o2', order_no: '#A-1044', channel: 'whatsapp_online', order_type: 'delivery', table: null,
     total: 87500, received_at: '2026-11-18T03:23:00Z', timezone: 'Asia/Jakarta' },
 ]
 
 const DETAIL: ProofDetail = {
-  proof_id: 'pr1', status: 'pending', image_url: null, order_id: 'o1', order_no: '#A-1043', channel: 'whatsapp_table',
+  proof_id: 'pr1', kind: 'screenshot', status: 'pending', image_url: null, order_id: 'o1', order_no: '#A-1043', channel: 'whatsapp_table',
   order_type: 'dine_in', table: 'Meja 07', total: 30800, order_status: 'pending_payment', payment_status: 'proof_submitted',
   customer_phone_masked: '+62 812-xxxx-221', received_at: '2026-11-18T03:21:00Z', timezone: 'Asia/Jakarta',
   timer_stopped: true, reviewed_by: null, reviewed_at: null, rejection_reason: null,
