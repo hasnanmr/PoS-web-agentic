@@ -1,6 +1,6 @@
 # Task Breakdown — SME Business Automation Platform
 
-This backlog breaks down the 61 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
+This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
 
 ## Delivery assumptions
 
@@ -80,6 +80,7 @@ This backlog breaks down the 61 user stories in [User-Stories-SME-Automation-Pla
 | T-032 | Implement cancellation and paid-order reversal workflows, including stock return versus waste behavior and refund ledger hooks. | US-004, US-021 | T-020, T-030, T-031 | P0 |
 | T-033 | Implement open bills per table or guest name, one open bill per table, order attachment, running total, duration, and full-bill close. | US-020 | T-025, T-027, T-030 | P0 |
 | T-035 | Add concurrency and transition tests for last-stock orders, invalid status changes, open-bill uniqueness, and mode changes preserving existing order flow. | US-014, US-016, US-020 | T-028–T-033 | P0 |
+| T-137 | Split bill per item (issue #42, PRD v0.19): schema for several payments per bill and the order-item portions each part pays (`payment_items`, with a migration and RLS; a portion can be paid by at most one active part), bill detail with paid/unpaid portions and what is left, a part quote (subtotal, cumulative PB1, total), pay part (cash with amount received and shift, or QRIS; idempotent; ledger entries per part), undo a paid part with a reason (refund entry, audit log), refuse cancelling an order with paid items, close the bill when the last item is paid, and pay-what-is-left for a one-payment close; `allowed_actions` `split` / `pay_part` / `undo_part`. Update `docs/architecture/screen-endpoint-map.md` (S5, S5a) and `docs/domain/domain-glossary-and-rules.md`. Tests: AC10.11–AC10.15 figures (cash and QRIS parts on one bill, QRIS parts not in expected cash), concurrent pay of the same portion, cash count and cashflow still matching after a split (FR10.9). | US-064 | T-033, T-035, T-038, T-039, T-041 | P0 |
 
 ## Wave 4 — Payments, cashier shifts, ledger, and reports
 
@@ -147,6 +148,7 @@ This backlog breaks down the 61 user stories in [User-Stories-SME-Automation-Pla
 | T-136 | O8: table QR target setting per outlet (forced to web while WhatsApp isn't connected), download QR per table (PNG) and all tables (PDF), and "Ganti" to replace a table's token with a confirm step. Owner only (FR2.16). | US-063 | T-057, T-133, T-134 | P0 |
 | T-067 | Build staff counter order screen with dine-in and takeaway order types, add-ons, table selection, payment, and order submission. | US-034 | T-026–T-030, T-033, T-038, T-039, T-057 | P0 |
 | T-068 | Build order board with payment review, lifecycle actions, cancellation/reversal, and open-bills view. | US-016–US-021 | T-030–T-033, T-037–T-039 | P0 |
+| T-138 | Build split bill per item in the admin app (wireframe S5 "⇄ Split per item", S5a dialog, S5b QRIS step for one part, S5c bill after partial payment, M3 + M3a + M3b at 360 px): pick unpaid items or portions, part totals from the server, pay each part through the S1 payment popup (cash on the part total; static QRIS showing only the part's amount with the merchant-check list), paid parts list with "Batalkan…" (reason), remaining amount on the bill card, "Bayar sisa"; buttons only from `allowed_actions` (FR10.9). | US-064 | T-068, T-072, T-137 | P0 |
 | T-069 | Build stock, stock movement, low-stock, and sold-out screens. | US-006, US-007 | T-020–T-023 | P0 |
 | T-070 | Build reservation/table view and cashier shift screens. | US-018, US-026, US-027 | T-039, T-062–T-064 | P0 |
 | T-071 | Build owner dashboard for outlet-level and combined sales, cashflow, PB1, payment method, and stock summaries. | US-032, US-033 | T-041–T-043 | P0 |

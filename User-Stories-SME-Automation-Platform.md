@@ -284,9 +284,28 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Meja/guest hanya boleh memiliki satu open bill.
   - Order berikutnya dari meja atau counter bergabung ke bill yang sama.
   - Bill menampilkan item, total berjalan, dan durasi terbuka.
-  - Penutupan bill hanya menerima satu pembayaran penuh; semua order menjadi completed dan sale masuk ledger.
+  - Bill ditutup dengan satu pembayaran penuh, atau di-split per item (US-064); saat lunas semua order menjadi completed dan sale masuk ledger. PB1 dihitung sekali dari subtotal bill.
   - Jika mode outlet berubah, order baru mengikuti mode baru, sedangkan order yang sudah dibuat mempertahankan flow asalnya.
 - **Traceability:** FR10.6–FR10.8, AC10.7–AC10.10
+
+### US-064 — Split bill per item
+
+**Sebagai** staf, **saya ingin** membagi open bill per item sehingga tiap tamu membayar item yang dia pesan, **sehingga** meja dengan banyak tamu tidak perlu menghitung patungan di luar sistem.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Dari open bill (S5, M3) staf memilih "Split per item", lalu memilih item yang belum lunas atau sebagian porsi dari item dengan jumlah lebih dari satu; add-on ikut porsinya.
+  - Tiap bagian dibayar cash atau QRIS lewat popup pembayaran yang sama dengan tutup bill; bagian tercatat lunas hanya saat "Pembayaran selesai". Metode boleh berbeda per bagian.
+  - QRIS statis: popup menampilkan QRIS outlet dengan item, PB1, dan total bagian itu saja; tamu mengetik nominal bagiannya; staf mengecek mutasi merchant (nominal persis, masuk setelah popup dibuka, belum dipakai bagian lain) sebelum konfirmasi; satu bagian dalam satu waktu. Bagian QRIS tidak menambah uang tunai di shift kasir.
+  - Cash: uang diterima dan kembalian dihitung dari total bagian, dan uangnya masuk ke shift kasir yang terbuka.
+  - PB1 bagian = PB1 dari semua item yang sudah lunas termasuk bagian ini dikurangi PB1 yang sudah dibayar; tidak pernah negatif dan jumlah semua bagian sama persis dengan total bill.
+  - Tiap bagian adalah satu pembayaran dengan entri ledger sendiri (revenue dan PB1, metode bayar, shift kasir untuk cash).
+  - Item yang sudah lunas tidak bisa dipilih lagi atau dipindah; dua kasir membayar porsi yang sama bersamaan → hanya satu yang berhasil.
+  - Selama bill terbuka, bagian lunas bisa dibatalkan dengan alasan wajib: entri refund, audit log, item kembali belum lunas. Order yang punya item lunas tidak bisa dibatalkan sebelum bagiannya dibatalkan.
+  - Order baru tetap bisa masuk bill dan menambah sisa; daftar open bill menampilkan total dan sisa. "Tutup bill & bayar" setelah ada bagian lunas menagih tepat sisanya.
+  - Saat item terakhir lunas, semua order completed dan bill tertutup. Tombol mengikuti `allowed_actions` dari server.
+  - Halaman QR meja pelanggan tidak punya split (tidak menampilkan bill).
+- **Traceability:** FR10.6, FR10.9, FR11.4–FR11.6, AC10.8, AC10.11–AC10.15 · wireframe S5, S5a, S5b, S5c, M3, M3a, M3b · issue #42
 
 ### US-021 — Membatalkan dan membalik order
 
@@ -833,8 +852,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | FR7 Admin web app | US-003, US-033–US-035, US-056 |
 | FR8 Recommendations | US-028–US-029, US-052 |
 | FR9 Reservations | US-022–US-027, US-043 |
-| FR10 Order lifecycle | US-004, US-015–US-021, US-034 |
-| FR11 Payments & tax | US-017–US-020, US-047 |
+| FR10 Order lifecycle | US-004, US-015–US-021, US-034, US-064 |
+| FR11 Payments & tax | US-017–US-020, US-047, US-064 |
 | FR12 Membership & consent | US-040–US-041 |
 | NFR1 Data residency | US-039 |
 | NFR2 Multi-tenancy | US-038 |
