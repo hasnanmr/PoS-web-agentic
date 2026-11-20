@@ -9,6 +9,7 @@ Covers US-014 (sold-out handling across channels), US-036 (queued WhatsApp proce
 |---|---|---|---|
 | **Admin app** (React, `admin/`) | Static site (Cloudflare Pages or Vercel) | REST API only, with the user's Supabase access token | Call Supabase Data API for `app` tables, call Meta, hold secrets |
 | **Attendance tablet** (part of admin app, kiosk route) | Same static site | REST API `/api/v1/device/*` with a device session token | Use a staff token, open any other endpoint |
+| **Customer table web page** (part of admin app, public route `/t/{token}`; planned, #44) | Same static site | REST API `/api/v1/public/t/{token}/*` only, no sign-in | Read anything beyond that outlet's menu and that table's current bill, use any other endpoint |
 | **REST API** (FastAPI, `backend/app/api`) | Railway process `api` | Core services → Postgres; publishes to RabbitMQ | Call Meta directly (always via queue), skip RLS context |
 | **Webhook** (FastAPI route in the API process) | Railway process `api` | Verifies Meta signature, resolves outlet by phone, publishes to `wa.inbound` | Run order logic, write business tables |
 | **Workers** (`backend/app/worker`) | Railway process `worker` | Core services → Postgres; Meta Graph API; RabbitMQ | Expose HTTP (except health), bypass core services |
@@ -74,6 +75,7 @@ Rules:
 | `/api/v1/me`, `/api/v1/owner/onboarding` for an invited owner | Same token with `app_role = owner_pending`, no `tenant_id` | Same, plus a live open invitation (`app.pending_owner_invitation`) | None until the business is created (O1) |
 | Platform admin (owner invitations) | Service role key + `DATABASE_URL`, CLI only (`app.cli`) | — | Not a tenant user; no API endpoint or screen |
 | `/api/v1/device/*` | Device session token issued at pairing (T-121) | Token hash lookup in `attendance_devices`, not revoked | Fixed to one outlet |
+| `/api/v1/public/t/{token}/*` (planned, #44) | None; the table's `qr_token` in the path | Token lookup in `tables` (active table, current token); rate-limited per token and client address | Fixed to one outlet and one table |
 | `/webhooks/whatsapp` | Meta `X-Hub-Signature-256` | HMAC with the app secret | Outlet resolved from the receiving phone number id |
 | `/healthz`, `/readyz` | None | — | None; no tenant data |
 | Workers | No user token; actor `system` (or `agent`) | — | Tenant and outlet from the message or job payload |
@@ -108,6 +110,7 @@ The full endpoint list is defined per wireframe screen in [`screen-endpoint-map.
 | `/api/v1/ops/outlets/{outlet_id}/*`, `/api/v1/ops/{orders,bills,payment-proofs,reservations,drawers,shifts}/{id}/*` | owner, staff (assigned outlets) | S1–S9, M1–M6 |
 | `/api/v1/ops/me/attendance*` | staff (own records) | S9, M6 |
 | `/api/v1/device/*` (`pair`, `staff`, `selfies`, `attendance`) | attendance tablet | K0–K4 |
+| `/api/v1/public/t/{token}/*` (planned, #44) | customer at a table | Q1–Q5 |
 | `/webhooks/whatsapp` | Meta | — (worker flows W1–W12) |
 | `/healthz`, `/readyz` | none | — |
 

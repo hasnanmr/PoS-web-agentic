@@ -162,10 +162,38 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
-  - QR membuka chat nomor WhatsApp outlet yang benar dengan table identifier.
+  - QR membuka halaman meja (`/t/<token>`); bila outlet mengizinkan WhatsApp, pilihan "Pesan via WhatsApp" membuka chat nomor WhatsApp outlet yang benar dengan table identifier (pesan di web: US-062).
   - Order diberi channel `whatsapp_table`, tipe dine-in, dan table yang benar.
   - Order mengikuti mode pembayaran dine-in outlet.
 - **Traceability:** FR2.7, FR2.10, AC2.8
+
+### US-062 — Memesan dan melihat bill dari halaman QR meja
+
+**Sebagai** pelanggan dine-in, **saya ingin** memesan dari HP lewat halaman web yang terbuka saat memindai QR meja, lalu melihat status pesanan dan bill meja, **sehingga** saya bisa memesan tanpa WhatsApp dan tanpa menunggu pelayan.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Halaman menampilkan outlet dan nomor meja dari QR tanpa login; bila outlet memakai web + WhatsApp, layar pertama menawarkan "Pesan di sini" dan "Pesan via WhatsApp".
+  - Menu menampilkan foto, harga outlet, dan add-on; item habis tidak bisa ditambah; add-on wajib harus dipilih sebelum kirim.
+  - "Kirim pesanan" membuat order dine-in channel `web_table` untuk meja itu lewat fungsi order yang sama (stok, PB1, lifecycle); harga dihitung ulang di server; kirim dua kali tidak membuat order ganda.
+  - Outlet open bill: order masuk ke open bill meja yang sama dengan order WhatsApp dan kasir. Outlet pay-first: order menunggu pembayaran.
+  - Setelah kirim, halaman menampilkan status pesanan yang diperbarui sendiri, termasuk pembatalan beserta alasannya.
+  - Halaman bill meja menampilkan semua order di open bill meja itu dari semua kanal, dengan PB1 dan total, dan tidak pernah menampilkan bill meja lain atau tamu sebelumnya.
+  - Order dari web tampil di Order Board dan Open Bills dengan label kanal web dan nama pemesan bila diisi.
+- **Traceability:** FR2.7, FR2.8, FR2.13–FR2.15, AC2.8, AC2.15–AC2.19 · wireframe Q1–Q5 · issue #44
+
+### US-063 — Mengatur tujuan dan token QR meja
+
+**Sebagai** owner, **saya ingin** menentukan ke mana QR meja mengarah dan mengganti QR yang bocor, **sehingga** pelanggan memakai kanal yang saya siapkan tanpa mencetak ulang QR.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Per outlet, owner memilih tujuan QR: Web + WhatsApp, Web saja, atau WhatsApp saja; selama WhatsApp outlet belum terhubung, QR selalu ke web.
+  - Owner dapat mengunduh QR per meja dan semua QR outlet dalam satu PDF.
+  - "Ganti" membuat token baru untuk meja itu; QR lama langsung tidak berlaku dan menampilkan pesan bahwa QR tidak berlaku.
+  - Mengubah tujuan QR tidak memerlukan cetak ulang.
+  - Staf tidak dapat mengubah pengaturan ini, termasuk lewat API langsung.
+- **Traceability:** FR2.16, AC2.20, AC2.21 · wireframe O8 · issue #44
 
 ### US-014 — Membuat order secara konsisten dan aman terhadap stok
 
@@ -796,7 +824,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | Area PRD | User story |
 |---|---|
 | FR1 Business, outlet, staff | US-001–US-004 |
-| FR2 Order intake & WhatsApp catalog | US-008–US-015, US-034, US-042 |
+| FR2 Order intake, WhatsApp catalog & table QR web page | US-008–US-015, US-034, US-042, US-062, US-063 |
 | FR3 Cashflow | US-030–US-032, US-045, US-057–US-061 |
 | FR4 Menu, stock, inventory | US-005–US-008, US-014, US-021, US-045, US-060 |
 | FR5 Staff attendance (MVP) and scheduling (Phase 3) | US-046, US-053–US-055 |

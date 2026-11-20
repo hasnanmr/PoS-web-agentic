@@ -28,7 +28,7 @@ Decisions recorded from the product owner on 2026-11-17:
 | Pergerakan stok | `stock_movement` | Append-only change to stock: sale, sale reversal, restock, waste, adjustment. Stock level = sum of movements. |
 | Sold out / habis | derived | A product is unavailable at an outlet when any ingredient is below one portion. |
 | Order | `order` | One order from a channel. Has an order status and a separate payment status. |
-| Kanal | `order_channel` | `whatsapp_online`, `whatsapp_table`, `counter`. |
+| Kanal | `order_channel` | `whatsapp_online`, `whatsapp_table`, `web_table`, `counter`. |
 | Tipe order | `order_type` | `delivery`, `pickup` (online); `dine_in`, `takeaway` (counter, table). |
 | Open bill | `bill` | A running bill for a table or guest name at open-bill outlets; paid in full once. |
 | Mode pembayaran dine-in | `payment_mode` | Outlet setting: `pay_first` or `open_bill`. Online orders are always pay first. |
@@ -83,7 +83,7 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `tenant_type` | `restaurant`, `cafe` | `dropshipper` added in Phase 3 (T-097). |
 | `user_role` | `owner`, `staff` | Stored role. The `app_role` JWT claim (T-113) is `owner`, `staff`, or `owner_pending` (invited owner, no tenant yet). |
 | `payment_mode` | `pay_first`, `open_bill` | Dine-in only. Online orders always pay first. |
-| `order_channel` | `whatsapp_online`, `whatsapp_table`, `counter` | FR2.8. |
+| `order_channel` | `whatsapp_online`, `whatsapp_table`, `web_table`, `counter` | FR2.8. `web_table` = order from the table QR web page (issue #44, planned). |
 | `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in. Counter: dine_in/takeaway. |
 | `order_status` | `pending_payment`, `confirmed`, `preparing`, `ready`, `out_for_delivery`, `served`, `completed`, `cancelled` | Flows in §5. |
 | `payment_status` | `unpaid`, `proof_submitted`, `paid`, `refunded` | `refunded` only through a reversal. |

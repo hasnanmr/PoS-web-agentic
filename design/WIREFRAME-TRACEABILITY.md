@@ -2,7 +2,7 @@
 
 This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME-POS-Wireframe.figcraft) to the user stories in [User-Stories-SME-Automation-Platform.md](../User-Stories-SME-Automation-Platform.md) and the tasks in [Task-Breakdown-SME-Automation-Platform.md](../Task-Breakdown-SME-Automation-Platform.md).
 
-- **Baseline:** PRD v0.15, US-001–US-061, T-001–T-131.
+- **Baseline:** PRD v0.18, US-001–US-063, T-001–T-136.
 - **Open the file:** FigCraft (`figcraft SME-POS-Wireframe.figcraft`). PNG previews of each page are in [`previews/`](previews/).
 - **Labels:** every screen on the canvas has a label above it in the form `Code · Name — US-xxx · T-xxx`, matching the tables below.
 - **Fidelity:** low-to-mid fidelity wireframes. The colours follow the agreed reference (light sidebar, navy primary `#1E4FA3`, light-blue background `#F3F6FB`). Copy is in Bahasa Indonesia, as in the product.
@@ -17,6 +17,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | 03 · WhatsApp Customer | W1–W12 (MVP), A1–A2 (Phase 2) | [03-whatsapp-customer.png](previews/03-whatsapp-customer.png) |
 | 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
 | 05 · Tablet Absensi Outlet | K0–K4 | [05-tablet-absensi.png](previews/05-tablet-absensi.png) |
+| 06 · QR Meja Pelanggan | Q1–Q5 (table QR web page, issue #44) | [06-qr-meja-pelanggan.png](previews/06-qr-meja-pelanggan.png) |
 | 99 · Components | `Sidebar/Owner`, `Sidebar/Staff` (with the Thinker logo + name), "Logo Thinker · 2 opsi" (option 1 · Gelembung T chosen) | — |
 
 ## Screen → user story → task
@@ -32,7 +33,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
 | O6 Resep & Bahan | US-006, US-007 | T-019, T-021, T-022, T-066 |
 | O7 Rekomendasi (owner's picks & tags) | US-028, US-029 | T-073, T-074 |
-| O8 Meja & Aturan Reservasi (+ table QR) | US-013, US-022 | T-054, T-057 |
+| O8 Meja & Aturan Reservasi (+ table QR: unduh / ganti token / tujuan QR web · WhatsApp) | US-013, US-022, US-063 | T-054, T-057, T-136 |
 | O9 Laporan Cashflow & Pengeluaran (biaya saja; PO tidak lagi di sini) | US-030, US-031, US-032 | T-041, T-042, T-043 |
 | O10 Laporan Cash Count | US-018 | T-040, T-102 |
 | O11 Audit Log | US-004, US-016, US-021 | T-031, T-101 |
@@ -102,6 +103,16 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | K3 Cek foto & simpan (+ first-use privacy notice) | US-053 | T-117, T-122 |
 | K4 Berhasil + error states (camera, offline, already clocked in, revoked tablet) | US-053, US-055 | T-117, T-121 |
 
+### Customer table QR web page (issue #44)
+
+| Screen | User stories | Tasks |
+|---|---|---|
+| Q1 Scan QR meja — pilih cara pesan (Pesan di sini / Pesan via WhatsApp / Lihat bill) | US-062, US-013 | T-134, T-135 |
+| Q2 Menu (harga outlet, add-on, item habis) | US-062 | T-134, T-135 |
+| Q3 Pesanan kamu (catatan, nama opsional, PB1, kirim ke bill meja) | US-062 | T-134, T-135 |
+| Q4 Status pesanan (live, termasuk batal + alasan) | US-062 | T-134, T-135 |
+| Q5 Bill meja (live, semua kanal; split #42 dan bayar #43 menyusul) | US-062 | T-134, T-135 |
+
 Role-aware navigation (`Sidebar/Owner`, `Sidebar/Staff`) covers US-003 and US-033 through T-013 and T-072.
 
 ## User story → screens
@@ -122,7 +133,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-010 | W2 |
 | US-011 | W3, W5, S1 |
 | US-012 | W4 |
-| US-013 | W8, O8, S2, S5 |
+| US-013 | W8, O8, S2, S5, Q1 |
 | US-014 | W5, S2 |
 | US-015 | W7, S2, O12 |
 | US-016 | S2, S3, O11, M1 |
@@ -164,6 +175,8 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-059 | O15, O17, S10 |
 | US-060 | S11, S10, O15 |
 | US-061 | O15, O17 |
+| US-062 | Q1–Q5, S2, S5 |
+| US-063 | O8 |
 | US-042 (Phase 2) | A1 |
 | US-043 (Phase 2) | A2 |
 | US-044, US-045 (Phase 2) | Not drawn yet |
@@ -180,6 +193,9 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-052 Cart intake + add-on collection | W2, W3 |
 | T-053 Order summary, pickup/delivery, confirm | W4, W5 |
 | T-054 Table QR | W8, O8 |
+| T-134 Public table API (token-scoped) | Q1–Q5 |
+| T-135 Customer table web page | Q1–Q5, S2, S5 |
+| T-136 Table QR settings, download, replace token | O8 |
 | T-036 QRIS payment request + screenshot intake | W6, S4 |
 | T-034 Unpaid-order timeout | W6, W7, S2 |
 | T-055 Order notifications + templates | W7 |
@@ -222,7 +238,7 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 - Attendance is recorded only on the outlet's paired tablet (K0–K4): the staff member taps their name and takes a required selfie, so they must be at the outlet. Staff phones and the admin app only show their own history (S9, M6). No PIN is needed. Selfies are private, visible to the owner and the staff member, and deleted after 45 days; staff cannot delete them (the owner can, through the API).
 - All purchase-order screens for the owner live in their own Dashboard tab **PO & Supplier** (issue #16): O17 cards on top, the O15 list and detail below, Buka PO (O16) and Daftar supplier from the tab header. The tab has its own outlet + month filter (PRD v0.15). The month applies only to Ringkasan PO (by PO open date, FR3.12). Pembayaran supplier and PO ada selisih always show every PO that needs action (FR3.11). The list uses the status chips (FR3.10), and a Ringkasan figure opens it with exactly those POs. Each number appears once: the old O15 KPI row was merged into O17's Pembayaran supplier card. Pengeluaran (O9) is for expenses only. Staff keep S10–S12.
 - S6 / M4 add a **Selesai** action for seated reservations and walk-ins (US-026 "completed"; not drawn on the canvas, approved by the product owner on 2026-11-19) so the table is freed when the guests leave. The canvas should get the button in the next wireframe pass.
-- O8's **⭳ Unduh** QR column is shown disabled until WhatsApp (T-054, pilot) ships.
+- The table QR opens the Thinker web page `/t/<token>`, not WhatsApp directly (issue #44, PRD v0.18). From one printed QR the customer orders on the web (Q2–Q3, channel `web_table`) or continues in WhatsApp (W8, `whatsapp_table`). The owner picks web + WhatsApp, web only, or WhatsApp only on O8; while WhatsApp isn't connected the QR always goes to the web page, so O8's **⭳ Unduh** works without WhatsApp. Web and WhatsApp orders share the table's open bill. Q5 has no pay button until online payment (#43); customers pay at the counter.
 - A forgotten clock-out is flagged "perlu dikoreksi" 1 hour after closing time (default) without inventing a time; the owner checks selfies and corrects the record with a required reason (O14).
 
 ## Open points
