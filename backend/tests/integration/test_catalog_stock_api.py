@@ -128,6 +128,14 @@ def test_product_crud_prices_and_status_filter(client, ctx) -> None:
         json=[{"outlet_id": ctx["outlet"], "price": 15000}],
     ).json()
     assert prices[0]["price"] == 15000
+    # A new item has no photo yet, so it starts Nonaktif (T-132); with a photo it can go live.
+    assert teh["is_active"] is False and teh["has_photo"] is False
+    assert _product(client, ctx, "Teh Tarik")["status"] == "inactive"
+    admin_sql("update app.products set photo_path = 'x/teh.jpg' where id = %s", (teh["id"],))
+    res = client.patch(
+        f"/api/v1/owner/products/{teh['id']}", headers=ctx["owner"], json={"is_active": True}
+    )
+    assert res.status_code == 200, res.text
     # No recipe yet → cannot be sold → sold out at the outlet.
     assert _product(client, ctx, "Teh Tarik")["status"] == "sold_out"
 

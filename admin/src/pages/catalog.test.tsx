@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
@@ -74,12 +74,12 @@ describe('S7 Stok', () => {
 })
 
 const ROWS: ProductRow[] = [
-  { id: 'p1', name: 'Es Kopi Susu Senja', category: 'Kopi', is_owner_pick: true, is_sample: true, has_photo: false,
+  { id: 'p1', name: 'Es Kopi Susu Senja', category: 'Kopi', is_owner_pick: true, is_sample: true, has_photo: false, photo_url: null,
     addon_group_count: 1, ingredient_count: 4, price: 25000, status: 'active' },
 ]
 const DETAIL: ProductDetail = {
   id: 'p1', name: 'Es Kopi Susu Senja', category: 'Kopi', description: 'Espresso, susu segar & gula aren',
-  is_owner_pick: true, is_active: true, is_sample: true, has_photo: false, tags: ['coffee', 'sweet'],
+  is_owner_pick: true, is_active: true, is_sample: true, has_photo: false, photo_url: null, tags: ['coffee', 'sweet'],
   prices: [{ outlet_id: 'o-dago', outlet_name: 'Bandung – Dago', price: 25000 },
     { outlet_id: 'o-riau', outlet_name: 'Bandung – Riau', price: null }],
   addon_groups: [{ id: 'g1', name: 'Ukuran', selection: 'single', is_required: true, sort_order: 1, options: [
@@ -102,6 +102,55 @@ describe('O5 Menu & Add-on', () => {
       { outlet_id: 'o-dago', price: 25000 }, { outlet_id: 'o-riau', price: 27000 }]]))
     expect(api.calls.find(([m, p]) => m === 'PATCH' && p === '/owner/products/p1')?.[2]).toMatchObject({
       tags: ['coffee', 'sweet'], is_owner_pick: true })
+  })
+})
+
+describe('O5 Foto menu (T-132)', () => {
+  const inactive: ProductDetail = { ...DETAIL, is_active: false, is_sample: false }
+
+  it('uploads a photo, shows it, and only then allows switching the item on', async () => {
+    const withPhoto: ProductDetail = { ...inactive, has_photo: true, photo_url: 'https://signed.test/p1.png' }
+    const api = fakeApi({
+      'GET /owner/products?price_outlet_id=o-dago': [{ ...ROWS[0], status: 'inactive' }],
+      'GET /owner/products/p1': inactive,
+      'UPLOAD /owner/products/p1/photo': withPhoto,
+    })
+    render(<MemoryRouter><WithSession session={fakeSession('owner', { api })}><MenuPage /></WithSession></MemoryRouter>)
+    const toggle = await screen.findByRole('switch')
+    expect(toggle).toBeDisabled()
+    expect(screen.getByText('Tambahkan foto untuk mengaktifkan item ini.')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText('Deskripsi'), ' & es')
+    const file = new File(['png'], 'kopi.png', { type: 'image/png' })
+    await userEvent.upload(screen.getByLabelText('Foto menu'), file)
+    expect(await screen.findByAltText('Foto Es Kopi Susu Senja')).toHaveAttribute('src', 'https://signed.test/p1.png')
+    expect(api.calls).toContainEqual(['UPLOAD', '/owner/products/p1/photo', file])
+    expect(await screen.findByText('Foto disimpan.')).toBeInTheDocument()
+    expect(screen.getByRole('switch')).toBeEnabled()
+    expect(screen.getByLabelText('Deskripsi')).toHaveValue('Espresso, susu segar & gula aren & es') // draft kept
+  })
+
+  it('refuses other file types and large files before uploading', async () => {
+    const api = fakeApi({ 'GET /owner/products?price_outlet_id=o-dago': ROWS, 'GET /owner/products/p1': inactive })
+    render(<MemoryRouter><WithSession session={fakeSession('owner', { api })}><MenuPage /></WithSession></MemoryRouter>)
+    const input = await screen.findByLabelText('Foto menu')
+    await userEvent.upload(input, new File(['x'.repeat(6 * 1024 * 1024)], 'big.jpg', { type: 'image/jpeg' }))
+    expect(await screen.findByText('Foto harus JPG, PNG, atau WebP, maks 5 MB.')).toBeInTheDocument()
+    expect(api.calls.some(([m]) => m === 'UPLOAD')).toBe(false)
+  })
+
+  it('shows list thumbnails from photo_url', async () => {
+    const api = fakeApi({
+      'GET /owner/products?price_outlet_id=o-dago': [{ ...ROWS[0], has_photo: true, photo_url: 'https://signed.test/t.webp' }],
+      'GET /owner/products/p1': DETAIL,
+    })
+    const { container } = render(<MemoryRouter><WithSession session={fakeSession('owner', { api })}><MenuPage /></WithSession></MemoryRouter>)
+    await screen.findByText('Rp 25.000 · Aktif')
+    const img = container.querySelector('img[src="https://signed.test/t.webp"]')
+    expect(img).not.toBeNull()
+    // An expired signed URL falls back to the grey box, not a broken image.
+    fireEvent.error(img!)
+    expect(container.querySelector('img[src="https://signed.test/t.webp"]')).toBeNull()
   })
 })
 

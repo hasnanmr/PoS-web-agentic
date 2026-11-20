@@ -20,7 +20,7 @@ The `app_backend` role password and transaction-pooler URL are in the ignored lo
 | 10 | Pilot/production only: Pro plan, daily backups / PITR, and ADR 0001 accepted first | NFR1, T-114 |
 | 11 | Platform admin: run `uv run python -m app.cli invite-owner --email … --invited-by …` for each new owner (needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`) | T-006 owner invitations |
 
-Secrets never go into the repository. The service role key is used only for the Supabase Auth admin API: owner invitations (platform-admin CLI) and banning deactivated staff (API, T-012). It is never used to read or write tenant data, and lives in Railway secrets / the operator's machine.
+Secrets never go into the repository. The service role (secret) key is used only for the Supabase Auth admin API, namely owner invitations (platform-admin CLI) and banning deactivated staff (API, T-012), and for private Storage objects: menu photo upload, signed URLs and removal (API, T-132). It is never used to read or write tenant table data, and lives in Railway secrets / the operator's machine.
 
 ## Deploy note: sample menu for existing tenants
 

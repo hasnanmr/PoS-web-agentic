@@ -63,8 +63,16 @@ class Settings(BaseSettings):
     jwt_algorithms: Annotated[list[str], NoDecode] = ["ES256", "RS256"]
     jwks_cache_seconds: int = Field(default=600, ge=30, le=86400)
     # Service role key: used ONLY for the Supabase Auth admin API (owner invitations by the
-    # platform admin CLI, banning deactivated staff). Never used for tenant data.
+    # platform admin CLI, banning deactivated staff) and for private Storage objects (menu
+    # photos, T-132: upload, signed URLs, removal). Never used for tenant table data, which
+    # always goes through Postgres with RLS.
     supabase_service_role_key: SecretStr | None = None
+    menu_photo_bucket: str = "menu-photos"
+    # Signed menu photo URLs live this long; the API reuses one per photo while it still has
+    # at least `signed_url_min_left_seconds` left, so screens get stable URLs (browser cache)
+    # and every URL handed out stays valid for that long.
+    signed_url_seconds: int = Field(default=3600, ge=300, le=86400)
+    signed_url_min_left_seconds: int = Field(default=1200, ge=60, le=3600)
     # Admin app URL: where invitation emails send people to set their password.
     admin_app_url: AnyHttpUrl | None = None
 
