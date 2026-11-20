@@ -1,5 +1,6 @@
-"""Owner finance — O9 Laporan Cashflow & Pengeluaran (T-041 to T-043) and O10 Laporan Cash
-Count (T-040, T-102). The sidebar item "Pengeluaran" opens O9 until its own wireframe exists.
+"""Owner finance — O9 Laporan Cashflow & Pengeluaran (T-041 to T-043), O9b Pengeluaran (the
+sidebar menu: supplier payments for staff-opened POs plus direct expenses) and O10 Laporan Cash
+Count (T-040, T-102).
 
 Contract: docs/architecture/screen-endpoint-map.md → O9, O10.
 """
@@ -19,7 +20,7 @@ from pydantic import BaseModel, Field
 from app import db
 from app.api.errors import ApiError
 from app.auth.deps import OwnerOnly
-from app.core import idempotency, ledger, outlets, reports
+from app.core import idempotency, ledger, outlets, purchase_orders, reports
 from app.core.localtime import DEFAULT_TIMEZONE, local_date, to_local, zone_label
 
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: finance"])
@@ -33,6 +34,25 @@ class OutletRef(BaseModel):
     name: str
 
 
+class SupplierRef(BaseModel):
+    id: UUID
+    name: str
+
+
+class ExpensePO(BaseModel):
+    """The purchase order behind a supplier payment (O9b: "Lihat PO →", staff who opened it)."""
+
+    id: UUID
+    number: str
+    supplier: SupplierRef
+    created_by: str | None
+    created_by_role: Literal["owner", "staff"] | None
+    payment_term: Literal["pay_later", "pay_in_advance"]
+    payment_status: Literal["unpaid", "partially_paid", "paid"] = Field(
+        description="The PO's payment state right after this payment, not today's"
+    )
+
+
 class Expense(BaseModel):
     id: int
     business_date: date
@@ -43,6 +63,44 @@ class Expense(BaseModel):
     created_at: datetime
     reversed: bool
     reversal_reason: str | None
+    source: Literal["po", "direct"]
+    payment_method: Literal["cash", "transfer"] | None
+    purchase_order: ExpensePO | None
+
+
+class AmountCount(BaseModel):
+    amount: int
+    count: int
+
+
+class PoSpend(BaseModel):
+    amount: int
+    count: int = Field(description="Supplier payments (list rows), not POs")
+    po_count: int = Field(description="Distinct purchase orders those payments were for")
+
+
+class SupplierSpend(BaseModel):
+    supplier: SupplierRef
+    amount: int
+    count: int
+
+
+class PoOwed(BaseModel):
+    amount: int = Field(description="Still owed on closed pay-later POs, as of today")
+    count: int
+    overdue_count: int
+
+
+class ExpenseSummary(BaseModel):
+    from_: date = Field(alias="from")
+    to: date
+    total: AmountCount
+    po: PoSpend
+    direct: AmountCount
+    by_supplier: list[SupplierSpend]
+    po_owed: PoOwed
+
+    model_config = {"populate_by_name": True}
 
 
 class ExpensePage(BaseModel):
@@ -188,6 +246,7 @@ async def list_expenses(
     outlet_id: UUID | None = None,
     date_from: Annotated[date | None, Query(alias="from")] = None,
     date_to: Annotated[date | None, Query(alias="to")] = None,
+    source: Literal["po", "direct"] | None = None,
     cursor: str | None = Query(default=None, max_length=200),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> ExpensePage:
@@ -201,8 +260,30 @@ async def list_expenses(
             date_to=date_to,
             cursor=cursor,
             limit=limit,
+            source=source,
         )
     return ExpensePage(**page)
+
+
+@router.get("/expenses/summary")
+async def expenses_summary(
+    request: Request,
+    user: OwnerOnly,
+    outlet_id: UUID | None = None,
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
+) -> ExpenseSummary:
+    """O9b KPI cards and supplier bars. `po_owed` is as of today (not the range)."""
+    async with db.transaction(_pool(request), user.actor()) as conn:
+        start, end = await _range(conn, outlet_id, date_from, date_to)
+        data = await ledger.expense_summary(conn, outlet_id=outlet_id, date_from=start, date_to=end)
+        owed = await purchase_orders.supplier_payments(conn, outlet_id=outlet_id)
+    data["po_owed"] = {
+        "amount": owed["debt_total"],
+        "count": sum(1 for i in owed["items"] if i["payment_term"] == "pay_later"),
+        "overdue_count": owed["overdue_count"],
+    }
+    return ExpenseSummary(**data)
 
 
 @router.post("/expenses", status_code=status.HTTP_201_CREATED)

@@ -58,3 +58,11 @@ export function useLoad<T>(load: () => Promise<T>, key: string): Loaded<T> {
     reload,
   }
 }
+
+/** The last defined value, kept while a reload (new key) is in flight so the screen does not
+ *  blank out to a spinner. Pass `undefined` to clear it (e.g. when the reload failed). */
+export function useKept<T>(value: T | undefined, keep = true): T | undefined {
+  const [kept, setKept] = useState(value)
+  if (value !== undefined && value !== kept) setKept(value)
+  return value ?? (keep ? kept : undefined)
+}

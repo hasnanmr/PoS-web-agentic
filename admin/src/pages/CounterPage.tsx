@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { ROUTES } from '../app/nav'
-import { useSession } from '../app/session'
+import { useRolePath, useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
 import type { MenuItem, OrderCreated, Quote, ShiftRow, TableRow } from '../lib/types'
@@ -44,6 +44,7 @@ function addonText(line: CartLine): string {
 
 export default function CounterPage() {
   const { api, me, outlet } = useSession()
+  const pathFor = useRolePath()
   const outletId = outlet?.id ?? ''
   const menu = useLoad(() => api.get<MenuItem[]>(`/ops/outlets/${outletId}/menu`), outletId)
   usePhotoRefresh(menu.reload)
@@ -175,7 +176,7 @@ export default function CounterPage() {
         ) : drawerAmbiguous ? (
           <span className="text-[12px] text-warning">{openShifts.length} shift terbuka · pilih drawer untuk cash</span>
         ) : (
-          <Link to={ROUTES.shifts.path} className="text-[12px] text-warning hover:underline">○ Belum ada shift · Buka shift</Link>
+          <Link to={pathFor(ROUTES.shifts.path)} className="text-[12px] text-warning hover:underline">○ Belum ada shift · Buka shift</Link>
         )}
       />
       <div className="grid gap-4 p-4 md:p-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -290,7 +291,7 @@ export default function CounterPage() {
               </label>
             )}
             {!shift && !drawerAmbiguous && !toBill && (
-              <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka. <Link to={ROUTES.shifts.path} className="text-primary hover:underline">Buka shift</Link></p>
+              <p className="mt-1 text-[11px] text-text-muted">Cash butuh shift kasir terbuka. <Link to={pathFor(ROUTES.shifts.path)} className="text-primary hover:underline">Buka shift</Link></p>
             )}
           </div>
           {notice && <div className="mt-3"><Alert tone={notice.tone}>{notice.text}</Alert></div>}

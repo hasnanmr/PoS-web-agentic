@@ -2,7 +2,7 @@
 // Endpoints: GET/POST /owner/products, GET/PATCH/DELETE /owner/products/{id},
 // PUT /owner/products/{id}/prices, add-on groups under /owner/products/{id}/addon-groups,
 // PUT /owner/products/{id}/photo (T-132: "Foto *", JPG/PNG/WebP max 5 MB, private bucket, signed
-// photo_url). Every item needs a photo (FR2.11): a new item starts Nonaktif and the server refuses
+// photo_url; the browser first shrinks the picked file to 800 px JPEG). Every item needs a photo (FR2.11): a new item starts Nonaktif and the server refuses
 // to activate an item without one (photo_required). Not yet here: WhatsApp catalog sync (T-051).
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -10,6 +10,7 @@ import { useSession } from '../app/session'
 import { ROUTES } from '../app/nav'
 import { errorMessage } from '../lib/api'
 import { formatDelta, formatRupiah } from '../lib/format'
+import { resizeImage } from '../lib/resizeImage'
 import type { AddonGroup, ProductDetail, ProductRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { usePhotoRefresh } from '../lib/usePhotoRefresh'
@@ -206,7 +207,8 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
     }
     setUploading(true)
     try {
-      const saved = await api.upload<ProductDetail>(`/owner/products/${productId}/photo`, file, file.type)
+      const photo = await resizeImage(file)
+      const saved = await api.upload<ProductDetail>(`/owner/products/${productId}/photo`, photo, photo.type)
       setPhoto({ url: saved.photo_url, has: saved.has_photo })
       await onChanged(hasPhoto ? 'Foto diganti.' : 'Foto disimpan.')
     } catch (e) {
