@@ -46,7 +46,7 @@ export function PaymentDialog({ method, total, outletId, busy, error, onConfirm,
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 sm:items-center"
       role="dialog" aria-modal="true" aria-label={title}>
-      <div className="w-full max-w-sm rounded-lg bg-surface p-4">
+      <div className="w-full max-w-md rounded-lg bg-surface p-5">
         <h2 className="text-[16px] font-bold">{title}</h2>
         <div className="mt-2 flex justify-between text-[15px] font-bold">
           <span>Total</span><span>{formatRupiah(total)}</span>
@@ -55,7 +55,7 @@ export function PaymentDialog({ method, total, outletId, busy, error, onConfirm,
         {method === 'cash' ? (
           <form className="mt-3 space-y-2 text-[12px]" onSubmit={(e) => { e.preventDefault(); confirm() }}>
             <label className="flex items-center justify-between gap-2">
-              <span className="font-semibold">Uang diterima</span>
+              <span className="whitespace-nowrap font-semibold">Uang diterima</span>
               <TextInput ref={inputRef} aria-label="Uang diterima" inputMode="numeric" className="h-9 w-40 text-right"
                 value={received ? Number(received).toLocaleString('id-ID') : ''}
                 onChange={(e) => setReceived(e.target.value.replace(/\D/g, ''))} />
@@ -89,8 +89,8 @@ export function PaymentDialog({ method, total, outletId, busy, error, onConfirm,
 
         {error && <div className="mt-3"><Alert>{error}</Alert></div>}
         <div className="mt-4 flex gap-2">
-          <Button variant="ghost" className="flex-1" disabled={busy} onClick={onCancel}>Batal</Button>
-          <Button variant="action" className="flex-1" disabled={!canConfirm} onClick={confirm}>
+          <Button variant="ghost" className="flex-1 whitespace-nowrap" disabled={busy} onClick={onCancel}>Batal</Button>
+          <Button variant="action" className="flex-1 whitespace-nowrap" disabled={!canConfirm} onClick={confirm}>
             {busy ? 'Memproses…' : 'Pembayaran selesai'}
           </Button>
         </div>
