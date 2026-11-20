@@ -1,6 +1,7 @@
 // Wireframe S5 / M3 — Open Bills (T-033, T-068).
 // Endpoints: GET/POST /ops/outlets/{id}/bills, GET /ops/bills/{id}, POST /ops/bills/{id}/close
 // (Idempotency-Key). One open bill per table or guest; one full payment; no split bill.
+// Tutup bill opens the payment step (PaymentDialog): cash received + change, or the QRIS.
 import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
@@ -10,7 +11,7 @@ import { useLoad } from '../lib/useLoad'
 import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, LinkButton, Loading, Select, TextInput } from '../ui/kit'
-import { QrisPayPanel } from '../ui/QrisImage'
+import { PaymentDialog } from '../ui/PaymentDialog'
 
 function duration(iso: string, now = Date.now()): string {
   const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
@@ -140,14 +141,13 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
   const shifts = useLoad(() => api.get<ShiftRow[]>(`/ops/outlets/${outlet!.id}/shifts/current`), outlet!.id)
   usePolling(bill) // orders added from the counter show up, and the total to pay stays current
   const [method, setMethod] = useState<'cash' | 'qris'>('cash')
-  const [received, setReceived] = useState('')
+  const [paying, setPaying] = useState(false)
   const [drawerId, setDrawerId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const [key] = useState(() => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `bill-${Date.now()}`))
   const b = bill.data
   if (!b || !outlet) return <Loading />
-  const cash = Number(received || 0)
   // The server needs a drawer when several shifts are open and none is the cashier's own.
   const openShifts = shifts.data ?? []
   const myShift = openShifts.find((s) => s.opened_by === me.user.id)
@@ -156,7 +156,23 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
   const drawerAmbiguous = !shift && openShifts.length > 1
   // A failed shifts request is not the same as "no open shift": show the error, not the shift hint.
   const shiftsFailed = shifts.data === undefined && Boolean(shifts.error)
-  const canPay = b.orders.length > 0 && (method === 'qris' || (Boolean(shift) && cash >= b.total))
+  const canPay = b.orders.length > 0 && (method === 'qris' || Boolean(shift))
+
+  // Cash and QRIS both go through the payment step; the bill closes on "Pembayaran selesai".
+  async function close(cash?: number) {
+    setBusy(true)
+    setError(undefined)
+    try {
+      const res = await api.post<{ total: number; change_due: number | null; orders_completed: number }>(
+        `/ops/bills/${b!.id}/close`,
+        method === 'cash' ? { method, cash_received: cash, drawer_id: shift?.drawer_id } : { method },
+        { 'Idempotency-Key': key })
+      await onClosed(`Bill ditutup · ${formatRupiah(res.total)} · ${res.orders_completed} order completed${res.change_due != null ? ` · kembalian ${formatRupiah(res.change_due)}` : ''}`)
+    } catch (e) {
+      setError(errorMessage(e))
+      setBusy(false)
+    }
+  }
 
   return (
     <Card title={`Bill ${billName(b)} · dibuka ${formatTime(b.opened_at, outlet.timezone)} (${duration(b.opened_at)})`}>
@@ -199,15 +215,6 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
           </button>
         ))}
       </div>
-      {method === 'cash' && (
-        <label className="mt-2 flex items-center gap-2 text-[12px]">
-          Uang diterima:
-          <TextInput aria-label="Uang diterima bill" inputMode="numeric" className="h-8 w-32"
-            value={received ? Number(received).toLocaleString('id-ID') : ''}
-            onChange={(e) => setReceived(e.target.value.replace(/\D/g, ''))} />
-          {cash >= b.total && <span className="text-success">→ Kembalian {formatRupiah(cash - b.total)}</span>}
-        </label>
-      )}
       {method === 'cash' && drawerAmbiguous && (
         <label className="mt-2 block text-[12px]">
           <span className="mb-1 block font-semibold">Drawer penerima cash</span>
@@ -232,25 +239,16 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
           </Alert>
         </div>
       )}
-      {method === 'qris' && b.orders.length > 0 && <QrisPayPanel outletId={outlet.id} amount={b.total} />}
       <p className="mt-2 text-[11px] text-text-muted">Split bill tidak didukung di MVP.</p>
-      {error && <div className="mt-2"><Alert>{error}</Alert></div>}
-      <Button variant="action" className="mt-3 w-full" disabled={!canPay || busy} onClick={async () => {
-        setBusy(true)
-        setError(undefined)
-        try {
-          const res = await api.post<{ total: number; change_due: number | null; orders_completed: number }>(
-            `/ops/bills/${b.id}/close`,
-            method === 'cash' ? { method, cash_received: cash, drawer_id: shift?.drawer_id } : { method },
-            { 'Idempotency-Key': key })
-          await onClosed(`Bill ditutup · ${formatRupiah(res.total)} · ${res.orders_completed} order completed${res.change_due != null ? ` · kembalian ${formatRupiah(res.change_due)}` : ''}`)
-        } catch (e) {
-          setError(errorMessage(e))
-          setBusy(false)
-        }
-      }}>
+      {error && !paying && <div className="mt-2"><Alert>{error}</Alert></div>}
+      <Button variant="action" className="mt-3 w-full" disabled={!canPay || busy}
+        onClick={() => { setError(undefined); setPaying(true) }}>
         Tutup bill & bayar {formatRupiah(b.total)} → semua order completed
       </Button>
+      {paying && (
+        <PaymentDialog method={method} total={b.total} outletId={outlet.id} busy={busy} error={error}
+          onConfirm={(cash) => void close(cash)} onCancel={() => { setPaying(false); setError(undefined) }} />
+      )}
     </Card>
   )
 }
