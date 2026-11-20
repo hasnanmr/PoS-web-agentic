@@ -295,7 +295,9 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 - **Fase/Prioritas:** MVP / P0
 - **Acceptance criteria:**
   - Dari open bill (S5, M3) staf memilih "Split per item", lalu memilih item yang belum lunas atau sebagian porsi dari item dengan jumlah lebih dari satu; add-on ikut porsinya.
-  - Tiap bagian dibayar cash atau QRIS lewat popup pembayaran yang sama dengan tutup bill; bagian tercatat lunas hanya saat "Pembayaran selesai".
+  - Tiap bagian dibayar cash atau QRIS lewat popup pembayaran yang sama dengan tutup bill; bagian tercatat lunas hanya saat "Pembayaran selesai". Metode boleh berbeda per bagian.
+  - QRIS statis: popup menampilkan QRIS outlet dengan item, PB1, dan total bagian itu saja; tamu mengetik nominal bagiannya; staf mengecek mutasi merchant (nominal persis, masuk setelah popup dibuka, belum dipakai bagian lain) sebelum konfirmasi; satu bagian dalam satu waktu. Bagian QRIS tidak menambah uang tunai di shift kasir.
+  - Cash: uang diterima dan kembalian dihitung dari total bagian, dan uangnya masuk ke shift kasir yang terbuka.
   - PB1 bagian = PB1 dari semua item yang sudah lunas termasuk bagian ini dikurangi PB1 yang sudah dibayar; tidak pernah negatif dan jumlah semua bagian sama persis dengan total bill.
   - Tiap bagian adalah satu pembayaran dengan entri ledger sendiri (revenue dan PB1, metode bayar, shift kasir untuk cash).
   - Item yang sudah lunas tidak bisa dipilih lagi atau dipindah; dua kasir membayar porsi yang sama bersamaan → hanya satu yang berhasil.
@@ -303,7 +305,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Order baru tetap bisa masuk bill dan menambah sisa; daftar open bill menampilkan total dan sisa. "Tutup bill & bayar" setelah ada bagian lunas menagih tepat sisanya.
   - Saat item terakhir lunas, semua order completed dan bill tertutup. Tombol mengikuti `allowed_actions` dari server.
   - Halaman QR meja pelanggan tidak punya split (tidak menampilkan bill).
-- **Traceability:** FR10.6, FR10.9, FR11.4–FR11.6, AC10.8, AC10.11–AC10.14 · wireframe S5, S5a, M3, M3a · issue #42
+- **Traceability:** FR10.6, FR10.9, FR11.4–FR11.6, AC10.8, AC10.11–AC10.15 · wireframe S5, S5a, S5b, S5c, M3, M3a, M3b · issue #42
 
 ### US-021 — Membatalkan dan membalik order
 

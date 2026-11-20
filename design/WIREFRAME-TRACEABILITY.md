@@ -51,12 +51,14 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | S1 Counter / POS (dine-in, takeaway) | US-011, US-018, US-019, US-020, US-034 | T-038, T-067 |
-| S1 · Popup Pembayaran — Cash (uang diterima → kembalian) & QRIS (gambar QRIS → bukti bayar); also used by S5 Tutup bill. Order / bill completes only on "Pembayaran selesai" | US-018, US-020, US-034 | T-038, T-067, T-068 |
+| S1 · Popup Pembayaran — Cash (uang diterima → kembalian) & QRIS (gambar QRIS → bukti bayar); also used by S5 Tutup bill / Bayar sisa and by S5a for one split part (cash: "Bayar bagian N · Cash"; QRIS: S5b). Order / bill completes only on "Pembayaran selesai" | US-018, US-020, US-034 | T-038, T-067, T-068 |
 | S2 Order Board | US-013, US-014, US-015, US-016 | T-030, T-031, T-068 |
 | S3 Detail Order & Reversal | US-004, US-016, US-021 | T-031, T-032, T-068 |
 | S4 Review Pembayaran QRIS | US-017, US-021 | T-036, T-037, T-068 |
 | S5 Open Bills (+ "⇄ Split per item"; bayar penuh atau split) | US-013, US-020, US-064 | T-033, T-068, T-138 |
 | S5a Split bill per item (dialog dari S5: pilih item / porsi, bagian lunas + "Batalkan…", total bagian dengan PB1 kumulatif, sisa, Cash / QRIS → popup S1) | US-064, US-020 | T-137, T-138 |
+| S5b Popup Pembayaran QRIS untuk satu bagian (QRIS statis, item + PB1 + total bagian saja, "ketik nominal tepat", checklist cek mutasi merchant, "Pembayaran selesai · bagian N") | US-064 | T-137, T-138 |
+| S5c Open Bills setelah split sebagian (sisa di kartu, item lunas bertanda bagian, Sudah dibayar / Sisa, daftar bagian + "Batalkan…", "Bayar sisa", "Split lagi") | US-064, US-020 | T-137, T-138 |
 | S6 Reservasi & Meja (today) | US-024, US-026, US-027 | T-062, T-063, T-064, T-070 |
 | S7 Stok & Pergerakan | US-006, US-007 | T-020, T-022, T-069 |
 | S8 Shift Kasir & Blind Count | US-018, US-030 | T-039, T-040, T-070 |
@@ -92,6 +94,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | M2 Counter | US-034, US-035 | T-067, T-072 |
 | M3 Open Bill (+ "⇄ Split per item") | US-020, US-035, US-064 | T-068, T-072, T-138 |
 | M3a Split bill per item (mobile, sama dengan S5a, bar bawah "Bayar bagian …") | US-064, US-035 | T-138 |
+| M3b Bayar bagian dengan QRIS (mobile, bottom sheet sama dengan S5b) | US-064, US-035 | T-138 |
 | M4 Reservasi hari ini | US-026, US-027, US-035 | T-070, T-072 |
 | M5 Stok | US-006, US-007, US-035 | T-069, T-072 |
 | M6 Absensi Saya (own history) | US-035, US-053 | T-072, T-117 |
@@ -183,7 +186,7 @@ Every MVP story has at least one screen, except the backend-only stories marked 
 | US-061 | O15, O17 |
 | US-062 | Q1–Q5, Q2a, S2, S4 |
 | US-063 | O8 |
-| US-064 | S5, S5a, M3, M3a |
+| US-064 | S5, S5a, S5b, S5c, M3, M3a, M3b |
 | US-042 (Phase 2) | A1 |
 | US-043 (Phase 2) | A2 |
 | US-044, US-045 (Phase 2) | Not drawn yet |
@@ -211,8 +214,8 @@ Tasks that build a screen or a WhatsApp flow, and where to find them.
 | T-066 Owner onboarding, settings, staff, menu, recipe, prices | O1, O3, O4, O5, O6 |
 | T-067 Counter order screen | S1, M2 |
 | T-068 Order board, payment review, reversal, open bills | S2, S3, S4, S5, M1, M3 |
-| T-137 Split bill per item (domain + API) | S5, S5a, M3a |
-| T-138 Split bill per item (admin UI) | S5, S5a, M3, M3a |
+| T-137 Split bill per item (domain + API) | S5, S5a, S5b, S5c, M3a |
+| T-138 Split bill per item (admin UI) | S5, S5a, S5b, S5c, M3, M3a, M3b |
 | T-069 Stock screens | S7, M5 |
 | T-057 Tables and reservation rules | O8 |
 | T-062, T-063, T-064 Staff reservation board, walk-ins, no-show hold (Wave 6) | S6, M4 |
