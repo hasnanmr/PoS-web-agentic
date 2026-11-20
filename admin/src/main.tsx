@@ -10,6 +10,7 @@ import { AuthGate } from './auth/AuthGate'
 import { parseEnv } from './env'
 import { EnvErrorScreen } from './EnvErrorScreen'
 import { TabletApp } from './tablet/TabletApp'
+import { TableApp } from './table/TableApp'
 
 const envResult = parseEnv(import.meta.env)
 const root = createRoot(document.getElementById('root')!)
@@ -22,6 +23,14 @@ if (!envResult.ok) {
   root.render(
     <StrictMode>
       <TabletApp apiBaseUrl={envResult.env.VITE_API_BASE_URL} />
+    </StrictMode>,
+  )
+} else if (/^\/t\/[^/]+\/?$/.test(window.location.pathname)) {
+  // Q0–Q5: the customer table web page from the table QR, public (no sign-in, no sidebar).
+  const token = decodeURIComponent(window.location.pathname.split('/')[2])
+  root.render(
+    <StrictMode>
+      <TableApp apiBaseUrl={envResult.env.VITE_API_BASE_URL} token={token} />
     </StrictMode>,
   )
 } else {

@@ -246,6 +246,7 @@ describe('usePolling', () => {
 const CARD: OrderCard = {
   id: 'o1', order_no: '#A-1039', channel: 'counter', type: 'takeaway', payment_mode: 'pay_first', status: 'confirmed',
   payment_status: 'paid', payment_method: 'cash', payment_id: null, qris_checked: null, table: null, customer_name: null,
+  note: null, proof_id: null, payment_claimed_at: null,
   item_summary: '1× Americano, 1× Roti Bakar', total: 46200, bill_id: null, created_at: '2026-11-18T03:00:00Z',
   auto_cancel_at: null, allowed_actions: ['preparing', 'reversal'],
 }
@@ -280,6 +281,25 @@ describe('S2 Order Board + S3', () => {
     await userEvent.type(within(drawer).getByLabelText('Alasan reversal'), 'salah input')
     await userEvent.click(within(drawer).getByRole('button', { name: 'Konfirmasi reversal' }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/orders/o1/reversal', { reason: 'salah input', ingredients: 'waste' }]))
+  })
+})
+
+describe('S2 web order from the table QR (#44)', () => {
+  it('shows the customer claim and opens S4 to confirm or reject', async () => {
+    const web: OrderCard = { ...CARD, id: 'o9', order_no: '#A-1050', channel: 'web_table', type: 'dine_in',
+      status: 'pending_payment', payment_status: 'proof_submitted', payment_method: null, table: 'M05',
+      customer_name: 'Rina', note: 'kurang manis', proof_id: 'pr9', payment_claimed_at: '2026-11-18T05:44:00Z',
+      allowed_actions: ['cancel'] }
+    const api = fakeApi({ 'GET /ops/outlets/o-dago/orders/board': { ...EMPTY, awaiting_payment: [web] } })
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api })}><OrderBoardPage /></WithSession></MemoryRouter>)
+    const column = await screen.findByRole('region', { name: 'MENUNGGU BAYAR' })
+    expect(within(column).getByText('#A-1050 · web')).toBeInTheDocument()
+    expect(within(column).getByText('Dine-in · M05 · Rina')).toBeInTheDocument()
+    expect(within(column).getByText('Catatan: kurang manis')).toBeInTheDocument()
+    expect(within(column).getByText('Pelanggan bilang sudah bayar · 12:44')).toBeInTheDocument()
+    expect(within(column).getByRole('link', { name: 'Cek & konfirmasi lunas →' })).toHaveAttribute('href', '/admin/payment-review?order=o9')
+    expect(within(column).getByRole('link', { name: 'Tolak (pembayaran tidak ditemukan)' }))
+      .toHaveAttribute('href', '/admin/payment-review?order=o9#tolak')
   })
 })
 
