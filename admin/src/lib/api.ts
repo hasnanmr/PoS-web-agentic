@@ -95,6 +95,8 @@ const ERROR_COPY: Record<string, string> = {
   already_onboarded: 'Akun ini sudah punya bisnis.',
   insufficient_stock: 'Stok tidak cukup; stok tidak boleh minus.',
   stock_item_name_taken: 'Nama bahan sudah dipakai.',
+  stock_item_unit_locked: 'Satuan dasar tidak bisa diubah karena bahan ini sudah punya stok, resep, atau PO.',
+  stock_item_in_recipe: 'Bahan ini masih dipakai di resep. Lepas dulu dari resep, lalu hapus.',
   item_sold_out: 'Item habis.',
   photo_required: 'Tambahkan foto dulu sebelum mengaktifkan item ini.',
   storage_not_configured: 'Penyimpanan foto belum dikonfigurasi di server.',

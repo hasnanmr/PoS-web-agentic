@@ -215,4 +215,25 @@ describe('O6 Resep & Bahan', () => {
     await waitFor(() => expect(api.calls).toContainEqual(['PUT', '/owner/products/p1/recipe', [
       { stock_item_id: 'kopi', quantity: '18' }, { stock_item_id: 'cup', quantity: '1' }]]))
   })
+  it('edits an ingredient name and base unit, and deletes after confirming', async () => {
+    const api = fakeApi({
+      'GET /owner/stock-items': [{ id: 'gula', name: 'Gula pasri', unit: 'g', display_unit: 'g', thresholds: [] }],
+      'GET /owner/products': ROWS,
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><RecipesPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('tab', { name: 'Daftar bahan' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Gula pasri' }))
+    const name = screen.getByLabelText('Nama bahan')
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Gula pasir')
+    await userEvent.selectOptions(screen.getByLabelText('Satuan dasar', { selector: '#edit-item-unit' }), 'ml')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['PATCH', '/owner/stock-items/gula', { name: 'Gula pasir', unit: 'ml' }]))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Hapus Gula pasri' }))
+    expect(api.calls.some(([m]) => m === 'DELETE')).toBe(false)
+    expect(screen.getByText(/Hapus "Gula pasri"\?/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ya, hapus' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['DELETE', '/owner/stock-items/gula', undefined]))
+  })
 })
