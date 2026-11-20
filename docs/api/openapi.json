@@ -577,6 +577,60 @@
         "title": "Availability",
         "type": "object"
       },
+      "BestSellerItem": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Place in the customer's list; null when skipped",
+            "title": "Position"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "skipped_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "sold_out",
+                  "duplicate",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped Reason"
+          },
+          "units_30d": {
+            "title": "Units 30D",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "position",
+          "skipped_reason",
+          "units_30d"
+        ],
+        "title": "BestSellerItem",
+        "type": "object"
+      },
       "BillCard": {
         "properties": {
           "guest_name": {
@@ -4798,6 +4852,69 @@
         "title": "Period",
         "type": "object"
       },
+      "PickRow": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "category",
+          "is_active",
+          "tags"
+        ],
+        "title": "PickRow",
+        "type": "object"
+      },
+      "PicksBody": {
+        "properties": {
+          "product_ids": {
+            "description": "All picks, in the order shown to customers",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Product Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_ids"
+        ],
+        "title": "PicksBody",
+        "type": "object"
+      },
       "PoCreate": {
         "properties": {
           "due_date": {
@@ -5651,6 +5768,55 @@
           "by_term"
         ],
         "title": "PoSummary",
+        "type": "object"
+      },
+      "PreviewItem": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Place in the customer's list; null when skipped",
+            "title": "Position"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "skipped_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "sold_out",
+                  "duplicate",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped Reason"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "position",
+          "skipped_reason"
+        ],
+        "title": "PreviewItem",
         "type": "object"
       },
       "ProductCreate": {
@@ -6570,6 +6736,40 @@
           "unit"
         ],
         "title": "RecipeLineRow",
+        "type": "object"
+      },
+      "RecommendationPreview": {
+        "properties": {
+          "best_sellers": {
+            "items": {
+              "$ref": "#/components/schemas/BestSellerItem"
+            },
+            "title": "Best Sellers",
+            "type": "array"
+          },
+          "listed_count": {
+            "title": "Listed Count",
+            "type": "integer"
+          },
+          "max_items": {
+            "default": 30,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "picks": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewItem"
+            },
+            "title": "Picks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "picks",
+          "best_sellers",
+          "listed_count"
+        ],
+        "title": "RecommendationPreview",
         "type": "object"
       },
       "RecordDetail": {
@@ -14057,6 +14257,49 @@
         ]
       }
     },
+    "/api/v1/owner/outlets/{outlet_id}/recommendation-preview": {
+      "get": {
+        "operationId": "recommendation_preview_api_v1_owner_outlets__outlet_id__recommendation_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recommendation Preview",
+        "tags": [
+          "owner: recommendations"
+        ]
+      }
+    },
     "/api/v1/owner/outlets/{outlet_id}/reservation-settings": {
       "get": {
         "operationId": "get_settings_api_v1_owner_outlets__outlet_id__reservation_settings_get",
@@ -14512,6 +14755,63 @@
         "summary": "Outlet Qr Pdf",
         "tags": [
           "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/owner-picks": {
+      "get": {
+        "operationId": "get_owner_picks_api_v1_owner_owner_picks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PickRow"
+                  },
+                  "title": "Response Get Owner Picks Api V1 Owner Owner Picks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Owner Picks",
+        "tags": [
+          "owner: recommendations"
+        ]
+      },
+      "put": {
+        "operationId": "put_owner_picks_api_v1_owner_owner_picks_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PicksBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Owner Picks",
+        "tags": [
+          "owner: recommendations"
         ]
       }
     },
@@ -16499,6 +16799,31 @@
         "summary": "Table Qr Png",
         "tags": [
           "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/tags": {
+      "get": {
+        "operationId": "get_tags_api_v1_owner_tags_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Tags Api V1 Owner Tags Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Tags",
+        "tags": [
+          "owner: recommendations"
         ]
       }
     },
