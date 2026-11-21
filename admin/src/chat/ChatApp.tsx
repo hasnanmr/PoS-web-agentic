@@ -39,6 +39,7 @@ import type {
   Booking, CartLine, ChatMenuItem, ChatPage, ChatQuote, OrderOverview, OrderStatus, RecommendationCard, Scope,
 } from './types'
 import { Action, ActionBar, Bubble, BottomBar, ChatHeader, Choice, Mine, TextLink } from './ui'
+import { useVisualViewport } from './viewport'
 
 type Step =
   | { name: 'main' }
@@ -524,14 +525,19 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
 // Shell ----------------------------------------------------------------------------------------------
 
 function Shell({ header, children, footer, bottom }: { header: ReactNode; children: ReactNode; footer?: ReactNode; bottom?: ReactNode }) {
+  const root = useRef<HTMLDivElement>(null)
   const end = useRef<HTMLDivElement>(null)
-  useEffect(() => { end.current?.scrollIntoView?.({ block: 'end' }) })
+  const toEnd = useCallback(() => { end.current?.scrollIntoView?.({ block: 'end' }) }, [])
+  useEffect(toEnd)
+  // Keyboard open (iPhone Safari, Chrome on Galaxy): the shell follows the visible part of the
+  // screen, and the newest bubble stays in view above the text box.
+  useVisualViewport(root, toEnd)
   return (
-    // Full-height column: the conversation scrolls inside, the action bar and the bottom bar
-    // stay on screen (C2 "Lihat keranjang", C4 "Pesan & bayar", "☰ Menu utama").
-    <div className="mx-auto flex h-dvh max-w-[480px] flex-col bg-page font-sans text-text">
+    // Full-height column pinned to the screen: the conversation scrolls inside, the action bar and
+    // the bottom bar stay on screen (C2 "Lihat keranjang", C4 "Pesan & bayar", "☰ Menu utama").
+    <div ref={root} className="group fixed inset-x-0 top-0 mx-auto flex h-dvh max-w-[480px] flex-col bg-page font-sans text-text">
       {header}
-      <main className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-3 py-3">
+      <main className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3">
         {children}
         <div ref={end} />
       </main>

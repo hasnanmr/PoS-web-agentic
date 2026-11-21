@@ -166,10 +166,13 @@ export function CartCard({ cart, byId, onQuantity, onAddMore, onEmpty }: {
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5 font-semibold text-primary">
-                  <button type="button" aria-label={`Kurangi ${item?.name ?? 'item'}`} onClick={() => onQuantity(i, l.quantity - 1)}>−</button>
+                {/* Same "− 1 +" as the wireframe, with a finger-sized tap area around each sign. */}
+                <div className="-my-2 flex shrink-0 items-center font-semibold text-primary">
+                  <button type="button" aria-label={`Kurangi ${item?.name ?? 'item'}`} onClick={() => onQuantity(i, l.quantity - 1)}
+                    className="flex h-9 w-8 items-center justify-center rounded-lg text-[16px] active:bg-primary-soft">−</button>
                   <span className="min-w-4 text-center text-text">{l.quantity}</span>
-                  <button type="button" aria-label={`Tambah ${item?.name ?? 'item'}`} onClick={() => onQuantity(i, l.quantity + 1)}>+</button>
+                  <button type="button" aria-label={`Tambah ${item?.name ?? 'item'}`} onClick={() => onQuantity(i, l.quantity + 1)}
+                    className="flex h-9 w-8 items-center justify-center rounded-lg text-[16px] active:bg-primary-soft">+</button>
                 </div>
                 <span className="w-20 shrink-0 text-right">{item ? formatRupiah(lineUnitPrice(item, l.addon_option_ids) * l.quantity) : ''}</span>
               </li>
