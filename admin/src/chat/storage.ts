@@ -112,15 +112,27 @@ interface SavedTranscript<T> {
   messages: T[]
 }
 
+/** All saved transcripts with the ones idle for 2 hours or more removed from the phone (every
+ * scope, not only the one being opened, so an outlet or table never visited again is cleaned too). */
+function liveTranscripts<T>(now: number): Record<string, SavedTranscript<T>> {
+  const all = read<Record<string, SavedTranscript<T>>>(TRANSCRIPT, {})
+  const live = Object.fromEntries(Object.entries(all).filter(([, t]) =>
+    t && Array.isArray(t.messages) && now - new Date(t.saved_at).getTime() < TRANSCRIPT_IDLE_MS))
+  if (Object.keys(live).length !== Object.keys(all).length) {
+    if (Object.keys(live).length === 0) {
+      try { localStorage.removeItem(TRANSCRIPT) } catch { /* ignore */ }
+    } else write(TRANSCRIPT, live)
+  }
+  return live
+}
+
 export function loadTranscript<T>(scopeKey: string, session: string, now = Date.now()): T[] {
-  const saved = read<Record<string, SavedTranscript<T>>>(TRANSCRIPT, {})[scopeKey]
-  if (!saved || saved.session !== session || !Array.isArray(saved.messages)) return []
-  if (now - new Date(saved.saved_at).getTime() >= TRANSCRIPT_IDLE_MS) return []
-  return saved.messages
+  const saved = liveTranscripts<T>(now)[scopeKey]
+  return saved && saved.session === session ? saved.messages : []
 }
 
 export function saveTranscript<T>(scopeKey: string, session: string, messages: T[], now = Date.now()): void {
-  const all = read<Record<string, SavedTranscript<T>>>(TRANSCRIPT, {})
+  const all = liveTranscripts<T>(now)
   write(TRANSCRIPT, { ...all, [scopeKey]: { session, saved_at: new Date(now).toISOString(), messages } })
 }
 

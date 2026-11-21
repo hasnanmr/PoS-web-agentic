@@ -62,6 +62,12 @@ type Msg =
   | { id: number; kind: 'me' | 'ok' | 'info' | 'warn' | 'expired' | 'resumed'; text: string }
   | { id: number; kind: 'ai'; turn: AgentTurn }
 
+const RESUME_IDLE_MS = 2 * 60 * 60 * 1000
+
+function recentlyActive(lastActivityAt: string | null, now = Date.now()): boolean {
+  return lastActivityAt !== null && now - Date.parse(lastActivityAt) < RESUME_IDLE_MS
+}
+
 /** A transcript saved on this phone, as it should show after a refresh: a reply that was still
  * streaming when the page closed can't continue, so it shows the friendly fallback instead. */
 function restoreTranscript(saved: Msg[]): Msg[] {
@@ -160,6 +166,10 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       } else if (session.cart_expired) {
         setMsgs([{ id: nextId.current++, kind: 'expired', text: '' }])
         setStep({ name: 'main' })
+      } else if (session.cart.lines.length === 0 && !recentlyActive(session.last_activity_at)) {
+        // An empty-cart session left for 2 hours or more starts again from the greeting (C1/C8);
+        // the server only resets sessions that had something in the cart.
+        setStep({ name: 'main' })
       } else if (session.step === 'recs') {
         // Browsing Rekomendasi or the menu comes back there even with an empty cart.
         setStep({ name: 'recs', quiet: talking })
@@ -196,8 +206,17 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
   // reply changes it many times a second).
   useEffect(() => {
     if (!restored.current) return
-    const timer = window.setTimeout(() => saveTranscript(key, chat.session, msgs), 300)
-    return () => window.clearTimeout(timer)
+    const save = () => saveTranscript(key, chat.session, msgs)
+    const timer = window.setTimeout(save, 300)
+    // A refresh or closing the tab inside the 300 ms keeps the latest bubbles too.
+    const flush = () => { if (document.visibilityState !== 'visible') save() }
+    window.addEventListener('pagehide', save)
+    document.addEventListener('visibilitychange', flush)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pagehide', save)
+      document.removeEventListener('visibilitychange', flush)
+    }
   }, [chat, key, msgs])
 
   // Pesanan Saya (C1 button, C7 list): the orders this phone kept keys for.

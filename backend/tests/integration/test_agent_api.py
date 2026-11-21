@@ -232,7 +232,10 @@ def test_tool_log_has_no_personal_data(client, ctx) -> None:
         "select row_to_json(c)::text from app.agent_tool_calls c where outlet_id = %s",
         (ctx["outlet"],),
     )
-    assert rows and all("Bima" not in r[0] and "0812" not in r[0] for r in rows)
+    # The phone as typed, not a bare "0812": that also turns up by chance in random UUIDs and
+    # timestamps in the row, which made this test flaky.
+    leaks = ("Bima", "0812-3456-7890", "081234567890", "3456-7890")
+    assert rows and all(leak not in r[0] for r in rows for leak in leaks)
     history = admin_sql(
         "select agent_history from app.chat_sessions where outlet_id = %s", (ctx["outlet"],)
     )

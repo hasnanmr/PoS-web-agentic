@@ -600,13 +600,13 @@ describe('C5 delivery details', () => {
 
 describe('resume after a refresh (FR6.2)', () => {
   it('the menu comes back even with an empty cart', async () => {
-    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'menu' } })
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, last_activity_at: new Date().toISOString(), step: 'menu' } })
     expect(await screen.findByText(/Pilih kategori/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Reservasi meja/ })).not.toBeInTheDocument()
   })
 
   it('Rekomendasi comes back even with an empty cart', async () => {
-    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'recs' }, [`GET ${O}/recommendations`]: [] })
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, last_activity_at: new Date().toISOString(), step: 'recs' }, [`GET ${O}/recommendations`]: [] })
     await waitFor(() => expect(screen.queryByRole('button', { name: /Reservasi meja/ })).not.toBeInTheDocument())
     expect(screen.queryByText(/Selamat datang/)).not.toBeInTheDocument()
   })
@@ -627,7 +627,7 @@ describe('resume after a refresh (FR6.2)', () => {
     await waitFor(() => expect(localStorage.getItem('thinker.chat.transcript.v1')).toContain('Mau berapa porsi?'))
     first.unmount()
 
-    renderChat({ ...page, [`GET ${O}/chat-session`]: { ...SESSION, step: 'menu' } })
+    renderChat({ ...page, [`GET ${O}/chat-session`]: { ...SESSION, last_activity_at: new Date().toISOString(), step: 'menu' } })
     expect(await screen.findByText('Mau berapa porsi?')).toBeInTheDocument()
     expect(screen.getByRole('separator')).toHaveTextContent('Lanjut dari chat sebelumnya')
     expect(screen.queryByRole('list', { name: 'Menu' })).not.toBeInTheDocument()
@@ -651,6 +651,13 @@ describe('resume after a refresh (FR6.2)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('an empty-cart session idle for 2 hours starts again from the greeting', async () => {
+    const old = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'menu', last_activity_at: old } })
+    expect(await screen.findByRole('button', { name: /Reservasi meja/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Pilih kategori/)).not.toBeInTheDocument()
+  })
+
   it('checkout steps with an empty cart start from the main menu', async () => {
     renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'summary' } })
     expect(await screen.findByRole('button', { name: /Reservasi meja/ })).toBeInTheDocument()
@@ -666,5 +673,16 @@ describe('chat transcript storage', () => {
     expect(loadTranscript('o:x', 'sess-1', now + TRANSCRIPT_IDLE_MS)).toEqual([])
     expect(loadTranscript('o:x', 'sess-2', now)).toEqual([])
     expect(loadTranscript('t:y', 'sess-1', now)).toEqual([])
+  })
+
+  it('removes every expired transcript from the phone, not only the one opened', async () => {
+    const { loadTranscript, saveTranscript, TRANSCRIPT_IDLE_MS } = await import('./storage')
+    const now = Date.parse('2026-11-21T10:00:00Z')
+    saveTranscript('o:old', 's-old', [{ id: 1, text: 'Rina 0812' }], now)
+    saveTranscript('t:fresh', 's-new', [{ id: 2 }], now + TRANSCRIPT_IDLE_MS - 10)
+    expect(loadTranscript('t:fresh', 's-new', now + TRANSCRIPT_IDLE_MS + 1)).toEqual([{ id: 2 }])
+    expect(localStorage.getItem('thinker.chat.transcript.v1')).not.toContain('Rina')
+    loadTranscript('t:fresh', 's-new', now + 3 * TRANSCRIPT_IDLE_MS)
+    expect(localStorage.getItem('thinker.chat.transcript.v1')).toBeNull()
   })
 })
