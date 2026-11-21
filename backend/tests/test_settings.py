@@ -101,3 +101,56 @@ def test_deployed_env_requires_a_valid_encryption_key(monkeypatch: pytest.Monkey
     with pytest.raises(ConfigError, match="DATA_ENCRYPTION_KEY"):
         load_settings()
     assert load_settings(data_encryption_key=None, app_env="local").data_encryption_key is None
+
+
+def test_agent_is_off_without_its_variables() -> None:
+    settings = load_settings()
+    assert settings.agent_configured is False
+    assert settings.openai_base_url is None and settings.model_name is None
+
+
+def test_agent_variables_are_read_and_the_key_stays_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    monkeypatch.setenv("MODEL_NAME", "openai/gpt-4o-mini")
+    settings = load_settings()
+    assert settings.agent_configured is True
+    assert str(settings.openai_base_url) == "https://openrouter.ai/api/v1"
+    assert settings.model_name == "openai/gpt-4o-mini"
+    assert "sk-test-123" not in repr(settings)
+
+
+def test_partial_agent_config_never_blocks_the_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key, value in {**DEPLOYED_ENV, "APP_ENV": "demo"}.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-shared-for-another-tool")
+    monkeypatch.setenv("MODEL_NAME", "")  # empty counts as unset
+    settings = load_settings()
+    assert settings.agent_configured is False
+    assert settings.agent_config_warning == (
+        "web chat agent is off: OPENAI_BASE_URL, MODEL_NAME not set (buttons only)"
+    )
+
+
+def test_agent_without_a_key_for_self_hosted_servers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://ollama:11434/v1")
+    monkeypatch.setenv("MODEL_NAME", "llama3.1")
+    settings = load_settings()
+    assert settings.agent_configured is True and settings.openai_api_key is None
+    assert settings.agent_config_warning is None
+
+
+def test_agent_values_are_trimmed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", " https://api.openai.com/v1 ")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-abc\n")
+    monkeypatch.setenv("MODEL_NAME", "gpt-4o-mini ")
+    settings = load_settings()
+    assert settings.openai_api_key is not None
+    assert settings.openai_api_key.get_secret_value() == "sk-abc"
+    assert settings.model_name == "gpt-4o-mini"
+
+
+def test_nothing_set_means_no_warning() -> None:
+    assert load_settings().agent_config_warning is None
