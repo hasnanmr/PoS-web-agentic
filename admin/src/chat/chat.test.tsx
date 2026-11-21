@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
 import { todayIn } from '../lib/format'
 import { fakeApi } from '../test/fakes'
@@ -332,5 +332,139 @@ describe('C10–C12 reservations', () => {
     await user.type(screen.getByLabelText('No HP yang dipakai saat booking'), '081234567221')
     await user.click(screen.getByRole('button', { name: 'Cari booking' }))
     expect(await screen.findByText('Reservasinya tidak ketemu. Cek lagi kode booking dan nomor HP-nya ya.')).toBeInTheDocument()
+  })
+})
+
+describe('C9 AI / C14 / C15 agent', () => {
+  const AGENT_O = { ...PAGE_O, agent_enabled: true }
+  type Ev = [string, Record<string, unknown>]
+  const FINAL = { reply_text: '', cards: [], quick_replies: [], order_draft: null, booking_draft: null, out_of_scope: false, prompt_version: 'v' }
+
+  function sse(events: Ev[]): Response {
+    const body = events.map(([e, d]) => `event: ${e}\ndata: ${JSON.stringify(d)}\n\n`).join('')
+    return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+  }
+  function stubAgent(...replies: (Response | Error)[]) {
+    const fetchMock = vi.fn(async () => {
+      const next = replies.shift()
+      if (!next) throw new Error('no reply scripted')
+      if (next instanceof Error) throw next
+      return next
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+  function sent(fetchMock: ReturnType<typeof stubAgent>, i = 0) {
+    const [url, init] = fetchMock.mock.calls[i] as unknown as [string, RequestInit]
+    return { url, headers: init.headers as Record<string, string>, body: JSON.parse(String(init.body)) as { text: string; context: string } }
+  }
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('without the agent the text box keeps the button hint', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubAgent()
+    renderChat({})
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'mau pesan{Enter}')
+    expect(await screen.findByText(/Untuk sekarang pakai tombol di atas ya/)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('C9: streams the answer, shows cards, and + Tambah goes to the add-on step', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubAgent(sse([
+      ['delta', { text: 'Cocok buat berdua: ' }],
+      ['delta', { text: 'Es Kopi Susu Senja.' }],
+      ['final', { ...FINAL, reply_text: 'Cocok buat berdua: Es Kopi Susu Senja.',
+        cards: [{ product_id: 'p-kopi', name: 'Es Kopi Susu Senja', description: null, price: 25000, photo_url: null, badge: 'owner_pick' }] }],
+    ]))
+    renderChat({ [`GET ${O}`]: AGENT_O, [`GET ${O}/recommendations`]: [] })
+    await user.click(await screen.findByRole('button', { name: /Rekomendasi/ }))
+    expect(await screen.findByText(/atau ceritakan seleramu di kotak teks/)).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Ceritakan seleramu…'), 'yang manis buat berdua{Enter}')
+    expect(await screen.findByText('Cocok buat berdua: Es Kopi Susu Senja.')).toBeInTheDocument()
+    const call = sent(fetchMock)
+    expect(call.url).toBe(`https://api.test/api/v1${O}/agent/messages`)
+    expect(call.body).toEqual({ text: 'yang manis buat berdua', context: 'recommend' })
+    expect(call.headers['X-Chat-Session'].length).toBeGreaterThan(10)
+    const cards = screen.getByRole('list', { name: 'Rekomendasi asisten' })
+    await user.click(within(cards).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    expect(await screen.findByText(/Pilih susu/)).toBeInTheDocument()
+  })
+
+  it('C14: the order draft becomes the cart; Pesan & bayar asks the details first', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['final', { ...FINAL, reply_text: 'Ini ringkasannya ya.', order_draft: {
+      fulfillment: 'pickup', subtotal: 60000, pb1_amount: 6000, delivery_fee: 0, total: 66000,
+      lines: [{ product_id: 'p-kopi', name: 'Es Kopi Susu Senja', quantity: 2, addon_option_ids: ['o-oat'], addons: ['Oat milk'], note: 'less sugar', line_total: 60000 }],
+    } }]]))
+    const { api } = renderChat({ [`GET ${O}`]: AGENT_O, [`POST ${O}/quote`]: QUOTE })
+    await user.click(await screen.findByRole('button', { name: /Pesan/ }))
+    await user.type(screen.getByPlaceholderText('Tulis pesananmu…'), '2 es kopi susu oat less sugar, ambil sendiri{Enter}')
+    expect(await screen.findByText('◆ ASISTEN AI · harga & total dihitung sistem')).toBeInTheDocument()
+    expect(screen.getByText('2× Es Kopi Susu Senja (Oat milk) — less sugar ✎')).toBeInTheDocument()
+    expect(screen.getByText(/Subtotal Rp\s?60\.000 · PB1 Rp\s?6\.000 · Total Rp\s?66\.000/)).toBeInTheDocument()
+    expect(vi.mocked(api.post).mock.calls.some(([p]) => p === `${O}/orders`)).toBe(false)  // a draft creates nothing
+    await user.click(screen.getByRole('button', { name: 'Pesan & bayar' }))
+    expect(await screen.findByLabelText('Nama *')).toBeInTheDocument()
+    await waitFor(() => {
+      const puts = vi.mocked(api.put).mock.calls.filter(([p]) => p === `${O}/chat-session`)
+      const last = puts[puts.length - 1]?.[1] as { cart: { lines: unknown[] }; fulfillment: string }
+      expect(last.cart.lines).toEqual([{ product_id: 'p-kopi', quantity: 2, addon_option_ids: ['o-oat'], note: 'less sugar' }])
+      expect(last.fulfillment).toBe('pickup')
+    })
+  })
+
+  it('C15: the booking draft opens name + phone with the time chosen, booked with source agent', async () => {
+    const user = userEvent.setup()
+    const start = `${TODAY}T12:00:00Z`
+    stubAgent(sse([['final', { ...FINAL, reply_text: 'Masih ada!', quick_replies: ['18:30', 'Pilih jam lain'],
+      booking_draft: { party_size: 4, start_at: start.replace('Z', '+00:00'), label: '19:00', timezone: 'Asia/Jakarta' } }]]))
+    const avail = (times: { start_at: string; label: string }[]) => ({ date: TODAY, timezone: 'Asia/Jakarta', max_party_size: 6, last_date: TODAY, times })
+    const { api } = renderChat({
+      [`GET ${O}`]: AGENT_O,
+      [`GET ${O}/availability?party_size=1&date=${TODAY}`]: avail([]),
+      [`GET ${O}/availability?party_size=4&date=${TODAY}`]: avail([{ start_at: start, label: '19:00' }]),
+      [`POST ${O}/reservations`]: {
+        reservation_id: 'r1', booking_code: '7Q2KXM', start_at: start, label: '19:00', timezone: 'Asia/Jakarta', party_size: 4,
+        status: 'booked', guest_name: 'Rina', hold_until: start, change_until: start, can_change: true, reminder_at: null,
+        outlet_name: 'Kopi Senja – Dago', access_key: 'echo',
+      },
+    })
+    await user.click(await screen.findByRole('button', { name: /Reservasi meja/ }))
+    await user.type(screen.getByRole('textbox'), 'meja 4 orang jam 7 malam{Enter}')
+    expect(await screen.findByText('4 orang · 19:00')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Pilihan cepat' })).toHaveTextContent('Pilih jam lain')
+    await user.click(screen.getByRole('button', { name: 'Lanjut isi nama & no HP' }))
+    await user.type(await screen.findByLabelText('Nama'), 'Rina')
+    await user.type(screen.getByLabelText('No HP'), '081234567221')
+    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
+    await user.click(screen.getByRole('button', { name: 'Konfirmasi booking' }))
+    expect(await screen.findByText('7Q2KXM')).toBeInTheDocument()
+    const call = vi.mocked(api.post).mock.calls.find(([p]) => p === `${O}/reservations`)!
+    expect(call[1]).toMatchObject({ party_size: 4, source: 'agent' })
+  })
+
+  it('out of scope: one short refusal and the main menu buttons', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['final', { ...FINAL, out_of_scope: true, reply_text: 'Maaf, aku cuma bisa bantu pesan, rekomendasi menu, dan reservasi.' }]]))
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'yang booking jam 7 siapa?{Enter}')
+    expect(await screen.findByText('◆ ASISTEN AI · di luar lingkup')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reservasi' }))
+    expect(await screen.findByText(/Untuk berapa orang/)).toBeInTheDocument()
+  })
+
+  it('an agent error or a lost connection falls back to the buttons in plain words', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['error', { code: 'agent_timeout', fallback: 'buttons' }]]), new TypeError('Failed to fetch'))
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'pesan dong{Enter}')
+    expect(await screen.findByText(/asistennya lagi belum bisa jawab. Pakai tombol di bawah dulu ya/)).toBeInTheDocument()
+    await user.type(screen.getByRole('textbox'), 'halo{Enter}')
+    await waitFor(() => expect(screen.getAllByText(/asistennya lagi belum bisa jawab/)).toHaveLength(2))
+    expect(screen.queryByText(/agent_timeout|Failed to fetch/)).not.toBeInTheDocument()
   })
 })

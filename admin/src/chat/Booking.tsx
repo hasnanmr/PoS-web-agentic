@@ -16,14 +16,27 @@ export interface Person {
   phone: string
 }
 
-export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVersion, reschedule, person, prefilled,
-  remember, onRemember, onBooked, onRescheduled }: {
+/** A time the agent already checked (C15): the flow opens at name + phone with it chosen. */
+export interface BookingPreset {
+  party_size: number
+  start_at: string
+  label: string
+}
+
+function localDate(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date(iso))
+}
+
+export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVersion, reschedule, preset = null, person,
+  prefilled, remember, onRemember, onBooked, onRescheduled }: {
   api: ChatApi
   outletName: string
   timezone: string
   privacyUrl: string
   privacyVersion: string
   reschedule: { booking: Booking; key: string } | null
+  preset?: BookingPreset | null
   person: Person
   prefilled: boolean
   remember: boolean
@@ -33,11 +46,12 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
 }) {
   const today = todayIn(timezone)
   const [limits, setLimits] = useState<{ max: number; last: string } | null>(null)
-  const [party, setParty] = useState<number | null>(reschedule?.booking.party_size ?? null)
-  const [day, setDay] = useState<string | null>(null)
+  const [party, setParty] = useState<number | null>(reschedule?.booking.party_size ?? preset?.party_size ?? null)
+  const [day, setDay] = useState<string | null>(preset ? localDate(preset.start_at, timezone) : null)
   const [otherDay, setOtherDay] = useState(false)
   const [slotsFor, setSlotsFor] = useState<{ key: string; times: Availability['times'] } | null>(null)
-  const [slot, setSlot] = useState<Availability['times'][number] | null>(null)
+  const [slot, setSlot] = useState<Availability['times'][number] | null>(
+    preset ? { start_at: preset.start_at, label: preset.label } : null)
   const [who, setWho] = useState<Person>(person)
   const [whoDone, setWhoDone] = useState(Boolean(reschedule))
   const [error, setError] = useState<string | null>(null)
@@ -78,7 +92,7 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
         const created = await api.book({
           party_size: party, start_at: slot.start_at, customer: { name: who.name.trim(), phone: who.phone.trim() },
           privacy_notice_version: privacyVersion,
-        }, keys.current)
+        }, keys.current, preset && slot && Date.parse(slot.start_at) === Date.parse(preset.start_at) ? 'agent' : 'buttons')
         onBooked(created, who)
       }
     } catch (e) {
@@ -142,7 +156,7 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
             <p className="text-[12px]">Yah, di tanggal itu sudah tidak ada meja yang muat. Coba tanggal lain ya.</p>
           ) : (
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Jam">
-              {slots.map((s) => <Chip key={s.start_at} selected={slot?.start_at === s.start_at} onClick={() => setSlot(s)}>{s.label}</Chip>)}
+              {slots.map((s) => <Chip key={s.start_at} selected={slot !== null && Date.parse(slot.start_at) === Date.parse(s.start_at)} onClick={() => setSlot(s)}>{s.label}</Chip>)}
             </div>
           )}
         </Bubble>
