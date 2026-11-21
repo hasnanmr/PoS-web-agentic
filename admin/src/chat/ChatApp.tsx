@@ -486,8 +486,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
           privacyVersion={page.privacy_notice.version}
           reschedule={step.name === 'reschedule' ? { booking: step.booking, key: step.key } : null}
           preset={step.name === 'book' ? step.preset ?? null : null}
-          person={{ name: details.name, phone: details.phone }} prefilled={prefilled} remember={remember}
-          onRemember={(on) => { setRemember(on); if (!on) { clearDetails(); setPrefilled(false) } }}
+          person={{ name: details.name, phone: details.phone }} prefilled={prefilled}
           onBooked={(created, person: Person) => {
             if (remember) saveDetails({ name: person.name, phone: person.phone, address: details.address })
             const sb: SavedBooking = { reservation_id: created.reservation_id, access_key: created.access_key,

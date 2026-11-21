@@ -246,10 +246,6 @@ export function DetailsForm({ mode, initial, typedAddress, prefilled, remember, 
             🔒 Nama hanya untuk pesanan ini dan dihapus setelah selesai.{' '}
             <a href={privacyUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary">Kebijakan privasi ›</a>
           </p>
-          <label className="mt-2 flex items-center gap-2 text-[12px]">
-            <input type="checkbox" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
-            Ingat nama di HP ini (tidak disimpan di server)
-          </label>
           {prefilled && <TextLink className="mt-1" onClick={onClearSaved}>Hapus data tersimpan</TextLink>}
         </Bubble>
         {error && <Bubble tone="danger">{error}</Bubble>}

@@ -29,7 +29,7 @@ function localDate(iso: string, timezone: string): string {
 }
 
 export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVersion, reschedule, preset = null, person,
-  prefilled, remember, onRemember, onBooked, onRescheduled }: {
+  prefilled, onBooked, onRescheduled }: {
   api: ChatApi
   outletName: string
   timezone: string
@@ -39,8 +39,6 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
   preset?: BookingPreset | null
   person: Person
   prefilled: boolean
-  remember: boolean
-  onRemember: (on: boolean) => void
   onBooked: (created: BookingCreated, person: Person) => void
   onRescheduled: (booking: Booking) => void
 }) {
@@ -178,10 +176,6 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
               🔒 Nama &amp; no HP hanya untuk booking ini, dihapus setelah booking selesai.{' '}
               <a href={privacyUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary">Kebijakan privasi ›</a>
             </p>
-            <label className="flex items-center gap-2 text-[12px]">
-              <input type="checkbox" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
-              Ingat data di HP ini (tidak disimpan di server)
-            </label>
             {!whoDone && <Action type="submit" disabled={!who.name.trim() || !who.phone.trim()}>Lanjut</Action>}
           </form>
         </Bubble>
