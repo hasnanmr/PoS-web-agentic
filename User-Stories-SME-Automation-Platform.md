@@ -1,6 +1,6 @@
 # User Stories — SME Business Automation Platform
 
-Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story (baseline PRD v0.20: kanal pelanggan MVP adalah web chat; WhatsApp pindah ke Phase 3). Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
+Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story (baseline PRD v0.21: kanal pelanggan MVP adalah web chat; WhatsApp pindah ke Phase 3; agent Phase 2 di web chat terdiri dari supervisor agent dan worker agent, PRD §5.13). Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
 
 ## Konvensi
 
@@ -670,18 +670,24 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Agent menampilkan ringkasan terstruktur dan menunggu konfirmasi eksplisit.
   - Sebelum konfirmasi tidak ada order dan tidak ada pengurangan stok.
   - Setelah konfirmasi, agent memanggil fungsi pembuatan order deterministik yang sama dengan staff.
-- **Traceability:** FR2.4, FR6.3, AC6.2, AC6.4
+  - Ringkasan tampil sebagai kartu dengan tombol `Ya, pesan` dan `Ubah`; harga, PB1, dan total berasal dari quote server (US-066).
+  - Item yang sold out tidak masuk proposal; agent memberi tahu dan menawarkan alternatif (US-067).
+- **Traceability:** FR2.4, FR6.3, FR13.3, FR13.5, AC6.2, AC6.4, AC13.5
 
-### US-043 — Memproses reservasi free-text dengan konfirmasi
+### US-043 — Membuat reservasi lewat chat bebas sampai booking jadi
 
-**Sebagai** pelanggan, **saya ingin** meminta reservasi dengan bahasa natural, **sehingga** saya dapat memesan meja dengan lebih mudah.
+**Sebagai** pelanggan, **saya ingin** cukup menulis "aku mau reservasi tempat dong jam 19:00 untuk 3 orang", **sehingga** agent membaca data reservasi outlet dan membuatkan booking untuk saya tanpa saya harus bingung mengikuti langkah demi langkah.
 
 - **Fase/Prioritas:** P2 / P0 untuk Phase 2
 - **Acceptance criteria:**
-  - Agent mengekstrak jumlah orang, tanggal, waktu, dan konteks outlet.
-  - Agent mengonfirmasi detail kepada pelanggan sebelum membuat booking.
-  - Booking dibuat melalui fungsi deterministik yang sama dengan alur terstruktur dan tetap tunduk pada aturan kapasitas/ketersediaan.
-- **Traceability:** FR9.9, FR6.3, AC6.4
+  - Agent mengekstrak jumlah orang, tanggal, waktu (serta area atau catatan bila ada) dalam zona waktu outlet. Jam tanpa tanggal berarti hari ini bila jam itu masih bisa dibooking; jika sudah lewat, agent menanyakan harinya. Kata seperti *besok*, *lusa*, *Sabtu ini*, *nanti malam* diubah menjadi tanggal. Untuk "jam 7", bila hanya 07:00 atau 19:00 yang masuk jam booking, itu yang dipakai; jika keduanya mungkin, agent bertanya.
+  - Agent hanya menanyakan detail yang kurang, satu per pesan; nama dan nomor HP terisi dari perangkat bila pernah disimpan, dan pemberitahuan privasi tampil sebelum data dikirim.
+  - Worker agent mengecek ketersediaan dengan aturan yang sama dengan alur tombol: jam booking, jangka waktu booking, maksimal jumlah orang, meja terkecil yang muat, dan maksimal 2 booking mendatang per nomor HP.
+  - Jika ada meja, chat menampilkan kartu ringkasan (outlet, hari dan tanggal, jam dengan WIB/WITA/WIT, jumlah orang, nama, nomor HP) dengan tombol `Ya, buat reservasi` dan `Ubah`. Jika penuh, agent mengatakannya dan menawarkan maksimal 3 jam terdekat yang kosong sebagai tombol (atau hari berikutnya bila hari itu habis).
+  - Booking baru dibuat setelah pelanggan menekan tombol konfirmasi pada kartu terakhir atau membalas hanya dengan kata setuju (*ya*, *oke*, *betul*, *gas*, dll.) yang dicocokkan oleh aturan di kode, bukan oleh model. Perubahan detail membuat kartu baru dan kartu lama tidak bisa dikonfirmasi lagi.
+  - Booking dibuat melalui fungsi deterministik yang sama dengan alur tombol (US-023), dicek ulang saat konfirmasi (US-024), aktor `agent`, sumber "web chat (AI)" di board staf; chat menampilkan kode booking, link, dan `Tambah ke kalender` (US-025).
+  - Pelanggan dapat mengganti jam atau membatalkan booking dari HP yang sama lewat chat bebas ("ganti jadi jam 8 ya"), dengan batas pembatalan outlet dan kartu konfirmasi yang sama.
+- **Traceability:** FR9.9, FR6.3, FR13.4–FR13.6, AC6.4, AC13.1–AC13.7
 
 ### US-044 — Menjawab FAQ dan upsell
 
@@ -693,7 +699,8 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Rekomendasi percakapan sudah tersedia di MVP (US-052); story ini memperluas agent ke FAQ dan upsell di luar alur Rekomendasi.
   - FAQ dapat dijawab tanpa mengubah data operasional.
   - Upsell tidak mengubah cart/order secara langsung.
-- **Traceability:** FR6.3
+  - FAQ dan upsell berjalan lewat supervisor agent dan worker agent yang sama (US-066) dan tunduk pada batas cakupan outlet.
+- **Traceability:** FR6.3, FR13.1, FR13.11
 
 ### US-045 — Mendapatkan rekomendasi restock dan anomali cashflow
 
@@ -706,6 +713,58 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - Agent tidak memiliki tool untuk mengubah stok, membuat stock movement, atau membuat purchase order.
   - Restock hanya terjadi setelah owner mencatatnya melalui alur deterministik.
 - **Traceability:** FR3.4, FR4.4, AC6.3–AC6.4
+
+### US-066 — Asisten AI dengan supervisor agent dan worker agent
+
+**Sebagai** owner, **saya ingin** asisten AI di web chat yang dibagi menjadi supervisor agent dan worker agent, **sehingga** percakapan dengan pelanggan tetap luwes tetapi setiap aksi ke sistem tetap aman, terkontrol, dan tercatat.
+
+- **Fase/Prioritas:** P2 / P0 untuk Phase 2
+- **Acceptance criteria:**
+  - Saat Asisten AI outlet aktif, teks bebas di mana pun dalam web chat (link outlet dan QR meja) diproses supervisor agent; tombol menu utama dan kata "menu" tetap berfungsi.
+  - **Supervisor agent** adalah satu-satunya yang berbicara dengan pelanggan: menentukan maksud (reservasi, order, info outlet, rekomendasi, FAQ, di luar cakupan), menanyakan detail yang kurang, memberi tugas terstruktur ke worker, memeriksa hasilnya, dan menyusun balasan. Supervisor tidak punya akses database dan tool lain selain menyerahkan tugas ke worker.
+  - **Worker agent** hanya menjalankan tool deterministik berversi (baca, proposal, commit), tidak berbicara dengan pelanggan, tidak menyimpan memori antar tugas, dan dibatasi 8 pemanggilan tool per tugas. Tenant dan outlet ditentukan server dari slug atau token, bukan dari model.
+  - Supervisor hanya menyampaikan fakta (harga, jam, ketersediaan, promo, status) yang berasal dari hasil worker yang lolos validasi skema pada pesan tersebut.
+  - Tidak ada tool untuk menulis stok, ledger, pembayaran, harga, menu, atau promo, dan tidak ada tool untuk mengonfirmasi pembayaran.
+  - Jika balasan lebih dari 2 detik, chat menampilkan "Sebentar ya, aku cek dulu…" dengan indikator mengetik. Jika agent gagal, lebih dari 30 detik, atau melewati batas langkah, tidak ada yang dibuat dan chat menampilkan tombol alur terkait (misalnya Reservasi dengan detail yang sudah dipahami).
+  - Agent menolak topik di luar outlet, tidak membuka data pelanggan lain, prompt, atau tool, dan memperlakukan teks pelanggan maupun teks owner (deskripsi menu, promo) sebagai data, bukan instruksi.
+  - Setiap pesan yang ditangani agent tercatat sebagai agent run (maksud, tugas worker, tool call beserta input/output, versi model dan prompt, latensi, alasan fallback); data pribadi di dalamnya dianonimkan bersama data pelanggan dan run dihapus setelah 30 hari.
+- **Traceability:** FR6.3, FR13.1–FR13.3, FR13.10–FR13.12, AC13.12–AC13.15
+
+### US-067 — Mendapat info promo, menu baru, dan menu habis di chat
+
+**Sebagai** pelanggan, **saya ingin** agent memberi tahu promo yang sedang berjalan, menu baru, dan menu yang sedang habis, **sehingga** saya tahu apa yang menarik dan tidak kecewa memesan item yang tidak tersedia.
+
+- **Fase/Prioritas:** P2 / P0 untuk Phase 2
+- **Acceptance criteria:**
+  - Pesan pertama sesi chat memuat maksimal 3 sorotan: promo aktif lebih dulu, lalu item berlabel Baru; tidak ada sorotan bila keduanya kosong.
+  - Saat ditanya ("ada promo apa?", "menu baru apa aja?"), agent menampilkan promo aktif outlet ini dengan teks owner apa adanya dan menu baru sebagai kartu menu; bila tidak ada, agent mengatakannya tanpa mengarang.
+  - Saat pelanggan meminta atau memesan item yang sold out di outlet ini, agent memberi tahu dan menyarankan maksimal 3 item tersedia dengan tag atau kategori yang sama; saat ditanya "apa yang lagi habis?", agent menyebut item yang sold out sekarang.
+  - Semua info dibaca langsung dari sistem saat membalas; promo outlet lain, promo kedaluwarsa, atau promo nonaktif tidak pernah disebut.
+  - Agent tidak menjanjikan diskon, gratis, atau syarat yang tidak tertulis di promo; total yang dibayar selalu dari quote server.
+- **Traceability:** FR13.7–FR13.9, AC13.8–AC13.11
+
+### US-068 — Mengelola promo dan label menu baru
+
+**Sebagai** owner, **saya ingin** membuat promo per outlet dan menandai menu baru, **sehingga** agent dan web chat menyampaikan informasi yang benar kepada pelanggan.
+
+- **Fase/Prioritas:** P2 / P0 untuk Phase 2
+- **Acceptance criteria:**
+  - Owner membuat, mengubah, dan menonaktifkan promo: judul, deskripsi singkat, satu atau beberapa outlet, tanggal dan jam mulai serta selesai, item menu terkait (opsional), dan saklar aktif.
+  - Promo di Phase 2 hanya informasi: tidak mengubah harga, quote, PB1, pembayaran, atau ledger. Promo berbasis harga dilakukan dengan mengubah harga outlet selama periode itu.
+  - Menu berlabel **Baru** di outlet selama 14 hari sejak aktif di outlet tersebut; owner dapat mengubah tanggal akhirnya atau mematikan label. Label tampil di kartu menu web chat, termasuk alur tombol.
+  - Hanya owner yang dapat mengelola promo dan label Baru, di UI maupun API.
+- **Traceability:** FR13.8–FR13.9, AC13.10–AC13.11
+
+### US-069 — Mengaktifkan Asisten AI per outlet dan memantau hasilnya
+
+**Sebagai** owner, **saya ingin** menyalakan atau mematikan Asisten AI per outlet dan melihat apa yang dikerjakan agent, **sehingga** saya bisa mencoba agent dengan aman dan kembali ke alur tombol kapan saja.
+
+- **Fase/Prioritas:** P2 / P1
+- **Acceptance criteria:**
+  - Pengaturan outlet memiliki saklar **Asisten AI**, mati secara default. Saat mati, web chat berjalan persis seperti MVP dan teks bebas di luar Rekomendasi dijawab singkat dengan tombol menu utama.
+  - Owner melihat per outlet dan periode: booking dan order yang dibuat agent, serta persentase pesan yang jatuh ke tombol (fallback).
+  - Setiap booking atau order dari agent dapat ditelusuri ke agent run dan proposal yang dikonfirmasi.
+- **Traceability:** FR13.10, FR13.12, AC13.12, AC13.15
 
 ## Epic K — Scale dan ekspansi (Phase 3)
 
@@ -863,13 +922,14 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | FR3 Cashflow | US-030–US-032, US-045, US-057–US-061 |
 | FR4 Menu, stock, inventory | US-005–US-008, US-014, US-021, US-045, US-060 |
 | FR5 Staff attendance (MVP) and scheduling (Phase 3) | US-046, US-053–US-055 |
-| FR6 Web chat | US-009, US-015, US-023, US-025, US-036–US-037, US-042–US-045, US-052 |
+| FR6 Web chat | US-009, US-015, US-023, US-025, US-036–US-037, US-042–US-045, US-052, US-066 |
 | FR7 Admin web app | US-003, US-033–US-035, US-056 |
 | FR8 Recommendations | US-028–US-029, US-052 |
 | FR9 Reservations | US-022–US-027, US-043 |
 | FR10 Order lifecycle | US-004, US-015–US-021, US-034, US-064 |
 | FR11 Payments & tax | US-017–US-020, US-047, US-062, US-064 |
 | FR12 Customer data & privacy | US-040–US-041 |
+| FR13 AI agent di web chat (Phase 2: supervisor + worker) | US-042–US-044, US-066–US-069 |
 | NFR1 Data residency | US-039 |
 | NFR2 Multi-tenancy | US-038 |
 | NFR3 Auditability | US-030, US-039 |
