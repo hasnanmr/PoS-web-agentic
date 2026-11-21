@@ -148,7 +148,10 @@ def test_one_turn_is_a_clean_masked_trace(traced) -> None:
     # No middleware noise, and no personal data in any exported attribute.
     assert not [s.name for s in spans if s.name.endswith(("before_agent", "after_agent"))]
     exported = json.dumps([dict(s.attributes) for s in spans], ensure_ascii=False)
-    assert "3456" not in exported and "rina@mail.com" not in exported
+    # Match the phone as written, not a bare "3456": that also turns up by chance in random
+    # span/trace ids and timestamps, which made this test flaky.
+    for leak in ("0812-3456-7221", "081234567221", "3456-7221", "rina@mail.com"):
+        assert leak not in exported, leak
 
     # Outcome score on the trace.
     assert traced["scores"][-1] == {
