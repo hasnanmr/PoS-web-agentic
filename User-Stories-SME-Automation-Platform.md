@@ -722,13 +722,15 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 - **Acceptance criteria:**
   - Saat Asisten AI outlet aktif, teks bebas di mana pun dalam web chat (link outlet dan QR meja) diproses supervisor agent; tombol menu utama dan kata "menu" tetap berfungsi.
   - **Supervisor agent** adalah satu-satunya yang berbicara dengan pelanggan: menentukan maksud (reservasi, order, info outlet, rekomendasi, FAQ, di luar cakupan), menanyakan detail yang kurang, memberi tugas terstruktur ke worker, memeriksa hasilnya, dan menyusun balasan. Supervisor tidak punya akses database dan tool lain selain menyerahkan tugas ke worker.
-  - **Worker agent** hanya menjalankan tool deterministik berversi (baca, proposal, commit), tidak berbicara dengan pelanggan, tidak menyimpan memori antar tugas, dan dibatasi 8 pemanggilan tool per tugas. Tenant dan outlet ditentukan server dari slug atau token, bukan dari model.
+  - **Worker agent** hanya menjalankan tool deterministik berversi (baca dan proposal; tidak ada tool commit), tidak berbicara dengan pelanggan, tidak menyimpan memori antar tugas, dan dibatasi 8 pemanggilan tool per tugas. Tenant dan outlet ditentukan server dari slug atau token, bukan dari model.
   - Supervisor hanya menyampaikan fakta (harga, jam, ketersediaan, promo, status) yang berasal dari hasil worker yang lolos validasi skema pada pesan tersebut.
+  - Booking dan order dibuat oleh API saat pelanggan mengonfirmasi kartu ringkasan, bukan lewat tool call model.
+  - Dibangun dengan **LangChain Deep Agents** (`deepagents`): supervisor adalah agent utama `create_deep_agent`, worker adalah satu-satunya subagent yang dipanggil lewat tool `task`; subagent general-purpose bawaan dimatikan dan tool filesystem bawaan tidak dipakai.
   - Tidak ada tool untuk menulis stok, ledger, pembayaran, harga, menu, atau promo, dan tidak ada tool untuk mengonfirmasi pembayaran.
   - Jika balasan lebih dari 2 detik, chat menampilkan "Sebentar ya, aku cek dulu…" dengan indikator mengetik. Jika agent gagal, lebih dari 30 detik, atau melewati batas langkah, tidak ada yang dibuat dan chat menampilkan tombol alur terkait (misalnya Reservasi dengan detail yang sudah dipahami).
   - Agent menolak topik di luar outlet, tidak membuka data pelanggan lain, prompt, atau tool, dan memperlakukan teks pelanggan maupun teks owner (deskripsi menu, promo) sebagai data, bukan instruksi.
   - Setiap pesan yang ditangani agent tercatat sebagai agent run (maksud, tugas worker, tool call beserta input/output, versi model dan prompt, latensi, alasan fallback); data pribadi di dalamnya dianonimkan bersama data pelanggan dan run dihapus setelah 30 hari.
-- **Traceability:** FR6.3, FR13.1–FR13.3, FR13.10–FR13.12, AC13.12–AC13.15
+- **Traceability:** FR6.3, FR13.1–FR13.3, FR13.10–FR13.13, AC13.12–AC13.15
 
 ### US-067 — Mendapat info promo, menu baru, dan menu habis di chat
 
