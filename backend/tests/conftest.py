@@ -22,6 +22,9 @@ ENV_VARS = (
     "DB_POOL_MIN_SIZE",
     "DB_POOL_MAX_SIZE",
     "ADMIN_APP_URL",
+    "OPENAI_BASE_URL",
+    "OPENAI_API_KEY",
+    "MODEL_NAME",
 )
 
 DEPLOYED_ENV = {
