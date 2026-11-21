@@ -7,6 +7,7 @@ of a deactivated one brings that row back with the new capacity and area.
 
 from __future__ import annotations
 
+import secrets
 from datetime import time
 from typing import Any
 from uuid import UUID
@@ -14,6 +15,7 @@ from uuid import UUID
 from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
 
+from app.core import crypto
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
@@ -97,12 +99,24 @@ async def create_table(
             (name, capacity, area, is_bookable, existing["id"]),
         )
     else:
+        token = secrets.token_hex(16)  # the table QR token (128 bits)
         try:
             async with conn.transaction():
                 await cur.execute(
                     "insert into app.tables (tenant_id, outlet_id, name, capacity, area,"  # noqa: S608 - constant column list
-                    f" is_bookable) values (%s, %s, %s, %s, %s, %s) returning {_TABLE_COLUMNS}",
-                    (ctx.tenant_id, outlet_id, name, capacity, area, is_bookable),
+                    " is_bookable, qr_token, qr_token_hash) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+                    f" returning {_TABLE_COLUMNS}",
+                    (
+                        ctx.tenant_id,
+                        outlet_id,
+                        name,
+                        capacity,
+                        area,
+                        is_bookable,
+                        # Stored encrypted; looked up by its SHA-256 (app.core.crypto).
+                        crypto.encrypt(token, "tables.qr_token"),
+                        crypto.sha256_hex(token),
+                    ),
                 )
         except errors.UniqueViolation:
             raise ConflictError(

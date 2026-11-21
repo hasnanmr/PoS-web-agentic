@@ -18,11 +18,12 @@ from fastapi.testclient import TestClient
 
 from app.api.v1 import public_outlet
 from app.config import Settings
+from app.core import idempotency
 from app.core.web_chat import PRIVACY_NOTICE_VERSION
 from app.main import create_app
 
 from ..auth.keys import make_token, make_verifier
-from ._db import ADMIN_URL, APP_URL, admin_sql, cleanup_domain, invite_owner
+from ._db import ADMIN_URL, APP_URL, admin_sql, cleanup_domain, invite_owner, plain
 
 pytestmark = pytest.mark.skipif(
     not (ADMIN_URL and APP_URL), reason="TEST_DATABASE_URL / TEST_APP_DATABASE_URL not set"
@@ -150,7 +151,8 @@ def test_disabled_outlet_takes_no_bookings(client, ctx) -> None:
     res = client.get(f"{_base(ctx)}/availability", params={"party_size": 2, "date": "2030-01-01"})
     assert res.status_code == 409 and res.json()["error"]["code"] == "reservations_unavailable"
     table = admin_sql("select qr_token from app.tables where outlet_id = %s", (ctx["outlet"],))
-    assert client.get(f"/api/v1/public/t/{table[0][0]}/availability").status_code == 404
+    token = plain(table[0][0], "tables.qr_token")
+    assert client.get(f"/api/v1/public/t/{token}/availability").status_code == 404
 
 
 def test_availability_respects_party_limit_and_local_time(client, enabled) -> None:
@@ -203,14 +205,20 @@ def test_booking_gets_smallest_table_code_and_staff_view(client, enabled) -> Non
     )
     assert missing.status_code == 422
     row = admin_sql(
-        "select r.table_id::text, r.source::text, r.guest_phone, c.name, a.notice_version"
-        " from app.reservations r join app.customers c on c.id = r.customer_id"
+        "select r.table_id::text, r.source::text, r.guest_phone, c.name, a.notice_version,"
+        " r.booking_code, r.guest_name from app.reservations r"
+        " join app.customers c on c.id = r.customer_id"
         " join app.privacy_notice_acknowledgements a on a.customer_id = c.id where r.id = %s",
         (b["reservation_id"],),
     )
-    assert row == [
-        (ctx["tables"]["M05"], "web_chat", "081222220001", "Dewi", PRIVACY_NOTICE_VERSION)
-    ]
+    table_id, source, phone, name, version, code, guest = row[0]
+    assert (table_id, source, version) == (ctx["tables"]["M05"], "web_chat", PRIVACY_NOTICE_VERSION)
+    # Stored encrypted (glossary §10): no plaintext phone, name, or booking code in the rows.
+    assert all(v.startswith("enc:v1:") for v in (phone, name, code, guest))
+    assert plain(phone, "reservations.guest_phone") == "081222220001"
+    assert plain(name, "customers.name") == "Dewi"
+    assert plain(guest, "reservations.guest_name") == "Dewi"
+    assert plain(code, "reservations.booking_code") == b["booking_code"]
     board = client.get(
         f"/api/v1/ops/outlets/{ctx['outlet']}/reservations",
         headers=ctx["owner"],
@@ -394,9 +402,10 @@ def test_replays_need_the_key_and_cache_no_personal_data(client, enabled) -> Non
         phone="0819-2000-0001",
         name="Laras",
     )
-    cached = admin_sql("select response::text from app.idempotency_keys where key = %s", (key,))[0][
-        0
-    ]
+    cached = admin_sql(
+        "select response::text from app.idempotency_keys where key = %s",
+        (idempotency.stored_key(key),),
+    )[0][0]
     assert "Laras" not in cached and booking_key not in cached  # only the reservation id
     url = f"{_base(ctx)}/reservations/{b['reservation_id']}/reschedule"
     body = {"start_at": _tomorrow_at(7, 30).isoformat()}

@@ -20,7 +20,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from app.core import bills as bills_core
-from app.core import order_flow, payments, stock
+from app.core import crypto, order_flow, payments, stock
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, DomainError, NotFoundError, ValidationFailedError
 from app.core.localtime import local_date, local_day_bounds
@@ -391,9 +391,13 @@ async def create_web_order(
         extra={
             "access_key_hash": draft.access_key_hash,
             "note": draft.note,
-            "customer_name": draft.customer_name,
+            # Personal data is stored encrypted (app.core.crypto, glossary §10).
+            "customer_name": crypto.encrypt(draft.customer_name, "orders.customer_name"),
             "customer_id": draft.customer_id,
-            "delivery_address": draft.delivery_address if order_type == "delivery" else None,
+            "delivery_address": crypto.encrypt(
+                draft.delivery_address if order_type == "delivery" else None,
+                "orders.delivery_address",
+            ),
         },
     )
     return {
@@ -513,7 +517,7 @@ select o.id, o.outlet_id, o.order_no, o.channel::text as channel, o.type::text a
        o.payment_mode::text as payment_mode, o.status::text as status,
        o.payment_status::text as payment_status, o.table_id, o.bill_id, o.subtotal,
        o.pb1_rate_bps, o.pb1_amount, o.delivery_fee, o.total, o.created_at,
-       o.customer_name, o.note, o.delivery_address, c.phone as customer_phone,
+       o.customer_name, o.note, o.delivery_address, c.phone as customer_phone_enc,
        ou.order_prefix, ou.timezone, ou.unpaid_timeout_minutes,
        t.name as table_name, b.guest_name, pp.id as pending_proof_id,
        pp.kind as pending_proof_kind, pp.received_at as pending_proof_at
@@ -825,11 +829,14 @@ def _card(
         "payment_id": payment["payment_id"] if payment else None,
         "qris_checked": qris_checked,
         "table": order["table_name"],
-        "customer_name": order.get("customer_name") or order.get("guest_name"),
+        "customer_name": crypto.decrypt(order.get("customer_name"), "orders.customer_name")
+        or order.get("guest_name"),
         # Web chat orders from the outlet link: who to call and where to deliver (S2, T-146).
-        # Both are cleared once the order is finished (FR12.2).
-        "customer_phone": order.get("customer_phone"),
-        "delivery_address": order.get("delivery_address"),
+        # Both are cleared once the order is finished (FR12.2); stored encrypted.
+        "customer_phone": crypto.decrypt(order.get("customer_phone_enc"), "customers.phone"),
+        "delivery_address": crypto.decrypt(
+            order.get("delivery_address"), "orders.delivery_address"
+        ),
         "note": order.get("note"),
         # S2 web-order card: "Pelanggan bilang sudah bayar · 12:44" → S4 review of this proof.
         "proof_id": order.get("pending_proof_id"),

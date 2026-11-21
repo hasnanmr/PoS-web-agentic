@@ -21,7 +21,6 @@ Rules (PRD §5.2, §5.6, §5.12; docs/architecture/screen-endpoint-map.md → C1
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import secrets
@@ -35,7 +34,7 @@ from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from app.core import orders
+from app.core import crypto, orders
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 
@@ -113,7 +112,7 @@ def new_access_key() -> str:
 
 
 def hash_key(key: str) -> str:
-    return hashlib.sha256(key.encode()).hexdigest()
+    return crypto.sha256_hex(key)
 
 
 CLIENT_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
@@ -212,6 +211,11 @@ async def expire_unpaid(conn: AsyncConnection, ctx: ActorContext, outlet_id: UUI
 # Customer details (FR12.1) ----------------------------------------------------------------------
 
 
+def phone_index(phone: str) -> str:
+    """Blind index of a cleaned phone number (customers and bookings share it)."""
+    return crypto.blind_index(phone, "phone")
+
+
 def clean_phone(phone: str) -> str:
     """ "0812-3456 7890" → "081234567890"; refuses anything that is not a phone number."""
     digits = re.sub(r"[\s().-]", "", phone or "")
@@ -236,9 +240,15 @@ async def record_customer(
             "show the current privacy notice first", {"field": "privacy_notice_version"}
         )
     cur = await conn.execute(
-        "insert into app.customers (tenant_id, outlet_id, name, phone)"
-        " values (%s, %s, %s, %s) returning id",
-        (ctx.tenant_id, outlet_id, name, phone),
+        "insert into app.customers (tenant_id, outlet_id, name, phone, phone_index)"
+        " values (%s, %s, %s, %s, %s) returning id",
+        (
+            ctx.tenant_id,
+            outlet_id,
+            crypto.encrypt(name, "customers.name"),
+            crypto.encrypt(phone, "customers.phone"),
+            phone_index(phone) if phone else None,
+        ),
     )
     customer_id: UUID = (await cur.fetchone())[0]  # type: ignore[index]
     await conn.execute(
@@ -335,7 +345,7 @@ async def order_status(
         "fulfillment": extra["type"],
         "customer_name": detail["customer_name"],
         # Cleared by the anonymization trigger once the order is finished (FR12.2).
-        "delivery_address": extra["delivery_address"],
+        "delivery_address": crypto.decrypt(extra["delivery_address"], "orders.delivery_address"),
         "note": detail["note"],
         "status": detail["status"],
         "payment_status": detail["payment_status"],

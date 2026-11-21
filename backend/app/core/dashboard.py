@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
+from app.core import crypto
 from app.core.errors import NotFoundError, ValidationFailedError
 from app.core.orders import _items as order_items
 from app.core.orders import _summary as item_summary
@@ -831,7 +832,8 @@ async def drill_orders(
                 "channel": r["channel"],
                 "type": r["type"],
                 "table": r["table_name"],
-                "customer_name": r["customer_name"] or r["guest_name"],
+                "customer_name": crypto.decrypt(r["customer_name"], "orders.customer_name")
+                or r["guest_name"],
                 "payment_method": r["method"],
                 "item_summary": item_summary(lines.get(r["id"], [])),
                 "revenue_excl_pb1": int(r["subtotal"]),

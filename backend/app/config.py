@@ -33,6 +33,7 @@ REQUIRED_OUTSIDE_LOCAL: tuple[str, ...] = (
     "supabase_url",
     "supabase_jwks_url",
     "supabase_jwt_issuer",
+    "data_encryption_key",
 )
 
 
@@ -73,6 +74,10 @@ class Settings(BaseSettings):
     # and every URL handed out stays valid for that long.
     signed_url_seconds: int = Field(default=3600, ge=300, le=86400)
     signed_url_min_left_seconds: int = Field(default=1200, ge=60, le=3600)
+    # Field encryption (app.core.crypto): 32 random bytes, base64 (`openssl rand -base64 32`).
+    # Encrypts customer personal data and stored credentials (AES-256-GCM) and keys the blind
+    # indexes (HMAC-SHA256). Required outside local; losing it makes that data unreadable.
+    data_encryption_key: SecretStr | None = None
     # Admin app URL: where invitation emails send people to set their password.
     admin_app_url: AnyHttpUrl | None = None
 
@@ -101,6 +106,7 @@ class Settings(BaseSettings):
         "rabbitmq_url",
         "supabase_service_role_key",
         "admin_app_url",
+        "data_encryption_key",
         "openai_base_url",
         "openai_api_key",
         "model_name",
@@ -112,6 +118,15 @@ class Settings(BaseSettings):
             # Pasted secrets often end with a newline or space; never send those along.
             value = value.strip()
             return value or None
+        return value
+
+    @field_validator("data_encryption_key")
+    @classmethod
+    def _valid_encryption_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None:
+            from app.core.crypto import parse_key
+
+            parse_key(value.get_secret_value())
         return value
 
     @field_validator("app_env", mode="before")

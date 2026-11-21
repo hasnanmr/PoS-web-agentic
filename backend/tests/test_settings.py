@@ -91,6 +91,18 @@ def test_invalid_values_fail_fast(
     assert expected in str(excinfo.value)
 
 
+def test_deployed_env_requires_a_valid_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key, value in {**DEPLOYED_ENV, "APP_ENV": "demo"}.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.delenv("DATA_ENCRYPTION_KEY")
+    with pytest.raises(ConfigError, match="DATA_ENCRYPTION_KEY"):
+        load_settings()
+    monkeypatch.setenv("DATA_ENCRYPTION_KEY", "too-short")
+    with pytest.raises(ConfigError, match="DATA_ENCRYPTION_KEY"):
+        load_settings()
+    assert load_settings(data_encryption_key=None, app_env="local").data_encryption_key is None
+
+
 def test_agent_is_off_without_its_variables() -> None:
     settings = load_settings()
     assert settings.agent_configured is False

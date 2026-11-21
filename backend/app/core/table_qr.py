@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import re
+import secrets
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Literal
@@ -24,7 +25,7 @@ import segno
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
-from app.core import web_chat
+from app.core import crypto, web_chat
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
 from app.core.errors import NotFoundError
@@ -99,7 +100,8 @@ async def resolve(conn: AsyncConnection, token: str) -> TableRef | None:
     if not TOKEN_PATTERN.match(token):
         return None
     cur = conn.cursor(row_factory=dict_row)
-    await cur.execute("select * from app.resolve_table_qr(%s)", (token,))
+    # Looked up by the SHA-256 of the token; the stored token itself is encrypted.
+    await cur.execute("select * from app.resolve_table_qr(%s)", (crypto.sha256_hex(token),))
     row = await cur.fetchone()
     if row is None:
         return None
@@ -165,6 +167,7 @@ async def table_token(conn: AsyncConnection, table_id: UUID) -> dict[str, Any]:
     row = await cur.fetchone()
     if row is None:
         raise NotFoundError("table")
+    row["qr_token"] = crypto.decrypt(row["qr_token"], "tables.qr_token")
     return row
 
 
@@ -176,18 +179,20 @@ async def outlet_tokens(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str
         " where t.outlet_id = %s and t.is_active order by t.name",
         (outlet_id,),
     )
-    return await cur.fetchall()
+    rows = await cur.fetchall()
+    for r in rows:
+        r["qr_token"] = crypto.decrypt(r["qr_token"], "tables.qr_token")
+    return rows
 
 
 async def replace_token(conn: AsyncConnection, ctx: ActorContext, table_id: UUID) -> str:
     """O8 "↻ Ganti": the old printed QR stops working at once (Q0)."""
     table = await table_token(conn, table_id)
-    cur = await conn.execute(
-        "update app.tables set qr_token = replace(gen_random_uuid()::text, '-', '')"
-        " where id = %s returning qr_token",
-        (table_id,),
+    token = new_qr_token()
+    await conn.execute(
+        "update app.tables set qr_token = %s, qr_token_hash = %s where id = %s",
+        (crypto.encrypt(token, "tables.qr_token"), crypto.sha256_hex(token), table_id),
     )
-    token = (await cur.fetchone())[0]  # type: ignore[index]
     await record_audit(
         conn,
         ctx,
@@ -198,6 +203,11 @@ async def replace_token(conn: AsyncConnection, ctx: ActorContext, table_id: UUID
         data={"table": table["name"]},
     )
     return token
+
+
+def new_qr_token() -> str:
+    """32 random hex characters (128 bits), like the column default."""
+    return secrets.token_hex(16)
 
 
 def table_url(app_url: str, token: str) -> str:

@@ -28,7 +28,7 @@ from zoneinfo import ZoneInfo
 from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
 
-from app.core import reservations, web_chat
+from app.core import crypto, reservations, web_chat
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, DomainError, NotFoundError, ValidationFailedError
 from app.core.tables import HOLD_MINUTES, get_settings
@@ -97,8 +97,8 @@ async def _new_code(conn: AsyncConnection, outlet_id: UUID) -> str:
     for _ in range(10):
         code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(6))
         cur = await conn.execute(
-            "select 1 from app.reservations where outlet_id = %s and booking_code = %s",
-            (outlet_id, code),
+            "select 1 from app.reservations where outlet_id = %s and booking_code_index = %s",
+            (outlet_id, reservations.booking_code_index(code)),
         )
         if await cur.fetchone() is None:
             return code
@@ -127,8 +127,8 @@ async def create(
     )
     cur = await conn.execute(
         "select count(*) from app.reservations where outlet_id = %s and source = 'web_chat'"
-        " and guest_phone = %s and status = 'booked' and starts_at > now()",
-        (scope.outlet_id, phone),
+        " and guest_phone_index = %s and status = 'booked' and starts_at > now()",
+        (scope.outlet_id, reservations.phone_index(phone)),
     )
     if (await cur.fetchone())[0] >= MAX_UPCOMING_PER_PHONE:  # type: ignore[index]
         raise ConflictError(
@@ -197,13 +197,13 @@ async def booking(conn: AsyncConnection, scope: web_chat.ChatScope, res_id: UUID
     now = datetime.now(UTC)
     return {
         "reservation_id": row["id"],
-        "booking_code": row["booking_code"],
+        "booking_code": crypto.decrypt(row["booking_code"], "reservations.booking_code"),
         "start_at": row["starts_at"],
         "label": time_label(row["starts_at"], scope.timezone),
         "timezone": scope.timezone,
         "party_size": row["party_size"],
         "status": row["status"],
-        "guest_name": row["guest_name"],
+        "guest_name": crypto.decrypt(row["guest_name"], "reservations.guest_name"),
         "hold_until": reservations.hold_until(row),
         "change_until": change_until,
         "can_change": row["status"] == "booked" and now < change_until,
@@ -273,8 +273,9 @@ async def lookup(
     await reservations.release_no_shows(conn, scope.outlet_id)
     cur = await conn.execute(
         "select id from app.reservations where outlet_id = %s and source = 'web_chat'"
-        " and booking_code = %s and guest_phone = %s and status in ('booked', 'seated')",
-        (scope.outlet_id, code.strip().upper(), phone),
+        " and booking_code_index = %s and guest_phone_index = %s"
+        " and status in ('booked', 'seated')",
+        (scope.outlet_id, reservations.booking_code_index(code), reservations.phone_index(phone)),
     )
     row = await cur.fetchone()
     if row is None:

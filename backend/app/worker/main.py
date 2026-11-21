@@ -12,6 +12,7 @@ import logging
 import sys
 
 from app.config import ConfigError, get_settings
+from app.core import crypto
 from app.logging import configure_logging
 
 logger = logging.getLogger("app.worker")
@@ -25,6 +26,9 @@ def main() -> int:
         return 1
 
     configure_logging(settings.log_level, service="whatsapp-worker", app_env=settings.app_env)
+    crypto.configure(
+        settings.data_encryption_key.get_secret_value() if settings.data_encryption_key else None
+    )
     logger.info(
         "whatsapp worker not implemented yet; exiting",
         extra={"rabbitmq_configured": bool(settings.rabbitmq_url)},
