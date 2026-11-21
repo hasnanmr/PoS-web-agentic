@@ -12,8 +12,8 @@ import { Action, Bubble, Chip, Choice, Field, FromPhone, TextLink, inputClass } 
 
 // C2 ------------------------------------------------------------------------------------------------
 
-export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
-  outletName: string; menu: ChatMenuItem[]; cart: CartLine[]; webOrdering: boolean; onAdd: (item: ChatMenuItem) => void
+export function MenuCards({ outletName, menu, cart, webOrdering, canBook = false, onAdd }: {
+  outletName: string; menu: ChatMenuItem[]; cart: CartLine[]; webOrdering: boolean; canBook?: boolean; onAdd: (item: ChatMenuItem) => void
 }) {
   const [category, setCategory] = useState<string | null>(null)
   const categories = useMemo(() => [...new Set(menu.map((m) => m.category).filter((c): c is string => Boolean(c)))], [menu])
@@ -32,7 +32,7 @@ export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
       </Bubble>
       {!webOrdering && (
         <Bubble tone="warning">
-          🧾 Untuk outlet ini, pesanan dilayani langsung di kasir ya. Menunya bisa kamu lihat dulu di sini.
+          🧾 Untuk outlet ini, pesanan dilayani langsung di kasir ya. Menunya bisa kamu lihat dulu di sini{canBook ? ', dan reservasi meja tetap bisa.' : '.'}
         </Bubble>
       )}
       <ul className="space-y-2" aria-label="Menu">
@@ -41,7 +41,7 @@ export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
           const hint = item.description || (item.addon_groups.length ? 'ada pilihan' : '')
           return (
             <li key={item.product_id}
-              className={`flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5 ${item.sold_out ? 'opacity-60' : ''}`}>
+              className="flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5">
               {item.photo_url ? (
                 <Photo src={item.photo_url} className="h-14 w-14 shrink-0 rounded-lg" />
               ) : (
@@ -50,14 +50,14 @@ export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
               <div className="min-w-0 flex-1 text-[13px]">
                 <p className="font-semibold">{item.name}</p>
                 {hint && <p className="truncate text-[11px] text-text-muted">{item.description && item.addon_groups.length ? `${item.description} · ada pilihan` : hint}</p>}
-                <p className="font-semibold">{formatRupiah(item.price)}</p>
+                <p className={item.sold_out ? 'text-[12px] text-text-muted' : 'font-semibold'}>{formatRupiah(item.price)}</p>
               </div>
               {item.sold_out ? (
                 <span className="shrink-0 rounded-full bg-danger-soft px-2 py-1 text-[11px] font-semibold text-danger">Habis</span>
               ) : webOrdering ? (
                 count > 0 ? (
                   <button type="button" onClick={() => onAdd(item)} aria-label={`Tambah lagi ${item.name}`}
-                    className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1.5 text-[11px] font-semibold text-primary">
+                    className="shrink-0 rounded-lg bg-primary-soft px-2.5 py-1.5 text-[11px] font-semibold text-primary">
                     {count} di keranjang
                   </button>
                 ) : (
@@ -119,7 +119,7 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
         )
       })}
       <div className="grid max-w-[92%] grid-cols-2 gap-2">
-        <Action tone="ghost" disabled={missing} onClick={() => onDone(requiredOnly())}>Lewati</Action>
+        <Action tone="quiet" disabled={missing} onClick={() => onDone(requiredOnly())}>Lewati</Action>
         <Action disabled={missing} onClick={() => onDone(Object.values(picked).flat())}>Lanjut</Action>
       </div>
     </div>
@@ -230,7 +230,7 @@ export function DetailsForm({ mode, initial, prefilled, remember, privacyUrl, er
               onChange={(e) => setD({ ...d, name: e.target.value })} />
           </Field>
           {touched && !d.name.trim() && <p className="mt-1 text-[12px] text-danger">Isi nama dulu ya, biar staf bisa memanggilmu.</p>}
-          <p className="mt-2 text-[11px] text-text-muted">
+          <p className="mt-2 text-[11px] text-primary">
             🔒 Nama hanya untuk pesanan ini dan dihapus setelah selesai.{' '}
             <a href={privacyUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary">Kebijakan privasi ›</a>
           </p>

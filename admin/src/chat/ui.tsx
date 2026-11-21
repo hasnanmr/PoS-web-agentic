@@ -21,18 +21,19 @@ export function ChatHeader({ initials, title, subtitle }: { initials: string; ti
 
 /** A message from the outlet (left). */
 export function Bubble({ children, tone = 'plain', label }: {
-  children: ReactNode; tone?: 'plain' | 'success' | 'danger' | 'warning' | 'info'; label?: string
+  children: ReactNode; tone?: 'plain' | 'success' | 'danger' | 'warning' | 'info' | 'ai'; label?: string
 }) {
   const tones = {
     plain: 'bg-surface border-border',
     success: 'bg-success-soft border-transparent text-success',
-    danger: 'bg-danger-soft border-danger/30 text-danger',
+    danger: 'bg-danger-soft border-danger text-danger',
     warning: 'bg-warning-soft border-transparent text-warning',
     info: 'bg-primary-soft border-transparent',
+    ai: 'bg-surface border-ai',
   }
   return (
-    <div className={`max-w-[92%] rounded-xl border px-3 py-2.5 text-[13px] ${tones[tone]}`} role={tone === 'danger' ? 'alert' : undefined}>
-      {label && <p className="mb-1 text-[11px] font-semibold text-text-muted">{label}</p>}
+    <div className={`max-w-[92%] rounded-xl rounded-tl-[4px] border px-3 py-2.5 text-[13px] ${tones[tone]}`} role={tone === 'danger' ? 'alert' : undefined}>
+      {label && <p className={`mb-1 font-semibold ${label.startsWith('◆') ? 'text-[10px] text-ai' : 'text-[11px] text-text-muted'}`}>{label}</p>}
       {children}
     </div>
   )
@@ -42,7 +43,7 @@ export function Bubble({ children, tone = 'plain', label }: {
 export function Mine({ children }: { children: ReactNode }) {
   return (
     <div className="flex justify-end">
-      <p className="max-w-[80%] rounded-xl bg-primary px-3 py-2 text-[13px] text-white">{children}</p>
+      <p className="max-w-[80%] rounded-xl rounded-tr-[4px] bg-primary px-3 py-2 text-[13px] text-white">{children}</p>
     </div>
   )
 }
@@ -61,18 +62,19 @@ export function Choice({ selected = false, className = '', ...props }: ButtonHTM
 export function Chip({ selected = false, className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
   return (
     <button type="button" aria-pressed={selected}
-      className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40 ${
-        selected ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-primary'} ${className}`}
+      className={`rounded-full border px-3 py-1.5 text-[12px] disabled:opacity-40 ${
+        selected ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-border bg-surface text-text'} ${className}`}
       {...props} />
   )
 }
 
 /** Primary (navy) or action (orange) full-width button inside a card. */
-export function Action({ tone = 'primary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'primary' | 'action' | 'ghost' }) {
+export function Action({ tone = 'primary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'primary' | 'action' | 'ghost' | 'quiet' }) {
   const tones = {
     primary: 'bg-primary text-white',
     action: 'bg-action text-white',
     ghost: 'border border-primary bg-surface text-primary',
+    quiet: 'border border-border bg-surface text-text-muted',
   }
   return (
     <button type="button"
@@ -91,7 +93,7 @@ export function ActionBar({ children, onClick, disabled, label }: {
 }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} aria-label={label}
-      className="flex w-full items-center justify-between gap-2 bg-action px-4 py-3 text-[14px] font-semibold text-white disabled:opacity-60">
+      className="flex w-full items-center justify-between gap-2 bg-action px-4 py-3 text-[13px] font-semibold text-white disabled:opacity-60">
       {children}
     </button>
   )
@@ -111,7 +113,7 @@ export function BottomBar({ placeholder, onMainMenu, onSend }: {
   return (
     <form onSubmit={submit} className="flex items-center gap-2 border-t border-border bg-surface px-3 py-2">
       <button type="button" onClick={onMainMenu}
-        className="shrink-0 rounded-full bg-page px-3 py-2 text-[12px] font-semibold text-primary">
+        className="shrink-0 rounded-[18px] bg-primary-soft px-3 py-2 text-[12px] font-semibold text-primary">
         ☰ Menu utama
       </button>
       <input aria-label="Ketik pesan" value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder}
@@ -137,5 +139,5 @@ export const inputClass =
 
 /** "dari HP ini" next to a field prefilled from this phone (C5, C8). */
 export function FromPhone() {
-  return <span className="text-[11px] font-normal text-success">dari HP ini</span>
+  return <span className="text-[10px] font-normal text-teal">dari HP ini</span>
 }

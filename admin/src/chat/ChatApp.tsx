@@ -288,6 +288,8 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         onDelta: (d) => updateTurn(id, (t) => ({ ...t, text: t.text + d })),
       })
       updateTurn(id, (t) => ({ ...t, result }))
+      // C9 fallback: when the agent fails in Rekomendasi, the owner's pick + best seller cards come back.
+      if (result.kind === 'error' && result.fallback === 'cards') setStep((s) => (s.name === 'recs' ? { name: 'recs' } : s))
     } finally {
       agentBusy.current = false
     }
@@ -328,7 +330,8 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         )}
         {load === 'error' && (
           <Bubble>
-            <p>Sinyalnya lagi putus-putus. Coba lagi sebentar ya.</p>
+            <p className="font-semibold">Sebentar ya…</p>
+            <p className="mt-1">Sinyalnya lagi putus-putus. Coba lagi sebentar ya.</p>
             <TextLink className="mt-1" onClick={() => { setLoad('loading'); void start() }}>Coba lagi</TextLink>
           </Bubble>
         )}
@@ -364,7 +367,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       bottom={<BottomBar placeholder={placeholder} onMainMenu={mainMenu} onSend={onText} />}>
       {msgs.map((m) => (
         m.kind === 'ai' ? (
-          <AgentReply key={m.id} turn={m.turn} active={m.id === lastAgentId} byId={byId} webOrdering={page.web_ordering}
+          <AgentReply key={m.id} turn={m.turn} active={m.id === lastAgentId} customer={details} byId={byId} webOrdering={page.web_ordering}
             canBook={scope.kind === 'o' && page.reservations_enabled}
             onAdd={startAdd} onQuick={(q) => void askAgent(q)} onOrder={applyOrderDraft} onBook={applyBookingDraft}
             onPick={(target) => go(target === 'menu' ? 'Pesan' : target === 'recs' ? 'Rekomendasi' : 'Reservasi meja', { name: target })} />
@@ -390,7 +393,8 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
           onPick={(label, next) => go(label, next)} />
       )}
       {step.name === 'menu' && !step.quiet && (
-        <MenuCards outletName={outletName} menu={menu} cart={cart} webOrdering={page.web_ordering} onAdd={startAdd} />
+        <MenuCards outletName={outletName} menu={menu} cart={cart} webOrdering={page.web_ordering}
+          canBook={scope.kind === 'o' && page.reservations_enabled} onAdd={startAdd} />
       )}
       {step.name === 'addons' && (
         <AddonPicker item={step.item} onDone={(ids) => setStep({ name: 'note', item: step.item, optionIds: ids })} />
@@ -426,13 +430,14 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
             setOrders(rememberOrder(key, s))
             setCart([])
             setMsgs([])
+            say('me', 'Pesan & bayar')
             location.write(orderFragment(s))
             setStep({ name: 'order', saved: s })
           }} />
       )}
       {step.name === 'order' && (
         <OrderView chat={chat} saved={step.saved} link={location.href(orderFragment(step.saved))}
-          others={myOrders.filter((o) => o.order_id !== step.saved.order_id)} timezone={page.outlet.timezone}
+          others={myOrders} timezone={page.outlet.timezone}
           onGone={() => {
             setOrders(forgetOrder(key, step.saved.order_id))
             mainMenu()
@@ -463,6 +468,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
             rememberBooking(scope.slug, sb)
             location.write(bookingFragment(sb))
             setMsgs([])
+            say('me', 'Konfirmasi booking')
             setStep({ name: 'booked', booking: created, saved: sb })
           }}
           onRescheduled={(b) => {
@@ -789,7 +795,7 @@ function OrderView({ chat, saved, link, others, timezone, onGone, onOpen }: {
           <div className="max-w-[92%] space-y-2">
             <StatusCard order={order} link={link} />
             {error && <Bubble tone="danger">{error}</Bubble>}
-            {others.length > 0 && <MyOrders orders={others} timezone={timezone} onOpen={onOpen} />}
+            {others.some((o) => o.order_id !== saved.order_id) && <MyOrders orders={others} timezone={timezone} onOpen={onOpen} />}
           </div>
         </>
       )}

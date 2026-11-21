@@ -494,6 +494,16 @@ describe('C9 AI / C14 / C15 agent', () => {
     expect(await screen.findByText('Hai!')).toBeInTheDocument()
   })
 
+  it('agent fails in Rekomendasi: the owner pick + best seller cards come back (C9 fallback)', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['error', { code: 'agent_timeout', fallback: 'cards' }]]))
+    renderChat({ [`GET ${O}`]: AGENT_O, [`GET ${O}/recommendations`]: [] })
+    await user.click(await screen.findByRole('button', { name: /Rekomendasi/ }))
+    await user.type(screen.getByPlaceholderText('Ceritakan seleramu…'), 'yang manis{Enter}')
+    expect(await screen.findByText(/Ini pilihan owner & terlaris di outlet ini ya/)).toBeInTheDocument()
+    expect(await screen.findByText(/Belum ada rekomendasi di outlet ini/)).toBeInTheDocument()
+  })
+
   it('rate limited in Rekomendasi: the buttons the copy points at are shown', async () => {
     const user = userEvent.setup()
     stubAgent(sse([['error', { code: 'too_many_requests', fallback: 'cards' }]]))

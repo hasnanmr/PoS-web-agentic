@@ -108,7 +108,7 @@ export function StatusCard({ order, link }: { order: OrderStatus; link: string }
     <Bubble>
       <div className="flex items-center justify-between">
         <p className="font-semibold">Pesanan {order.order_no}</p>
-        {isActive(order) && <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success">● Live</span>}
+        {isActive(order) && <span className="rounded-full bg-teal-soft px-2 py-0.5 text-[11px] font-semibold text-teal">● Live</span>}
       </div>
       <p className="text-[11px] text-text-muted">{fulfillment} · {count} item · {formatRupiah(order.total)} · QRIS</p>
       <ol className="mt-2 space-y-1 text-[12px]" aria-label="Status pesanan">

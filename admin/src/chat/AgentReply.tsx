@@ -26,9 +26,11 @@ const WAITING: Record<AgentContext, string> = {
   auto: 'Sebentar ya…',
 }
 
-export function AgentReply({ turn, active = true, byId, webOrdering, canBook, onAdd, onQuick, onOrder, onBook, onPick }: {
+export function AgentReply({ turn, active = true, customer, byId, webOrdering, canBook, onAdd, onQuick, onOrder, onBook, onPick }: {
   turn: AgentTurn
   active?: boolean
+  /** Name and phone the customer already gave on this phone (shown masked in the C14 summary). */
+  customer?: { name: string; phone: string }
   byId: Map<string, ChatMenuItem>
   webOrdering: boolean
   canBook: boolean
@@ -69,9 +71,9 @@ export function AgentReply({ turn, active = true, byId, webOrdering, canBook, on
     : final.order_draft ? '◆ ASISTEN AI · harga & total dihitung sistem' : '◆ ASISTEN AI'
   return (
     <div className="max-w-[92%] space-y-2">
-      <Bubble label={label}>
+      <Bubble label={label} tone={final.order_draft ? 'ai' : 'plain'}>
         {final.reply_text && <p className="whitespace-pre-line">{final.reply_text}</p>}
-        {final.order_draft && <OrderDraft draft={final.order_draft} webOrdering={webOrdering} disabled={!active} onOrder={onOrder} />}
+        {final.order_draft && <OrderDraft draft={final.order_draft} webOrdering={webOrdering} disabled={!active} customer={customer} onOrder={onOrder} />}
         {final.booking_draft && (
           <div className="mt-2 rounded-lg bg-page px-2 py-1.5 text-[12px]">
             <p className="font-semibold">{final.booking_draft.party_size} orang · {final.booking_draft.label}</p>
@@ -109,8 +111,8 @@ export function AgentReply({ turn, active = true, byId, webOrdering, canBook, on
   )
 }
 
-function OrderDraft({ draft, webOrdering, disabled, onOrder }: {
-  draft: AgentOrderDraft; webOrdering: boolean; disabled: boolean; onOrder: (draft: AgentOrderDraft, edit: boolean) => void
+function OrderDraft({ draft, webOrdering, disabled, customer, onOrder }: {
+  draft: AgentOrderDraft; webOrdering: boolean; disabled: boolean; customer?: { name: string; phone: string }; onOrder: (draft: AgentOrderDraft, edit: boolean) => void
 }) {
   return (
     <div className="mt-2 space-y-1 text-[12px]">
@@ -121,8 +123,14 @@ function OrderDraft({ draft, webOrdering, disabled, onOrder }: {
           </li>
         ))}
       </ul>
-      {draft.fulfillment && <p className="text-text-muted">{draft.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}</p>}
-      <p className="font-semibold">
+      {draft.fulfillment && (
+        <p className="text-text-muted">
+          {[draft.fulfillment === 'delivery' ? 'Delivery' : 'Pickup',
+            customer?.name.trim() ? `a.n. ${customer.name.trim()}` : '',
+            maskPhone(customer?.phone ?? '')].filter(Boolean).join(' · ')}
+        </p>
+      )}
+      <p>
         Subtotal {formatRupiah(draft.subtotal)}
         {draft.pb1_amount > 0 ? ` · PB1 ${formatRupiah(draft.pb1_amount)}` : ''}
         {draft.delivery_fee > 0 ? ` · Ongkir ${formatRupiah(draft.delivery_fee)}` : ''}
@@ -134,6 +142,12 @@ function OrderDraft({ draft, webOrdering, disabled, onOrder }: {
       </div>
     </div>
   )
+}
+
+/** "0812-3456-7221" → "0812-xxxx-221" (C14): enough to recognise, not to copy. */
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  return digits.length >= 8 ? `${digits.slice(0, 4)}-xxxx-${digits.slice(-3)}` : ''
 }
 
 function MenuButtons({ canBook, disabled, onPick }: {

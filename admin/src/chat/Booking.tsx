@@ -132,7 +132,7 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tanggal">
             {[0, 1, 2].map((n) => addDays(today, n)).filter((d) => d <= limits.last).map((d, i) => (
               <Chip key={d} selected={day === d && !otherDay} onClick={() => { setOtherDay(false); setDay(d); setSlot(null) }}>
-                {i === 0 ? `Hari ini · ${dayLabel(d, false)}` : dayLabel(d, true)}
+                {i === 0 ? `Hari ini · ${dayLabel(d, false)}` : dayLabel(d, i === 1)}
               </Chip>
             ))}
             {addDays(today, 3) <= limits.last && (
@@ -159,6 +159,7 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
               {slots.map((s) => <Chip key={s.start_at} selected={slot !== null && Date.parse(slot.start_at) === Date.parse(s.start_at)} onClick={() => setSlot(s)}>{s.label}</Chip>)}
             </div>
           )}
+          <p className="mt-2 text-[11px] text-text-muted">Hanya jam di dalam jam booking &amp; batas hari outlet yang masih ada meja muat.</p>
         </Bubble>
       )}
       {!reschedule && slot && (
@@ -173,7 +174,7 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
               <input className={inputClass} value={who.phone} inputMode="tel" maxLength={20} autoComplete="tel"
                 onChange={(e) => { setWho({ ...who, phone: e.target.value }); setWhoDone(false) }} />
             </Field>
-            <p className="text-[11px] text-text-muted">
+            <p className="text-[11px] text-primary">
               🔒 Nama &amp; no HP hanya untuk booking ini, dihapus setelah booking selesai.{' '}
               <a href={privacyUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary">Kebijakan privasi ›</a>
             </p>
