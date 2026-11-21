@@ -8,6 +8,7 @@ dependencies = [
     "deepagents>=0.7.41",
     "fastapi>=0.163.2",
     "langchain-openai>=1.8.5",
+    "langfuse>=5.2.0",
     "psycopg-pool>=3.2",
     "psycopg[binary]>=3.3.9",
     "pydantic-settings>=2.16.3",

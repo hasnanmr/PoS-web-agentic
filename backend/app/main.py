@@ -43,6 +43,7 @@ from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
 from app.config import Settings, get_settings
 from app.core import crypto
+from app.core.agent import tracing
 from app.core.agent.gateway import ModelFactory, openai_model_factory
 from app.logging import configure_logging
 from app.storage import ObjectStorage, SupabaseStorage
@@ -113,6 +114,7 @@ def create_app(
         try:
             yield
         finally:
+            tracing.flush()
             if pool is not None:
                 await pool.close()
 
@@ -130,6 +132,7 @@ def create_app(
     app.state.auth_admin = auth_admin or build_auth_admin(settings)
     app.state.storage = storage or build_storage(settings)
     app.state.agent_model = agent_model or openai_model_factory(settings)
+    tracing.configure(settings)
 
     app.add_middleware(
         CORSMiddleware,
@@ -172,6 +175,7 @@ def create_app(
             "db_configured": bool(settings.database_url),
             "auth_configured": app.state.token_verifier is not None,
             "agent_configured": settings.agent_configured,
+            "agent_tracing": tracing.enabled(),
         },
     )
     if settings.agent_config_warning:

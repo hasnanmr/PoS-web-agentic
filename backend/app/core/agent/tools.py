@@ -78,7 +78,9 @@ class ItemArg(BaseModel):
     jumlah: int = Field(ge=1, le=99)
     addon_option_ids: list[UUID] = Field(default_factory=list, max_length=20)
     catatan: str | None = Field(
-        default=None, max_length=200, description='Catatan untuk dapur, mis. "less sugar"'
+        default=None,
+        max_length=200,
+        description='Catatan dapur yang tidak ada opsi add-on-nya, mis. "tanpa es batu"',
     )
 
 

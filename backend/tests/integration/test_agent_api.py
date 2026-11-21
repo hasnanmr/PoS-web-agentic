@@ -383,6 +383,19 @@ def test_out_of_scope_is_refused_with_the_main_menu(client, ctx) -> None:
     assert _tool_log(ctx) == [("di_luar_lingkup", "ok")]
 
 
+def test_text_written_next_to_a_tool_call_is_the_reply(client, ctx) -> None:
+    # Eval case order-unknown-item: the model answers alongside a tool call, then ends with an
+    # empty message. The answer must reach the customer, not the "belum paham" default.
+    answer = "Nasi goreng spesial tidak ada di menu, jadi tidak aku masukkan. Lanjut Americano?"
+    _script(
+        AIMessage(answer, tool_calls=[call("pilihan_cepat", {"pilihan": ["Ya", "Tidak"]})]),
+        AIMessage(""),
+    )
+    final = _final(_send(client, _outlet(ctx), "1 nasi goreng spesial sama 1 americano")[1])
+    assert final["reply_text"] == answer
+    assert final["quick_replies"] == ["Ya", "Tidak"]
+
+
 def test_builtin_and_unknown_tools_are_refused(client, ctx) -> None:
     model = _script(
         _tools(

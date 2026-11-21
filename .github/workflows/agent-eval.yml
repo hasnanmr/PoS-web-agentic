@@ -1,0 +1,89 @@
+# Agent evaluation set (T-092): runs the web chat agent against the real model before a prompt,
+# tool, or model change is merged. Costs model tokens, so it runs only when the agent changes
+# (or by hand from the Actions tab). Needs the repository secrets OPENAI_BASE_URL,
+# OPENAI_API_KEY, MODEL_NAME (and optionally LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY,
+# LANGFUSE_HOST); without OPENAI_BASE_URL the job says so and skips the run.
+name: Agent eval
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/core/agent/**"
+      - "backend/tests/evals/**"
+      - "backend/pyproject.toml"
+      - ".github/workflows/agent-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    name: Agent eval (real model)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: sme_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres@localhost:5432/sme_test
+      TEST_DATABASE_URL: postgresql://postgres@localhost:5432/sme_test
+      TEST_APP_DATABASE_URL: postgresql://app_backend@localhost:5432/sme_test
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MODEL_NAME: ${{ secrets.MODEL_NAME }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+    steps:
+      - name: Model configured?
+        id: model
+        run: |
+          if [ -z "$OPENAI_BASE_URL" ] || [ -z "$MODEL_NAME" ]; then
+            echo "::notice::Agent eval skipped: add the OPENAI_BASE_URL and MODEL_NAME repository secrets to run it."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.model.outputs.run == 'true'
+
+      - uses: astral-sh/setup-uv@v6
+        if: steps.model.outputs.run == 'true'
+        with:
+          working-directory: backend
+
+      - name: Backend dependencies
+        if: steps.model.outputs.run == 'true'
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Test database
+        if: steps.model.outputs.run == 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+          scripts/db-test.sh > /dev/null
+
+      - name: Agent eval
+        if: steps.model.outputs.run == 'true'
+        run: scripts/agent-eval.sh
+
+      - name: Report
+        if: always() && steps.model.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-eval-report
+          path: backend/eval-reports/
+          if-no-files-found: ignore
