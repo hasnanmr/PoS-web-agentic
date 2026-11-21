@@ -8,12 +8,12 @@
 // Cash / QRIS, "Semua kanal ▾", and "Cari no. order…" filter only the list. "Per outlet" only for
 // Semua outlet with more than one outlet. Newest first, 30 per page, "Muat lagi". A row opens S3
 // inside this drawer with "← Kembali". ✕, Esc, or a click on the dark area closes it.
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from '../../app/session'
 import { errorMessage } from '../../lib/api'
 import { formatNumber, formatRupiah, formatTime, todayIn, ZONE_LABEL } from '../../lib/format'
 import type { DashboardOrderRow, DashboardOrders, DrillPeriod, HoursFilter } from '../../lib/types'
-import { useLoad } from '../../lib/useLoad'
+import { useKept, useLoad } from '../../lib/useLoad'
 import { Alert, Button, Loading, Select, TextInput } from '../../ui/kit'
 import { TYPE_LABEL } from '../orders/labels'
 import { OrderDetailPanel } from '../orders/OrderDrawer'
@@ -34,6 +34,8 @@ export interface Drill {
 }
 
 const PAGE_SIZE = 30
+/** Matches --animate-drawer-out in index.css. */
+const CLOSE_MS = 160
 const HOURS_LABEL: Record<HoursFilter, string> = { all: 'Semua jam', busy: 'Jam ramai', quiet: 'Jam sepi' }
 const CHANNELS: { key: DashboardOrderRow['channel']; label: string }[] = [
   { key: 'whatsapp_online', label: 'WhatsApp online' },
@@ -80,6 +82,14 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState<string>()
   const [openId, setOpenId] = useState<string>()
+  const [leaving, setLeaving] = useState(false)
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const close = useCallback(() => {
+    if (closeTimer.current) return
+    setLeaving(true)
+    closeTimer.current = setTimeout(onClose, CLOSE_MS)
+  }, [onClose])
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
 
   useEffect(() => {
     const t = setTimeout(() => setQ(search.trim()), 300)
@@ -87,10 +97,10 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
   }, [search])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [close])
 
   const params = drillQuery(drill)
   if (method) params.set('method', method)
@@ -99,7 +109,9 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
   params.set('limit', String(PAGE_SIZE))
   const query = params.toString()
   const result = useLoad(() => api.get<DashboardOrders>(`/owner/dashboard/orders?${query}`), query)
-  const data = result.data
+  // Keep the last result on screen while a filter reloads, so the drawer does not flash to "Memuat…".
+  const data = useKept(result.data, !result.error)
+  const reloading = result.loading && data !== undefined
   const extra = more?.key === query ? more : undefined
   const rows = [...(data?.orders ?? []), ...(extra?.rows ?? [])]
   const cursor = extra ? extra.cursor : data?.next_cursor ?? null
@@ -132,17 +144,18 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
   const listTotal = filtered || !s ? undefined : method === 'cash' ? s.cash_count : method === 'qris' ? s.qris_count : s.orders
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-text/30" role="dialog" aria-modal="true" aria-label={title(drill)}>
-      <button type="button" aria-label="Tutup drawer" className="flex-1 cursor-default" onClick={onClose} />
-      <div className="h-full w-full max-w-[460px] overflow-y-auto bg-surface p-5 shadow-xl">
+    <div className={`fixed inset-0 z-40 flex justify-end bg-text/30 ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
+      role="dialog" aria-modal="true" aria-label={title(drill)}>
+      <button type="button" aria-label="Tutup drawer" className="flex-1 cursor-default" onClick={close} />
+      <div className={`h-full w-full max-w-[460px] overflow-y-auto overscroll-contain bg-surface p-5 shadow-xl ${leaving ? 'animate-drawer-out' : 'animate-drawer-in'}`}>
         {openId ? (
-          <OrderDetailPanel orderId={openId} onClose={onClose} onBack={() => setOpenId(undefined)}
+          <OrderDetailPanel orderId={openId} onClose={close} onBack={() => setOpenId(undefined)}
             onChanged={() => void result.reload()} />
         ) : (
           <>
             <div className="flex items-start justify-between gap-2">
               <h2 className="text-[16px] font-bold text-text">{title(drill)}</h2>
-              <button type="button" aria-label="Tutup" className="text-[16px] text-text-muted" onClick={onClose}>✕</button>
+              <button type="button" aria-label="Tutup" className="-m-1 rounded p-1 text-[16px] text-text-muted transition-colors hover:bg-page hover:text-text" onClick={close}>✕</button>
             </div>
             <p className="mt-1 text-[12px] text-text-muted">{subtitle}</p>
 
@@ -160,9 +173,9 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
                     <div role="group" aria-label="Metode bayar" className="flex flex-wrap gap-2">
                       {([['', 'Semua', s.orders], ['cash', 'Cash', s.cash_count], ['qris', 'QRIS', s.qris_count]] as const).map(([key, label, n]) => (
                         <button key={key} type="button" aria-pressed={method === key} onClick={() => setMethod(key)}
-                          className={`h-[26px] rounded-full border px-3 text-[12px] ${method === key
+                          className={`h-[26px] rounded-full border px-3 text-[12px] transition-colors ${method === key
                             ? 'border-primary bg-primary-soft font-semibold text-primary'
-                            : 'border-border bg-surface text-[#444444]'}`}>
+                            : 'border-border bg-surface text-[#444444] hover:border-primary hover:text-primary'}`}>
                           {label} {formatNumber(n)}
                         </button>
                       ))}
@@ -176,6 +189,7 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
                     value={search} onChange={(e) => setSearch(e.target.value)} />
 
                   {result.error ? <div className="mt-2"><Alert>Daftar belum bisa dimuat: {errorMessage(result.error)}</Alert></div> : null}
+                  <div aria-busy={reloading} className={`transition-opacity duration-150 ${reloading ? 'opacity-50' : ''}`}>
                   {rows.length === 0 ? (
                     <p className="py-8 text-center text-[13px] text-text-muted">Belum ada order di periode ini.</p>
                   ) : (
@@ -188,6 +202,7 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
                       Menampilkan {formatNumber(rows.length)}{listTotal !== undefined ? ` dari ${formatNumber(listTotal)}` : ''}
                     </p>
                   )}
+                  </div>
                   {moreError && <div className="mt-2"><Alert>{moreError}</Alert></div>}
                   {cursor && (
                     <Button variant="ghost" className="mt-2 h-8 w-full text-[12px]" disabled={loadingMore} onClick={() => void loadMore()}>
@@ -270,7 +285,7 @@ function OrderRow({ order: o, multiOutlet, onOpen }: { order: DashboardOrderRow;
   const meta = [`${time}${zone && zone !== 'WIB' ? ` ${zone}` : ''}`, CHANNEL_LABEL[o.channel], multiOutlet ? o.outlet : null]
   return (
     <li>
-      <button type="button" onClick={onOpen} className="w-full py-2.5 text-left hover:bg-page">
+      <button type="button" onClick={onOpen} className="-mx-2 w-[calc(100%+1rem)] rounded px-2 py-2.5 text-left transition-colors hover:bg-page">
         <span className="flex items-start justify-between gap-2">
           <span className="min-w-0 text-[13px] font-semibold text-text">{o.order_no} · {where(o)}</span>
           <span className="shrink-0 text-[13px] font-semibold text-text">{formatRupiah(o.revenue_excl_pb1)}</span>
