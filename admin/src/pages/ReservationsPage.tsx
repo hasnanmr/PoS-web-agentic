@@ -2,7 +2,8 @@
 // Endpoints: GET /ops/outlets/{id}/reservations?date=, POST /ops/outlets/{id}/reservations,
 // POST /ops/outlets/{id}/walk-ins, GET /ops/reservations/{id},
 // POST /ops/reservations/{id}/seat|move|cancel|no-show|complete.
-// Desktop: timeline per table. Mobile (M4): list by time. Buttons come from `allowed_actions`.
+// Desktop: timeline per table. Mobile (M4): summary + list by time or by table ("Per jam" / "Per meja",
+// product owner request 2026-11-22, not drawn on M4). Buttons come from `allowed_actions`.
 import { useEffect, useState } from 'react'
 import { useSession } from '../app/session'
 import { ApiError, errorMessage } from '../lib/api'
@@ -291,46 +292,146 @@ function Timeline({ board, now, selected, onSelect }: {
   )
 }
 
+function localDate(ms: number, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms))
+}
+
+/** A table is in use now when a guest sits there or a booking is on hold for it. */
+function activeNow(r: ReservationRow, now: number): boolean {
+  const start = new Date(r.starts_at).getTime()
+  const end = new Date(r.ends_at).getTime()
+  const kind = look(r, now)
+  return (kind === 'seated' || kind === 'walk_in' || kind === 'hold') && start <= now && now < end
+}
+
+/** M4 summary (product owner request 2026-11-22, not drawn): counts for the shown day. */
+function MobileSummary({ board, now }: { board: ReservationBoard; now: number }) {
+  const rows = board.reservations
+  const count = (k: Look) => rows.filter((r) => look(r, now) === k).length
+  const guests = rows.filter((r) => r.source !== 'walk_in' && r.status !== 'no_show').reduce((n, r) => n + r.party_size, 0)
+  const isToday = localDate(now, board.timezone) === board.date
+  const tables = board.tables.filter((t) => t.is_bookable || rows.some((r) => r.table_id === t.id))
+  const busy = new Set(rows.filter((r) => activeNow(r, now)).map((r) => r.table_id))
+  const chips: [Look, string, number][] = [
+    ['booked', 'booked', count('booked')], ['hold', 'hold', count('hold')], ['seated', 'seated', count('seated')],
+    ['walk_in', 'terisi', count('walk_in')], ['no_show', 'no-show', count('no_show')], ['completed', 'selesai', count('completed')],
+  ]
+  const booked = rows.filter((r) => r.source !== 'walk_in').length
+  return (
+    <section aria-label="Ringkasan reservasi" className="rounded-lg border border-border bg-surface p-3 text-[12px] md:hidden">
+      <p className="text-[13px] font-semibold">Ringkasan: {booked} reservasi · {guests} tamu</p>
+      {isToday && (
+        <p className="text-text-muted">Meja terpakai sekarang: <span className="font-semibold text-text">{busy.size}/{tables.length}</span></p>
+      )}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {chips.filter(([, , n]) => n > 0).map(([k, label, n]) => (
+          <span key={k} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${LOOK[k]}`}>{n} {label}</span>
+        ))}
+        {rows.length === 0 && <span className="text-text-muted">Belum ada reservasi.</span>}
+      </div>
+    </section>
+  )
+}
+
+type MobileView = 'time' | 'table'
+
 function MobileList({ board, now, selected, onSelect, onChanged }: {
   board: ReservationBoard; now: number; selected?: string; onSelect: (id: string) => void
   onChanged: (text?: string) => Promise<void>
 }) {
+  const [view, setView] = useState<MobileView>(() => {
+    try { return localStorage.getItem('m4-view') === 'table' ? 'table' : 'time' } catch { return 'time' }
+  })
+  const choose = (v: MobileView) => {
+    setView(v)
+    try { localStorage.setItem('m4-view', v) } catch { /* private mode: keep it for this visit only */ }
+  }
   const tz = board.timezone
   const rows = [...board.reservations].sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+  const isToday = localDate(now, tz) === board.date
+  const card = (r: ReservationRow, withTable: boolean) => (
+    <ReservationCard key={r.id} row={r} board={board} now={now} open={selected === r.id} withTable={withTable}
+      onToggle={() => onSelect(r.id)} onChanged={onChanged} />
+  )
   return (
     <section aria-label="Daftar reservasi" className="space-y-2 md:hidden">
-      {rows.map((r) => {
-        const kind = look(r, now)
-        const open = selected === r.id
-        const name = r.source === 'walk_in' ? 'Tanpa reservasi' : r.guest_name
-        const status = kind === 'hold' ? null : kind === 'walk_in' ? 'terisi' : kind === 'no_show' ? 'no-show'
-          : kind === 'completed' ? 'selesai' : r.status
-        // M4: the hold card shows its actions right away; other cards on tap.
-        const showActions = r.allowed_actions.length > 0 && (open || kind === 'hold')
-        return (
-          <div key={r.id} className={`rounded-lg border p-3 text-[12px] ${LOOK[kind]} ${open ? 'ring-2 ring-primary' : ''}`}>
-            <button type="button" aria-expanded={open} className="flex w-full items-start gap-2 text-left text-text"
-              onClick={() => onSelect(r.id)}>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold">
-                  {formatTime(r.starts_at, tz)} · {name} · {r.party_size} org · {r.table_name}{status ? ` · ${status}` : ''}
-                </span>
-                {kind === 'hold'
-                  ? <span className="block text-warning">Hold — auto no-show {formatTime(r.hold_until!, tz)}</span>
-                  : <span className="block text-[11px] text-text-muted">
-                      {formatTime(r.starts_at, tz)}–{formatTime(r.ends_at, tz)} · {sourceLabel(r.source)}
-                    </span>}
-              </span>
-              <span aria-hidden className={`pt-0.5 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
-            </button>
-            {showActions && <div className="mt-2"><ActionBar row={r} board={board} onChanged={onChanged} /></div>}
-            {open && <MobileDetail row={r} tz={tz} now={now} />}
-          </div>
-        )
-      })}
-      {rows.length === 0 && <p className="text-[12px] text-text-muted">Belum ada reservasi di tanggal ini.</p>}
-      <p className="text-[11px] text-text-muted">Timeline per meja di desktop → daftar per jam di mobile. Ketuk kartu untuk detail &amp; aksi.</p>
+      <MobileSummary board={board} now={now} />
+      <div role="group" aria-label="Tampilan" className="grid grid-cols-2 overflow-hidden rounded-md border border-border text-[12px]">
+        {([['time', 'Per jam'], ['table', 'Per meja']] as [MobileView, string][]).map(([v, label]) => (
+          <button key={v} type="button" aria-pressed={view === v} onClick={() => choose(v)}
+            className={`h-9 ${view === v ? 'bg-primary-soft font-semibold text-primary' : 'bg-surface text-text'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === 'time' ? (
+        <>
+          {rows.map((r) => card(r, true))}
+          {rows.length === 0 && <p className="text-[12px] text-text-muted">Belum ada reservasi di tanggal ini.</p>}
+        </>
+      ) : (
+        <>
+          {board.tables.map((t) => {
+            const mine = rows.filter((r) => r.table_id === t.id)
+            const current = isToday ? mine.find((r) => activeNow(r, now)) : undefined
+            const next = isToday
+              ? mine.find((r) => look(r, now) === 'booked' && new Date(r.starts_at).getTime() > now)
+              : undefined
+            // Badge colour follows the row using the table now; a free table stays neutral.
+            const state = current
+              ? [look(current, now) === 'hold' ? 'Hold' : 'Terisi', LOOK[look(current, now)]]
+              : isToday ? ['Kosong', 'border-border bg-page text-text-muted'] : null
+            return (
+              <div key={t.id} aria-label={`Meja ${t.name}`} role="group" className="rounded-lg border border-border bg-surface p-3">
+                <div className="flex items-center justify-between gap-2 text-[12px]">
+                  <span className="font-semibold">{tableLabel(t)}{t.is_bookable ? '' : ' · tidak untuk booking'}</span>
+                  {state && <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${state[1]}`}>{state[0]}</span>}
+                </div>
+                <p className="text-[11px] text-text-muted">
+                  {mine.length === 0 ? 'Belum ada jadwal di tanggal ini.'
+                    : `${mine.length} jadwal${next ? ` · berikutnya ${formatTime(next.starts_at, tz)}` : ''}`}
+                </p>
+                {mine.length > 0 && <div className="mt-2 space-y-2">{mine.map((r) => card(r, false))}</div>}
+              </div>
+            )
+          })}
+          {board.tables.length === 0 && <p className="text-[12px] text-text-muted">Belum ada meja. Owner menambah meja di Pengaturan → Meja &amp; Reservasi.</p>}
+        </>
+      )}
+      <p className="text-[11px] text-text-muted">Ketuk kartu untuk detail &amp; aksi.</p>
     </section>
+  )
+}
+
+function ReservationCard({ row: r, board, now, open, withTable, onToggle, onChanged }: {
+  row: ReservationRow; board: ReservationBoard; now: number; open: boolean; withTable: boolean
+  onToggle: () => void; onChanged: (text?: string) => Promise<void>
+}) {
+  const tz = board.timezone
+  const kind = look(r, now)
+  const name = r.source === 'walk_in' ? 'Tanpa reservasi' : r.guest_name
+  const status = kind === 'hold' ? null : kind === 'walk_in' ? 'terisi' : kind === 'no_show' ? 'no-show'
+    : kind === 'completed' ? 'selesai' : r.status
+  // M4: the hold card shows its actions right away; other cards on tap.
+  const showActions = r.allowed_actions.length > 0 && (open || kind === 'hold')
+  return (
+    <div className={`rounded-lg border p-3 text-[12px] ${LOOK[kind]} ${open ? 'ring-2 ring-primary' : ''}`}>
+      <button type="button" aria-expanded={open} className="flex w-full items-start gap-2 text-left text-text" onClick={onToggle}>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">
+            {formatTime(r.starts_at, tz)} · {name} · {r.party_size} org{withTable ? ` · ${r.table_name}` : ''}{status ? ` · ${status}` : ''}
+          </span>
+          {kind === 'hold'
+            ? <span className="block text-warning">Hold — auto no-show {formatTime(r.hold_until!, tz)}</span>
+            : <span className="block text-[11px] text-text-muted">
+                {formatTime(r.starts_at, tz)}–{formatTime(r.ends_at, tz)} · {sourceLabel(r.source)}
+              </span>}
+        </span>
+        <span aria-hidden className={`pt-0.5 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+      </button>
+      {showActions && <div className="mt-2"><ActionBar row={r} board={board} onChanged={onChanged} /></div>}
+      {open && <MobileDetail row={r} tz={tz} now={now} />}
+    </div>
   )
 }
 

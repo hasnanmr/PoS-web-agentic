@@ -263,6 +263,36 @@ describe('S6 / M4 Reservasi & Meja', () => {
     }
   })
 
+  it('M4 mobile: summary of the day and a per-table view', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    try {
+      localStorage.removeItem('m4-view')
+      const api = fakeApi({ 'GET /ops/outlets/o-dago/reservations': BOARD })
+      render(<WithSession session={fakeSession('staff', { api })}><ReservationsPage /></WithSession>)
+      const summary = await screen.findByRole('region', { name: 'Ringkasan reservasi' })
+      // Lina 3 (hold) + Tono no-show (not counted as a guest); the walk-in isn't a reservation.
+      expect(summary).toHaveTextContent('Ringkasan: 2 reservasi · 3 tamu')
+      expect(summary).toHaveTextContent('Meja terpakai sekarang: 1/3')
+      expect(within(summary).getByText('1 hold')).toBeInTheDocument()
+      expect(within(summary).getByText('1 terisi')).toBeInTheDocument()
+      expect(within(summary).getByText('1 no-show')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Per meja' }))
+      expect(localStorage.getItem('m4-view')).toBe('table')
+      const m09 = screen.getByRole('group', { name: 'Meja M09' })
+      expect(within(m09).getByText('Hold')).toBeInTheDocument()
+      expect(within(m09).getByText('1 jadwal')).toBeInTheDocument()
+      // Inside a table card the table name isn't repeated.
+      expect(within(m09).getByRole('button', { name: /11:30 · Lina · 3 org/ })).not.toHaveTextContent('M09')
+      const m01 = screen.getByRole('group', { name: 'Meja M01' })
+      expect(within(m01).getByText('Kosong')).toBeInTheDocument()
+      expect(within(screen.getByRole('group', { name: 'Meja M12' })).getByText(/tidak untuk booking/)).toBeInTheDocument()
+    } finally {
+      vi.unstubAllGlobals()
+      localStorage.removeItem('m4-view')
+    }
+  })
+
   it('books by phone with the outlet offset and explains a clash', async () => {
     const api = fakeApi({ 'GET /ops/outlets/o-dago/reservations': BOARD })
     render(<WithSession session={fakeSession('staff', { api })}><ReservationsPage /></WithSession>)
