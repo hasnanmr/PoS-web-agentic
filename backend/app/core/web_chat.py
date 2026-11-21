@@ -143,7 +143,8 @@ async def replace_order_key(
 
 def short_name(name: str) -> str:
     """Initials for the outlet avatar in the chat header (C1): "Kopi Senja Dago" → "KS"."""
-    words = [w for w in re.split(r"\s+", name.strip()) if w]
+    # Only words that start with a letter or digit: an en dash between words is skipped.
+    words = [w for w in re.split(r"\s+", name.strip()) if w and w[0].isalnum()]
     return "".join(w[0] for w in words[:2]).upper() or "?"
 
 

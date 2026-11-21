@@ -206,6 +206,10 @@ async def booking(conn: AsyncConnection, scope: web_chat.ChatScope, res_id: UUID
         "guest_name": crypto.decrypt(row["guest_name"], "reservations.guest_name"),
         "hold_until": reservations.hold_until(row),
         "change_until": change_until,
+        # C11 "Pengingat di kalender HP": the alert time in the .ics file (none when 0).
+        "reminder_at": row["starts_at"] - timedelta(minutes=settings["reminder_offset_minutes"])
+        if settings["reminder_offset_minutes"] > 0
+        else None,
         "can_change": row["status"] == "booked" and now < change_until,
         "outlet_name": scope.outlet_name,
     }

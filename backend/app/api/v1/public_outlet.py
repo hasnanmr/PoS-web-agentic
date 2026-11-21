@@ -188,6 +188,9 @@ class Booking(BaseModel):
     guest_name: str | None = Field(description="Cleared once the booking is finished")
     hold_until: datetime | None
     change_until: datetime = Field(description="Cancel/reschedule allowed until (cutoff)")
+    reminder_at: datetime | None = Field(
+        default=None, description='C11 "Pengingat di kalender HP": the .ics alert time'
+    )
     can_change: bool
     outlet_name: str
 

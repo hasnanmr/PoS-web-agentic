@@ -1107,6 +1107,19 @@
             "title": "Party Size",
             "type": "integer"
           },
+          "reminder_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "C11 \"Pengingat di kalender HP\": the .ics alert time",
+            "title": "Reminder At"
+          },
           "reservation_id": {
             "format": "uuid",
             "title": "Reservation Id",
@@ -1199,6 +1212,19 @@
           "party_size": {
             "title": "Party Size",
             "type": "integer"
+          },
+          "reminder_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "C11 \"Pengingat di kalender HP\": the .ics alert time",
+            "title": "Reminder At"
           },
           "reservation_id": {
             "format": "uuid",
