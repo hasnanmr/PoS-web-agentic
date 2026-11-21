@@ -1,11 +1,11 @@
 # CLAUDE.md
 
-Project: SME Business Automation Platform (POS + WhatsApp ordering) for restaurants and cafes.
+Project: SME Business Automation Platform (POS + customer web chat ordering) for restaurants and cafes.
 Specs: `PRD-SME-Automation-Platform.md`, `User-Stories-SME-Automation-Platform.md`, `Task-Breakdown-SME-Automation-Platform.md`.
 
 ## Frontend must follow the wireframes
 
-Every frontend (admin web app, attendance tablet) screen must match the wireframes in `design/`:
+Every frontend (admin web app, attendance tablet, customer web chat) screen must match the wireframes in `design/`:
 
 - Source of truth: `design/SME-POS-Wireframe.figcraft` (zip; `document.json` holds the nodes). PNG previews in `design/previews/`.
 - Before building a screen, look up its code in `design/WIREFRAME-TRACEABILITY.md` (e.g. T-067 → S1, M2) and open the matching preview. Use the same layout, sections, field order, labels, and Bahasa Indonesia copy. Do not invent screens, fields, or navigation that the wireframe does not show; if the spec and wireframe disagree, or a screen is not drawn, ask before building.
@@ -20,7 +20,8 @@ Every backend endpoint used by an admin or tablet screen must serve exactly what
 - Before building or changing an endpoint, find its screen in the map and the wireframe. Do not add endpoints, fields, or actions that no screen uses (except health/infra endpoints); if a screen needs something the map lacks, update the map in the same change.
 - If a screen needs data the schema cannot provide, add a migration and note it in the map.
 - Order responses include `allowed_actions` computed by the server; the UI only renders those buttons.
-- Mobile screens (M1–M6) reuse the desktop endpoints. WhatsApp screens (W1–W12) are worker flows, not REST.
+- Mobile screens (M1–M6) reuse the desktop endpoints. Customer web chat screens (C1–C15, page 07) use the public `public/o/{slug}/*` and `public/t/{token}/*` endpoints in the map. WhatsApp screens (W1–W12) are a Phase 3 reference, not built.
+- Customer-facing copy, errors included, is friendly everyday Bahasa Indonesia: never show error codes, paths, tokens, or technical terms.
 - Domain names, enums, and money/time rules come from `docs/domain/domain-glossary-and-rules.md`.
 
 ### Design tokens (extracted from the wireframe)
