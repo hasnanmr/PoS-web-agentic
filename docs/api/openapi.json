@@ -1252,6 +1252,62 @@
         "title": "BusynessCell",
         "type": "object"
       },
+      "Cart": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/CartLine"
+            },
+            "maxItems": 50,
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "title": "Cart",
+        "type": "object"
+      },
+      "CartLine": {
+        "properties": {
+          "addon_option_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Addon Option Ids",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id",
+          "quantity"
+        ],
+        "title": "CartLine",
+        "type": "object"
+      },
       "CashCount": {
         "properties": {
           "from": {
@@ -1514,6 +1570,221 @@
         "title": "ChannelShare",
         "type": "object"
       },
+      "ChatOutlet": {
+        "properties": {
+          "is_open_now": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None when no opening hours are set",
+            "title": "Is Open Now"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "opening_hours": {
+            "items": {
+              "$ref": "#/components/schemas/OpeningHours"
+            },
+            "title": "Opening Hours",
+            "type": "array"
+          },
+          "short_name": {
+            "description": "Initials for the chat avatar (C1)",
+            "title": "Short Name",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "short_name",
+          "timezone",
+          "opening_hours",
+          "is_open_now"
+        ],
+        "title": "ChatOutlet",
+        "type": "object"
+      },
+      "ChatQuote": {
+        "properties": {
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/QuoteLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "pb1_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Rate Bps"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lines",
+          "subtotal",
+          "pb1_rate_bps",
+          "pb1_amount",
+          "delivery_fee",
+          "total"
+        ],
+        "title": "ChatQuote",
+        "type": "object"
+      },
+      "ChatQuoteIn": {
+        "properties": {
+          "fulfillment": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pickup",
+                  "delivery"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Outlet link only; a table order is always dine-in",
+            "title": "Fulfillment"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ChatQuoteIn",
+        "type": "object"
+      },
+      "ChatSessionIn": {
+        "properties": {
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          },
+          "fulfillment": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pickup",
+                  "delivery"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fulfillment"
+          },
+          "step": {
+            "examples": [
+              "menu",
+              "addons:<product_id>"
+            ],
+            "pattern": "^[a-z0-9_.:-]{1,60}$",
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "ChatSessionIn",
+        "type": "object"
+      },
+      "ChatSessionOut": {
+        "properties": {
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          },
+          "cart_expired": {
+            "description": "True once after a 2-hour idle cart was emptied (C13)",
+            "title": "Cart Expired",
+            "type": "boolean"
+          },
+          "fulfillment": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pickup",
+                  "delivery"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fulfillment"
+          },
+          "last_activity_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity At"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "cart",
+          "fulfillment",
+          "last_activity_at",
+          "cart_expired"
+        ],
+        "title": "ChatSessionOut",
+        "type": "object"
+      },
       "CloseIn": {
         "properties": {
           "note": {
@@ -1637,6 +1908,40 @@
           "level"
         ],
         "title": "Crowd",
+        "type": "object"
+      },
+      "CustomerIn": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "minLength": 8,
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ],
+        "title": "CustomerIn",
         "type": "object"
       },
       "Dashboard": {
@@ -2096,6 +2401,7 @@
               "whatsapp_online",
               "whatsapp_table",
               "web_table",
+              "web_online",
               "counter"
             ],
             "title": "Channel",
@@ -3156,6 +3462,18 @@
             ],
             "title": "Category"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "C2 menu card (web chat)",
+            "title": "Description"
+          },
           "is_owner_pick": {
             "title": "Is Owner Pick",
             "type": "boolean"
@@ -3567,6 +3885,69 @@
         "title": "OnboardingResponse",
         "type": "object"
       },
+      "OnlineOrderIn": {
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerIn"
+          },
+          "expected_total": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total the page showed; `price_changed` if it differs",
+            "title": "Expected Total"
+          },
+          "fulfillment": {
+            "enum": [
+              "pickup",
+              "delivery"
+            ],
+            "title": "Fulfillment",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "privacy_notice_version": {
+            "description": "The notice the chat showed before the details were sent",
+            "maxLength": 40,
+            "title": "Privacy Notice Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "fulfillment",
+          "customer",
+          "privacy_notice_version"
+        ],
+        "title": "OnlineOrderIn",
+        "type": "object"
+      },
       "OpenBillRef": {
         "properties": {
           "id": {
@@ -3584,6 +3965,30 @@
           "total"
         ],
         "title": "OpenBillRef",
+        "type": "object"
+      },
+      "OpeningHours": {
+        "properties": {
+          "closes_at": {
+            "title": "Closes At",
+            "type": "string"
+          },
+          "opens_at": {
+            "title": "Opens At",
+            "type": "string"
+          },
+          "weekday": {
+            "description": "ISO weekday, 1 = Monday",
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday",
+          "opens_at",
+          "closes_at"
+        ],
+        "title": "OpeningHours",
         "type": "object"
       },
       "OpeningHoursItem": {
@@ -4352,6 +4757,94 @@
         "title": "OrderItemOut",
         "type": "object"
       },
+      "OrderOverview": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "fulfillment": {
+            "enum": [
+              "dine_in",
+              "pickup",
+              "delivery"
+            ],
+            "title": "Fulfillment",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "order_id",
+          "order_no",
+          "fulfillment",
+          "status",
+          "payment_status",
+          "total",
+          "created_at"
+        ],
+        "title": "OrderOverview",
+        "type": "object"
+      },
+      "OrderRef": {
+        "properties": {
+          "key": {
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Key",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "key"
+        ],
+        "title": "OrderRef",
+        "type": "object"
+      },
+      "OrdersStatusIn": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OrderRef"
+            },
+            "maxItems": 20,
+            "title": "Orders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "orders"
+        ],
+        "title": "OrdersStatusIn",
+        "type": "object"
+      },
       "OutletCounts": {
         "properties": {
           "active": {
@@ -4617,22 +5110,44 @@
         "title": "OutletInfo",
         "type": "object"
       },
-      "OutletOut": {
+      "OutletPage": {
         "properties": {
-          "name": {
-            "title": "Name",
-            "type": "string"
+          "agent_enabled": {
+            "description": "Free-text agent (C9/C14/C15); off until T-086 ships",
+            "title": "Agent Enabled",
+            "type": "boolean"
           },
-          "timezone": {
-            "title": "Timezone",
-            "type": "string"
+          "delivery_fee": {
+            "description": "Flat fee for delivery orders, outside the PB1 base",
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/ChatOutlet"
+          },
+          "privacy_notice": {
+            "$ref": "#/components/schemas/PrivacyNotice"
+          },
+          "reservations_enabled": {
+            "description": "Shows Reservasi and Reservasi Saya (FR2.0)",
+            "title": "Reservations Enabled",
+            "type": "boolean"
+          },
+          "web_ordering": {
+            "description": "False without a static QRIS: \"Pesan di kasir\"",
+            "title": "Web Ordering",
+            "type": "boolean"
           }
         },
         "required": [
-          "name",
-          "timezone"
+          "outlet",
+          "reservations_enabled",
+          "web_ordering",
+          "delivery_fee",
+          "agent_enabled",
+          "privacy_notice"
         ],
-        "title": "OutletOut",
+        "title": "OutletPage",
         "type": "object"
       },
       "OutletPatch": {
@@ -6104,6 +6619,25 @@
         "title": "PreviewItem",
         "type": "object"
       },
+      "PrivacyNotice": {
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "version": {
+            "description": "Send back as `privacy_notice_version` with personal data",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "url"
+        ],
+        "title": "PrivacyNotice",
+        "type": "object"
+      },
       "ProductCreate": {
         "properties": {
           "category": {
@@ -7021,6 +7555,63 @@
           "unit"
         ],
         "title": "RecipeLineRow",
+        "type": "object"
+      },
+      "RecommendationCard": {
+        "properties": {
+          "badge": {
+            "enum": [
+              "owner_pick",
+              "best_seller"
+            ],
+            "title": "Badge",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "price": {
+            "title": "Price",
+            "type": "integer"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "description",
+          "price",
+          "photo_url",
+          "badge"
+        ],
+        "title": "RecommendationCard",
         "type": "object"
       },
       "RecommendationPreview": {
@@ -8922,16 +9513,92 @@
         "title": "TableCreate",
         "type": "object"
       },
+      "TableOrderIn": {
+        "properties": {
+          "customer_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "expected_total": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total the page showed; `price_changed` if it differs",
+            "title": "Expected Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "privacy_notice_version": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The notice the chat showed before the name was sent (FR12.1)",
+            "title": "Privacy Notice Version"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TableOrderIn",
+        "type": "object"
+      },
       "TablePage": {
         "properties": {
+          "agent_enabled": {
+            "description": "Free-text agent (C9/C14); off until T-086 ships",
+            "title": "Agent Enabled",
+            "type": "boolean"
+          },
           "outlet": {
-            "$ref": "#/components/schemas/OutletOut"
+            "$ref": "#/components/schemas/ChatOutlet"
+          },
+          "privacy_notice": {
+            "$ref": "#/components/schemas/PrivacyNotice"
           },
           "table": {
             "$ref": "#/components/schemas/app__api__v1__public_table__TableOut"
           },
           "target": {
-            "description": "Effective: web while WhatsApp isn't connected",
+            "description": "Deprecated (Q1): web while WhatsApp isn't connected",
             "enum": [
               "web_whatsapp",
               "web",
@@ -8941,7 +9608,7 @@
             "type": "string"
           },
           "web_ordering": {
-            "description": "False without a static QRIS: menu only",
+            "description": "False without a static QRIS: \"Pesan di kasir\"",
             "title": "Web Ordering",
             "type": "boolean"
           },
@@ -8954,14 +9621,17 @@
                 "type": "null"
               }
             ],
+            "description": "Deprecated (Q1)",
             "title": "Whatsapp Url"
           }
         },
         "required": [
           "outlet",
           "table",
-          "target",
           "web_ordering",
+          "agent_enabled",
+          "privacy_notice",
+          "target",
           "whatsapp_url"
         ],
         "title": "TablePage",
@@ -9374,6 +10044,11 @@
             "title": "Access Key",
             "type": "string"
           },
+          "delivery_fee": {
+            "default": 0,
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
           "order_id": {
             "format": "uuid",
             "title": "Order Id",
@@ -9423,61 +10098,6 @@
         "title": "WebOrderCreated",
         "type": "object"
       },
-      "WebOrderIn": {
-        "properties": {
-          "customer_name": {
-            "anyOf": [
-              {
-                "maxLength": 40,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Customer Name"
-          },
-          "expected_total": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Total the page showed; `price_changed` if it differs",
-            "title": "Expected Total"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/LineIn"
-            },
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Items",
-            "type": "array"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "WebOrderIn",
-        "type": "object"
-      },
       "WebOrderStatus": {
         "properties": {
           "cancel_reason": {
@@ -9519,12 +10139,37 @@
             ],
             "title": "Customer Name"
           },
+          "delivery_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cleared once the order is finished",
+            "title": "Delivery Address"
+          },
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
           "events": {
             "items": {
               "$ref": "#/components/schemas/StatusEvent"
             },
             "title": "Events",
             "type": "array"
+          },
+          "fulfillment": {
+            "enum": [
+              "dine_in",
+              "pickup",
+              "delivery"
+            ],
+            "title": "Fulfillment",
+            "type": "string"
           },
           "id": {
             "format": "uuid",
@@ -9598,7 +10243,9 @@
           "id",
           "order_no",
           "created_at",
+          "fulfillment",
           "customer_name",
+          "delivery_address",
           "note",
           "status",
           "payment_status",
@@ -9607,6 +10254,7 @@
           "items",
           "subtotal",
           "pb1_amount",
+          "delivery_fee",
           "total",
           "reject_reason",
           "cancel_reason",
@@ -9614,24 +10262,6 @@
           "timezone"
         ],
         "title": "WebOrderStatus",
-        "type": "object"
-      },
-      "WebQuoteIn": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/LineIn"
-            },
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Items",
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "WebQuoteIn",
         "type": "object"
       },
       "app__api__v1__ops__attendance__OutletRef": {
@@ -11096,7 +11726,8 @@
                     "counter",
                     "whatsapp_online",
                     "whatsapp_table",
-                    "web_table"
+                    "web_table",
+                    "web_online"
                   ],
                   "type": "string"
                 },
@@ -13627,7 +14258,8 @@
                     "counter",
                     "whatsapp_online",
                     "whatsapp_table",
-                    "web_table"
+                    "web_table",
+                    "web_online"
                   ],
                   "type": "string"
                 },
@@ -17392,9 +18024,725 @@
         ]
       }
     },
+    "/api/v1/public/o/{slug}": {
+      "get": {
+        "description": "C1: greeting and what the main menu offers at this outlet.",
+        "operationId": "outlet_page_api_v1_public_o__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutletPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outlet Page",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/chat-session": {
+      "get": {
+        "description": "C1/C8 resume: step and cart of this phone's chat; empty after 2 idle hours.",
+        "operationId": "get_chat_session_api_v1_public_o__slug__chat_session_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Session",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      },
+      "put": {
+        "description": "Save step + cart (no personal data: name, phone, and address stay on the phone).",
+        "operationId": "put_chat_session_api_v1_public_o__slug__chat_session_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Chat Session",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/menu": {
+      "get": {
+        "description": "C2/C3: the outlet's active menu with prices, add-ons, and sold-out state.",
+        "operationId": "menu_api_v1_public_o__slug__menu_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MenuItem"
+                  },
+                  "title": "Response Menu Api V1 Public O  Slug  Menu Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Menu",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders": {
+      "post": {
+        "description": "C4/C5 \"Pesan & bayar\": a pay-first `web_online` order, pickup or delivery.",
+        "operationId": "place_order_api_v1_public_o__slug__orders_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnlineOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Place Order",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/status": {
+      "post": {
+        "description": "C1 \"Pesanan Saya\": the orders whose keys this phone kept, while still readable.",
+        "operationId": "orders_status_api_v1_public_o__slug__orders_status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrderOverview"
+                  },
+                  "title": "Response Orders Status Api V1 Public O  Slug  Orders Status Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Orders Status",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}": {
+      "get": {
+        "description": "C7 (and C6 on reload): only with the order's access key; polled every 5 seconds.",
+        "operationId": "order_status_api_v1_public_o__slug__orders__order_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Status",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}/cancel": {
+      "post": {
+        "description": "C6 \"Batalkan pesanan\": only before \"Saya sudah bayar\"; stock returns.",
+        "operationId": "cancel_api_v1_public_o__slug__orders__order_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}/payment-claim": {
+      "post": {
+        "description": "C6 \"Saya sudah bayar\": staff check the merchant account and confirm in S2/S4.\nRepeating it returns the same result (FR6.4).",
+        "operationId": "payment_claim_api_v1_public_o__slug__orders__order_id__payment_claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payment Claim",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}/qris": {
+      "get": {
+        "description": "C6: the outlet's static QRIS image (same as O3 / the S1 popup).",
+        "operationId": "order_qris_api_v1_public_o__slug__orders__order_id__qris_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Qris",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/quote": {
+      "post": {
+        "description": "C4 totals (subtotal, PB1, delivery fee, total), priced by the server.",
+        "operationId": "chat_quote_api_v1_public_o__slug__quote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatQuoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatQuote"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat Quote",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/recommendations": {
+      "get": {
+        "description": "C9 cards: owner's picks first, then 30-day best sellers; no sold-out items, ≤ 30.",
+        "operationId": "recommendation_cards_api_v1_public_o__slug__recommendations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecommendationCard"
+                  },
+                  "title": "Response Recommendation Cards Api V1 Public O  Slug  Recommendations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recommendation Cards",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
     "/api/v1/public/t/{token}": {
       "get": {
-        "description": "Q1: the outlet and table, where the QR leads, and the WhatsApp link when allowed.",
+        "description": "C8: the outlet and table, and whether ordering is possible here.",
         "operationId": "table_page_api_v1_public_t__token__get",
         "parameters": [
           {
@@ -17431,13 +18779,139 @@
         },
         "summary": "Table Page",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/chat-session": {
+      "get": {
+        "description": "C1/C8 resume: step and cart of this phone's chat; empty after 2 idle hours.",
+        "operationId": "get_chat_session_api_v1_public_t__token__chat_session_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Session",
+        "tags": [
+          "public: web chat from a table QR (C8)"
+        ]
+      },
+      "put": {
+        "description": "Save step + cart (no personal data: name, phone, and address stay on the phone).",
+        "operationId": "put_chat_session_api_v1_public_t__token__chat_session_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Chat Session",
+        "tags": [
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/menu": {
       "get": {
-        "description": "Q2/Q2a: the outlet's active menu with prices, add-ons and sold-out state.",
+        "description": "C2/C3: the outlet's active menu with prices, add-ons, and sold-out state.",
         "operationId": "menu_api_v1_public_t__token__menu_get",
         "parameters": [
           {
@@ -17478,13 +18952,13 @@
         },
         "summary": "Menu",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders": {
       "post": {
-        "description": "Q3 \"Pesan & bayar\": a pay-first dine-in order for this table (stock deducted).",
+        "description": "C8 \"Pesan & bayar\": a pay-first dine-in order for this table (stock deducted).",
         "operationId": "place_order_api_v1_public_t__token__orders_post",
         "parameters": [
           {
@@ -17517,7 +18991,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WebOrderIn"
+                "$ref": "#/components/schemas/TableOrderIn"
               }
             }
           },
@@ -17547,13 +19021,70 @@
         },
         "summary": "Place Order",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/orders/status": {
+      "post": {
+        "description": "C1 \"Pesanan Saya\": the orders whose keys this phone kept, while still readable.",
+        "operationId": "orders_status_api_v1_public_t__token__orders_status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrderOverview"
+                  },
+                  "title": "Response Orders Status Api V1 Public T  Token  Orders Status Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Orders Status",
+        "tags": [
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}": {
       "get": {
-        "description": "Q5 (and Q4 on reload): only with the order's access key.",
+        "description": "C7 (and C6 on reload): only with the order's access key; polled every 5 seconds.",
         "operationId": "order_status_api_v1_public_t__token__orders__order_id__get",
         "parameters": [
           {
@@ -17616,13 +19147,13 @@
         },
         "summary": "Order Status",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}/cancel": {
       "post": {
-        "description": "Q4 \"Batalkan pesanan\": only before \"Saya sudah bayar\"; stock returns.",
+        "description": "C6 \"Batalkan pesanan\": only before \"Saya sudah bayar\"; stock returns.",
         "operationId": "cancel_api_v1_public_t__token__orders__order_id__cancel_post",
         "parameters": [
           {
@@ -17685,13 +19216,13 @@
         },
         "summary": "Cancel",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}/payment-claim": {
       "post": {
-        "description": "Q4 \"Saya sudah bayar\": staff check the merchant account and confirm in S2/S4.",
+        "description": "C6 \"Saya sudah bayar\": staff check the merchant account and confirm in S2/S4.\nRepeating it returns the same result (FR6.4).",
         "operationId": "payment_claim_api_v1_public_t__token__orders__order_id__payment_claim_post",
         "parameters": [
           {
@@ -17754,13 +19285,13 @@
         },
         "summary": "Payment Claim",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}/qris": {
       "get": {
-        "description": "Q4: the outlet's static QRIS image (same as O3 / the S1 popup).",
+        "description": "C6: the outlet's static QRIS image (same as O3 / the S1 popup).",
         "operationId": "order_qris_api_v1_public_t__token__orders__order_id__qris_get",
         "parameters": [
           {
@@ -17821,14 +19352,14 @@
         },
         "summary": "Order Qris",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/quote": {
       "post": {
-        "description": "Q3 totals before ordering (subtotal, PB1, total), priced by the server like S1.",
-        "operationId": "web_quote_api_v1_public_t__token__quote_post",
+        "description": "C4 totals (subtotal, PB1, delivery fee, total), priced by the server.",
+        "operationId": "chat_quote_api_v1_public_t__token__quote_post",
         "parameters": [
           {
             "in": "path",
@@ -17844,7 +19375,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WebQuoteIn"
+                "$ref": "#/components/schemas/ChatQuoteIn"
               }
             }
           },
@@ -17855,7 +19386,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QuoteResponse"
+                  "$ref": "#/components/schemas/ChatQuote"
                 }
               }
             },
@@ -17872,9 +19403,56 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Web Quote",
+        "summary": "Chat Quote",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/recommendations": {
+      "get": {
+        "description": "C9 cards: owner's picks first, then 30-day best sellers; no sold-out items, ≤ 30.",
+        "operationId": "recommendation_cards_api_v1_public_t__token__recommendations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecommendationCard"
+                  },
+                  "title": "Response Recommendation Cards Api V1 Public T  Token  Recommendations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recommendation Cards",
+        "tags": [
+          "public: web chat from a table QR (C8)"
         ]
       }
     },

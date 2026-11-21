@@ -28,7 +28,7 @@ from app.core.pricing import LineInput, PricedLine, PricedOrder, quote
 from app.core.units import NegativeQuantityError, recipe_with_addons, scale_recipe
 
 OrderType = Literal["dine_in", "takeaway", "delivery", "pickup"]
-Channel = Literal["counter", "whatsapp_online", "whatsapp_table", "web_table"]
+Channel = Literal["counter", "whatsapp_online", "whatsapp_table", "web_table", "web_online"]
 
 
 class SoldOutError(DomainError):
@@ -224,7 +224,7 @@ class CounterOrder:
 async def _outlet(conn: AsyncConnection, outlet_id: UUID) -> dict[str, Any]:
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
-        "select id, order_prefix, payment_mode::text as payment_mode, timezone"
+        "select id, order_prefix, payment_mode::text as payment_mode, timezone, delivery_fee"
         " from app.outlets where id = %s and is_active",
         (outlet_id,),
     )
@@ -326,25 +326,44 @@ async def create_counter_order(
 
 @dataclass(frozen=True, slots=True)
 class WebOrder:
-    """Q3 "Pesan & bayar" on the customer table web page (T-134, FR2.13)."""
+    """Web chat "Pesan & bayar" (T-134 table QR, T-141 outlet link; FR2.3, FR2.6, FR2.13).
 
-    table_id: UUID
+    A table order (`table_id` set) is dine-in for that table, channel `web_table`; an outlet
+    link order (`table_id` None) is pickup or delivery, channel `web_online`, with a customer
+    record and, for delivery, an address and the outlet's flat delivery fee."""
+
+    table_id: UUID | None
     lines: list[LineInput]
     access_key_hash: str
     note: str | None = None
     customer_name: str | None = None
     expected_total: int | None = None
+    fulfillment: Literal["pickup", "delivery"] | None = None
+    delivery_address: str | None = None
+    customer_id: UUID | None = None
 
 
 async def create_web_order(
     conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID, draft: WebOrder
 ) -> dict[str, Any]:
-    """A dine-in order for one table, always paid first with the outlet's static QRIS and
-    never on the table's open bill, whatever the outlet's dine-in mode (FR2.13, FR10.6). Prices
-    and PB1 come from the server; `expected_total` (what the page showed) must still match."""
+    """Always paid first with the outlet's static QRIS and never on an open bill, whatever the
+    outlet's dine-in mode (FR2.3, FR10.6). Prices, PB1, and the delivery fee come from the
+    server; `expected_total` (what the page showed) must still match."""
     outlet = await _outlet(conn, outlet_id)
-    await _check_table(conn, outlet_id, draft.table_id)
-    priced = await quote(conn, outlet_id, draft.lines)
+    if draft.table_id is not None:
+        await _check_table(conn, outlet_id, draft.table_id)
+        channel: Channel = "web_table"
+        order_type: OrderType = "dine_in"
+    else:
+        if draft.fulfillment not in ("pickup", "delivery"):
+            raise ValidationFailedError("choose pickup or delivery", {"field": "fulfillment"})
+        if draft.customer_id is None:
+            raise ValidationFailedError("name and phone are required", {"field": "customer"})
+        if draft.fulfillment == "delivery" and not draft.delivery_address:
+            raise ValidationFailedError("address is required", {"field": "address"})
+        channel, order_type = "web_online", draft.fulfillment
+    fee = outlet["delivery_fee"] if order_type == "delivery" else 0
+    priced = await quote(conn, outlet_id, draft.lines, delivery_fee=fee)
     if draft.expected_total is not None and draft.expected_total != priced.quote.total:
         raise ConflictError(
             "price_changed",
@@ -353,6 +372,7 @@ async def create_web_order(
                 "quote": {
                     "subtotal": priced.quote.subtotal,
                     "pb1_amount": priced.quote.pb1_amount,
+                    "delivery_fee": priced.quote.delivery_fee,
                     "total": priced.quote.total,
                 }
             },
@@ -362,8 +382,8 @@ async def create_web_order(
         ctx,
         outlet,
         priced,
-        channel="web_table",
-        type="dine_in",
+        channel=channel,
+        type=order_type,
         table_id=draft.table_id,
         bill_id=None,
         payment_mode="pay_first",
@@ -372,6 +392,8 @@ async def create_web_order(
             "access_key_hash": draft.access_key_hash,
             "note": draft.note,
             "customer_name": draft.customer_name,
+            "customer_id": draft.customer_id,
+            "delivery_address": draft.delivery_address if order_type == "delivery" else None,
         },
     )
     return {
@@ -381,6 +403,7 @@ async def create_web_order(
         "payment_status": order["payment_status"],
         "subtotal": priced.quote.subtotal,
         "pb1_amount": priced.quote.pb1_amount,
+        "delivery_fee": priced.quote.delivery_fee,
         "total": priced.quote.total,
     }
 
@@ -408,8 +431,10 @@ async def _insert_order(
         """
         insert into app.orders (id, tenant_id, outlet_id, order_no, channel, type, payment_mode,
           status, table_id, bill_id, subtotal, pb1_rate_bps, pb1_amount, delivery_fee, total,
-          created_by_actor, created_by_id, access_key_hash, note, customer_name)
-        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+          created_by_actor, created_by_id, access_key_hash, note, customer_name, customer_id,
+          delivery_address)
+        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+          %s, %s)
         """,
         (
             order_id,
@@ -432,6 +457,8 @@ async def _insert_order(
             extra.get("access_key_hash"),
             extra.get("note"),
             extra.get("customer_name"),
+            extra.get("customer_id"),
+            extra.get("delivery_address"),
         ),
     )
     for line in priced.lines:
@@ -486,13 +513,15 @@ select o.id, o.outlet_id, o.order_no, o.channel::text as channel, o.type::text a
        o.payment_mode::text as payment_mode, o.status::text as status,
        o.payment_status::text as payment_status, o.table_id, o.bill_id, o.subtotal,
        o.pb1_rate_bps, o.pb1_amount, o.delivery_fee, o.total, o.created_at,
-       o.customer_name, o.note, ou.order_prefix, ou.timezone, ou.unpaid_timeout_minutes,
+       o.customer_name, o.note, o.delivery_address, c.phone as customer_phone,
+       ou.order_prefix, ou.timezone, ou.unpaid_timeout_minutes,
        t.name as table_name, b.guest_name, pp.id as pending_proof_id,
        pp.kind as pending_proof_kind, pp.received_at as pending_proof_at
 from app.orders o
 join app.outlets ou on ou.id = o.outlet_id
 left join app.tables t on t.id = o.table_id
 left join app.bills b on b.id = o.bill_id
+left join app.customers c on c.id = o.customer_id
 left join lateral (
   select p.id, p.kind, p.received_at from app.payment_proofs p
   where p.order_id = o.id and p.status = 'pending' order by p.received_at desc limit 1
@@ -513,6 +542,7 @@ async def _load(conn: AsyncConnection, order_id: UUID, *, lock: bool = False) ->
 
 
 FINAL_STATUSES = order_flow.FINAL
+WEB_CHANNELS = ("web_table", "web_online")
 
 
 async def load_for_update(conn: AsyncConnection, order_id: UUID) -> dict[str, Any]:
@@ -810,10 +840,10 @@ def _card(
 
 
 def auto_cancel_at(order: dict[str, Any]) -> datetime | None:
-    """When an unpaid web order is cancelled (FR10.4): created + the outlet's limit. The
-    WhatsApp unpaid timeout (T-034) is not built yet, so other channels have none."""
+    """When an unpaid web chat order is cancelled (FR10.4): created + the outlet's limit.
+    Other channels are paid at the counter and have none."""
     if (
-        order["channel"] != "web_table"
+        order["channel"] not in WEB_CHANNELS
         or order["status"] != "pending_payment"
         or order["payment_status"] != "unpaid"
     ):

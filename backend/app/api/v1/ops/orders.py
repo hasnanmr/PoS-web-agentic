@@ -17,7 +17,7 @@ from app import db
 from app.api.errors import ApiError
 from app.api.photos import attach_photo_urls
 from app.auth.deps import TenantUser
-from app.core import catalog, idempotency, orders, outlets, table_qr
+from app.core import catalog, idempotency, orders, outlets, web_chat
 from app.core.actor import ActorContext
 from app.core.orders import CounterOrder
 from app.core.payments import PaymentInput
@@ -51,6 +51,7 @@ class MenuItem(BaseModel):
     product_id: UUID
     name: str
     category: str | None
+    description: str | None = Field(default=None, description="C2 menu card (web chat)")
     is_owner_pick: bool
     price: int
     photo_url: str | None
@@ -333,7 +334,8 @@ async def order_board(
     outlet_id: UUID,
     request: Request,
     user: TenantUser,
-    channel: Literal["counter", "whatsapp_online", "whatsapp_table", "web_table"] | None = None,
+    channel: Literal["counter", "whatsapp_online", "whatsapp_table", "web_table", "web_online"]
+    | None = None,
     type: Literal["dine_in", "takeaway", "delivery", "pickup"] | None = None,
     q: str | None = Query(default=None, max_length=60),
 ) -> Board:
@@ -343,7 +345,7 @@ async def order_board(
     # poller yet), so the board never shows an order the customer can no longer pay.
     system = ActorContext.for_system(user.tenant_id)
     async with db.transaction(_pool(request), system) as conn:
-        await table_qr.expire_unpaid(conn, system, outlet_id)
+        await web_chat.expire_unpaid(conn, system, outlet_id)
     async with db.transaction(_pool(request), user.actor()) as conn:
         columns = await orders.board(conn, outlet_id, channel=channel, type=type, q=q)
     return Board(**columns)

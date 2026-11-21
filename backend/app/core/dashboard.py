@@ -645,7 +645,7 @@ def _empty_summary(period: str, hours: str, now: datetime) -> dict[str, Any]:
 # --- O2b drawer detail Revenue / Order: GET /owner/dashboard/orders -------------------------
 
 # web_table: the table QR web page (#44); channel_mix on O2 does not split it out yet.
-OrderChannel = Literal["whatsapp_online", "whatsapp_table", "web_table", "counter"]
+OrderChannel = Literal["whatsapp_online", "whatsapp_table", "web_table", "web_online", "counter"]
 PaymentMethod = Literal["cash", "qris"]
 ORDERS_LIMIT_DEFAULT = 30
 ORDERS_LIMIT_MAX = 100

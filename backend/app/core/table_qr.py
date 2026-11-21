@@ -6,23 +6,16 @@ tenant, touching only that outlet's menu and QRIS and the orders placed from tha
 
 Rules (PRD FR2.13-FR2.16, docs/architecture/screen-endpoint-map.md → Q0-Q5):
 
-- Web orders are always paid first with the outlet's static QRIS and never join the open bill.
-- Each web order gets an access key, returned once to the phone that placed it; only its
-  SHA-256 is stored. Reading or acting on an order needs that key (FR2.15).
-- "Saya sudah bayar" is a payment proof without a screenshot (`kind = customer_claim`): the
-  order becomes `proof_submitted`, the unpaid timer stops, and staff accept or reject it in S4.
-- An unpaid web order is cancelled when the outlet's unpaid-order limit passes (FR10.4). There
-  is no poller yet, so this runs lazily whenever the table page or the order board is read.
+- Ordering, payment, status, and the unpaid timeout are shared with the outlet link and live in
+  `app.core.web_chat` (`TableRef.scope`).
 """
 
 from __future__ import annotations
 
-import hashlib
 import io
 import re
-import secrets
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any, Literal
 from urllib.parse import quote as urlquote
 from uuid import UUID
@@ -31,10 +24,10 @@ import segno
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
-from app.core import orders
+from app.core import web_chat
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import NotFoundError
 
 Target = Literal["web_whatsapp", "web", "whatsapp"]
 
@@ -66,6 +59,21 @@ class TableRef:
 
     def actor(self) -> ActorContext:
         return ActorContext.for_system(self.tenant_id)
+
+    @property
+    def scope(self) -> web_chat.ChatScope:
+        """The web chat scope of this table (C8): dine-in orders for this table only."""
+        return web_chat.ChatScope(
+            tenant_id=self.tenant_id,
+            outlet_id=self.outlet_id,
+            outlet_name=self.outlet_name,
+            timezone=self.timezone,
+            unpaid_timeout_minutes=self.unpaid_timeout_minutes,
+            has_qris=self.has_qris,
+            table_id=self.table_id,
+            table_name=self.table_name,
+            area=self.area,
+        )
 
     @property
     def effective_target(self) -> Target:
@@ -110,188 +118,6 @@ async def resolve(conn: AsyncConnection, token: str) -> TableRef | None:
         unpaid_timeout_minutes=row["unpaid_timeout_minutes"],
         has_qris=row["has_qris"],
     )
-
-
-def new_access_key() -> str:
-    return secrets.token_urlsafe(24)
-
-
-def hash_key(key: str) -> str:
-    return hashlib.sha256(key.encode()).hexdigest()
-
-
-# Unpaid timeout (lazy, FR10.4) ---------------------------------------------------------------
-
-
-async def expire_unpaid(conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID) -> int:
-    """Cancel this outlet's web orders still unpaid past the limit; stock returns. Runs as
-    `system`. Orders whose customer tapped "Saya sudah bayar" wait for staff instead."""
-    cur = await conn.execute(
-        """
-        select o.id from app.orders o join app.outlets ou on ou.id = o.outlet_id
-        where o.outlet_id = %s and o.channel = 'web_table' and o.status = 'pending_payment'
-          and o.payment_status = 'unpaid'
-          and o.created_at + make_interval(mins => ou.unpaid_timeout_minutes) <= now()
-        order by o.created_at
-        for update of o skip locked
-        """,
-        (outlet_id,),
-    )
-    ids = [r[0] for r in await cur.fetchall()]
-    for order_id in ids:
-        await orders.cancel(conn, ctx, order_id, AUTO_CANCEL_REASON)
-    return len(ids)
-
-
-# Customer orders ------------------------------------------------------------------------------
-
-
-_WEB_ORDER_SQL = """
-select id, status::text as status, payment_status::text as payment_status, created_at, updated_at
-from app.orders
-where id = %s and outlet_id = %s and table_id = %s and channel = 'web_table'
-  and access_key_hash = %s
-"""
-_WEB_ORDER_LOCK_SQL = _WEB_ORDER_SQL + "for update"
-
-
-async def _web_order(
-    conn: AsyncConnection, ref: TableRef, order_id: UUID, key: str | None, *, lock: bool = False
-) -> dict[str, Any]:
-    """The order, only when it was placed from this table with this key and is still readable.
-    Anything else is `not_found` with no data (ACN6)."""
-    if not key:
-        raise NotFoundError("order")
-    cur = conn.cursor(row_factory=dict_row)
-    sql = _WEB_ORDER_LOCK_SQL if lock else _WEB_ORDER_SQL
-    await cur.execute(sql, (order_id, ref.outlet_id, ref.table_id, hash_key(key)))
-    row = await cur.fetchone()
-    if row is None:
-        raise NotFoundError("order")
-    if (
-        row["status"] in orders.FINAL_STATUSES
-        and row["updated_at"] < datetime.now(UTC) - READABLE_AFTER_FINAL
-    ):
-        raise NotFoundError("order")
-    return row
-
-
-async def place_order(
-    conn: AsyncConnection, ctx: ActorContext, ref: TableRef, draft: orders.WebOrder
-) -> dict[str, Any]:
-    if not ref.web_ordering:
-        raise ConflictError(
-            "web_ordering_unavailable", "this outlet takes orders at the counter only"
-        )
-    created = await orders.create_web_order(conn, ctx, ref.outlet_id, draft)
-    created["pay_by"] = await _pay_by(conn, ref, created["id"])
-    return created
-
-
-async def _pay_by(conn: AsyncConnection, ref: TableRef, order_id: UUID) -> datetime:
-    cur = await conn.execute("select created_at from app.orders where id = %s", (order_id,))
-    created_at = (await cur.fetchone())[0]  # type: ignore[index]
-    return created_at + timedelta(minutes=ref.unpaid_timeout_minutes)
-
-
-async def order_status(
-    conn: AsyncConnection, ref: TableRef, order_id: UUID, key: str | None
-) -> dict[str, Any]:
-    """Q4/Q5: what the phone that placed the order may see — no staff names, no other orders."""
-    await _web_order(conn, ref, order_id, key)
-    detail = await orders.detail(conn, order_id)
-    cur = conn.cursor(row_factory=dict_row)
-    await cur.execute(
-        "select kind, status::text as status, received_at, rejection_reason"
-        " from app.payment_proofs where order_id = %s order by received_at desc limit 1",
-        (order_id,),
-    )
-    proof = await cur.fetchone()
-    cancel_reason = None
-    for e in detail["events"]:
-        if e["to"] == "cancelled" and e["reason"]:
-            cancel_reason = e["reason"]
-    events = [
-        {"status": e["to"], "at": e["at"]}
-        for e in detail["events"]
-        if e["to"] and e["kind"] in ("created", "status_changed", "proof_rejected")
-    ]
-    claimed_at = proof["received_at"] if proof and proof["kind"] == "customer_claim" else None
-    rejected = proof is not None and proof["status"] == "rejected"
-    return {
-        "id": detail["id"],
-        "order_no": detail["order_no"],
-        "created_at": detail["created_at"],
-        "customer_name": detail["customer_name"],
-        "note": detail["note"],
-        "status": detail["status"],
-        "payment_status": detail["payment_status"],
-        "claimed_at": claimed_at,
-        "pay_by": detail["created_at"] + timedelta(minutes=ref.unpaid_timeout_minutes),
-        "items": [
-            {
-                "name": i["name"],
-                "quantity": i["quantity"],
-                "addons": [a["name"] for a in i["addons"]],
-                "note": i["note"],
-                "line_total": i["line_total"],
-            }
-            for i in detail["items"]
-        ],
-        "subtotal": detail["subtotal"],
-        "pb1_amount": detail["pb1_amount"],
-        "total": detail["total"],
-        "reject_reason": proof["rejection_reason"] if rejected else None,
-        "cancel_reason": None if rejected else cancel_reason,
-        "events": events,
-        "timezone": ref.timezone,
-    }
-
-
-async def claim_payment(
-    conn: AsyncConnection, ctx: ActorContext, ref: TableRef, order_id: UUID, key: str | None
-) -> None:
-    """Q4 "Saya sudah bayar": a proof without a screenshot, reviewed in S4 like any other."""
-    row = await _web_order(conn, ref, order_id, key, lock=True)
-    if row["payment_status"] == "proof_submitted":
-        return  # idempotent
-    if row["status"] != "pending_payment" or row["payment_status"] != "unpaid":
-        raise ConflictError(
-            "order_not_payable",
-            "this order is no longer waiting for payment",
-            {"status": row["status"], "payment_status": row["payment_status"]},
-        )
-    await conn.execute(
-        "insert into app.payment_proofs (tenant_id, outlet_id, order_id, kind)"
-        " values (%s, %s, %s, 'customer_claim')",
-        (ctx.tenant_id, ref.outlet_id, order_id),
-    )
-    await conn.execute(
-        "update app.orders set payment_status = 'proof_submitted' where id = %s", (order_id,)
-    )
-    await orders.record_event(
-        conn,
-        ctx,
-        {"id": order_id, "outlet_id": ref.outlet_id},
-        "payment_changed",
-        from_payment="unpaid",
-        to_payment="proof_submitted",
-        data={"kind": "customer_claim"},
-    )
-
-
-async def customer_cancel(
-    conn: AsyncConnection, ctx: ActorContext, ref: TableRef, order_id: UUID, key: str | None
-) -> None:
-    """Q4 "Batalkan pesanan": only before "Saya sudah bayar"; afterwards staff decide."""
-    row = await _web_order(conn, ref, order_id, key, lock=True)
-    if row["status"] != "pending_payment" or row["payment_status"] != "unpaid":
-        raise ConflictError(
-            "order_not_cancellable",
-            "the order can no longer be cancelled here; ask the staff",
-            {"status": row["status"], "payment_status": row["payment_status"]},
-        )
-    await orders.cancel(conn, ctx, order_id, CUSTOMER_CANCEL_REASON)
 
 
 # Owner (O8) ------------------------------------------------------------------------------------

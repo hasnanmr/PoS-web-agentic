@@ -782,7 +782,8 @@ async def counter_menu(
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         """
-        select p.id as product_id, p.name, p.category, p.is_owner_pick, op.price, p.photo_path
+        select p.id as product_id, p.name, p.category, p.description, p.is_owner_pick, op.price,
+               p.photo_path
         from app.products p
         join app.outlet_prices op on op.product_id = p.id and op.outlet_id = %s and op.is_available
         where p.is_active
