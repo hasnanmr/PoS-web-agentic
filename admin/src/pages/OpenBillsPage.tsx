@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
+import { newKey } from '../lib/newKey'
 import type { BillCard, BillDetail, ShiftRow, TableRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { usePolling } from '../lib/usePolling'
@@ -104,6 +105,7 @@ function OpenBillForm({ onOpened, onCancel }: { onOpened: (id: string) => Promis
   const [tableId, setTableId] = useState('')
   const [guest, setGuest] = useState('')
   const [error, setError] = useState<string>()
+  const [busy, setBusy] = useState(false)
   return (
     <Card title="Buka bill">
       <div className="mb-2 flex gap-4 text-[12px]">
@@ -120,13 +122,18 @@ function OpenBillForm({ onOpened, onCancel }: { onOpened: (id: string) => Promis
       )}
       {error && <div className="mt-2"><Alert>{error}</Alert></div>}
       <div className="mt-3 flex gap-3">
-        <Button disabled={mode === 'table' ? !tableId : !guest.trim()} onClick={async () => {
+        <Button disabled={busy || (mode === 'table' ? !tableId : !guest.trim())} onClick={async () => {
+          if (busy) return // a double click must not open two bills
+          setBusy(true)
+          setError(undefined)
           try {
             const bill = await api.post<BillDetail>(`/ops/outlets/${outlet!.id}/bills`,
               mode === 'table' ? { table_id: tableId } : { guest_name: guest.trim() })
             await onOpened(bill.id)
           } catch (e) {
             setError(errorMessage(e))
+          } finally {
+            setBusy(false)
           }
         }}>Buka bill</Button>
         <LinkButton onClick={onCancel}>Batal</LinkButton>
@@ -145,7 +152,7 @@ function BillPanel({ billId, onClosed }: { billId: string; onClosed: (text: stri
   const [drawerId, setDrawerId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
-  const [key] = useState(() => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `bill-${Date.now()}`))
+  const [key] = useState(newKey)
   const b = bill.data
   if (!b || !outlet) return <Loading />
   // The server needs a drawer when several shifts are open and none is the cashier's own.
