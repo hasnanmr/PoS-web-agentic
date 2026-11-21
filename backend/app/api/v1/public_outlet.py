@@ -102,10 +102,18 @@ async def place_order(
     request: Request,
     response: Response,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    order_key: str | None = Header(
+        default=None,
+        alias="X-Order-Key",
+        description="Access key made by the page (32-128 URL-safe characters); required",
+    ),
 ) -> WebOrderCreated:
-    """C4/C5 "Pesan & bayar": a pay-first `web_online` order, pickup or delivery."""
+    """C4/C5 "Pesan & bayar": a pay-first `web_online` order, pickup or delivery. The page
+    makes the access key and sends it as `X-Order-Key`; only its hash is stored."""
     scope = await current_scope(slug, request)
     ctx = scope.actor()
+    if not order_key:
+        raise ValidationFailedError("X-Order-Key is required", {"field": "access_key"})
     if not body.customer.name:
         raise ValidationFailedError("name is required", {"field": "name"})
     if body.fulfillment == "delivery" and not body.customer.address:
@@ -133,4 +141,6 @@ async def place_order(
             customer_id=customer_id,
         )
 
-    return await chat.create_order(request, response, scope, idempotency_key, body, build)
+    return await chat.create_order(
+        request, response, scope, idempotency_key, order_key, body, build
+    )

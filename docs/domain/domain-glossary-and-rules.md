@@ -179,9 +179,10 @@ Permission matrix as in PRD FR1.5. Key points:
 PRD v0.20 §5.12 (web chat); no accounts and no membership in the MVP.
 
 - Personal data (name, phone number) lives only in `customers`, one row per web chat order or booking; the delivery address lives on `orders.delivery_address`. It is never copied into ledger or stock tables (FR12.4), and chat sessions hold only the step and cart (FR6.2).
-- Before a name, phone number, or address is sent, the chat shows the privacy notice; the order stores the notice version in `privacy_notice_acknowledgements` (FR12.1). The API refuses any other version than the current one.
+- Before a name, phone number, or address is sent, the chat shows the privacy notice; the order stores the notice version in `privacy_notice_acknowledgements` (FR12.1). The API refuses any other version than the current one. Exception until the web chat page (T-145) replaces the Q3 table page: a table order may carry a name without `privacy_notice_version`; that name stays only on `orders.customer_name` (no `customers` row) and is cleared the same way when the order is finished. T-145 always sends the version, after which it becomes required.
 - Anonymized as soon as the order is completed or cancelled, or the booking is completed, cancelled, or no-show (FR12.2): the customer row loses name and phone, and the order loses `customer_name` and `delivery_address`; items, totals, and ledger entries stay.
 - The server never links visits into a profile (FR12.3); the phone may remember the customer's own details in local storage.
+- Access keys (orders, bookings) are stored only as SHA-256 hashes, never in plaintext, also not in the idempotency cache. The web chat page creates the key itself and sends it with the create request.
 - Phone numbers are stored as digits (optional leading `+`), 8–15 digits, without verification.
 - The WhatsApp tables (`whatsapp_contacts`, `customer_consents`, conversations, messages) are kept for the Phase 3 channel and unused in the MVP.
 

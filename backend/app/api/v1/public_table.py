@@ -109,6 +109,11 @@ async def place_order(
     request: Request,
     response: Response,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    order_key: str | None = Header(
+        default=None,
+        alias="X-Order-Key",
+        description="Access key made by the page (32-128 URL-safe characters); recommended",
+    ),
 ) -> WebOrderCreated:
     """C8 "Pesan & bayar": a pay-first dine-in order for this table (stock deducted)."""
     scope = await current_scope(token, request)
@@ -136,4 +141,6 @@ async def place_order(
             customer_id=customer_id,
         )
 
-    return await chat.create_order(request, response, scope, idempotency_key, body, build)
+    return await chat.create_order(
+        request, response, scope, idempotency_key, order_key, body, build
+    )

@@ -249,10 +249,19 @@ def test_web_order_is_pay_first_and_never_joins_the_open_bill(client, ctx) -> No
     assert order["total"] == order["subtotal"] + order["pb1_amount"]
     assert len(order["access_key"]) >= 30 and order["pay_by"]
 
-    # A retry with the same key returns the same order (and key), not a second order.
+    # A retry with the same key returns the same order, not a second order. The old Q3 page
+    # sends no X-Order-Key, so the replay gets a NEW access key (the first is not stored in
+    # plaintext anywhere) and the earlier one stops working.
     again = _place(client, token, body, key, note="kurang manis", customer_name="  Rina ")
     assert again.status_code == 200 and again.headers["Idempotent-Replay"] == "true"
     assert again.json()["order_id"] == order["order_id"]
+    assert again.json()["access_key"] != order["access_key"]
+    stale = client.get(
+        f"/api/v1/public/t/{token}/orders/{order['order_id']}",
+        headers={"X-Order-Key": order["access_key"]},
+    )
+    assert stale.status_code == 404
+    order = {**order, "access_key": again.json()["access_key"]}
 
     row = admin_sql(
         "select channel::text, payment_mode::text, bill_id, customer_name, note from app.orders"

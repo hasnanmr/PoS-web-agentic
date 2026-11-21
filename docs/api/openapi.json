@@ -1548,6 +1548,8 @@
             "enum": [
               "whatsapp_online",
               "whatsapp_table",
+              "web_table",
+              "web_online",
               "counter"
             ],
             "title": "Channel",
@@ -4092,6 +4094,30 @@
             ],
             "title": "Customer Name"
           },
+          "customer_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online: the number to call (cleared once finished)",
+            "title": "Customer Phone"
+          },
+          "delivery_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online delivery: where to deliver (cleared once finished)",
+            "title": "Delivery Address"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -4400,6 +4426,30 @@
               }
             ],
             "title": "Customer Name"
+          },
+          "customer_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online: the number to call (cleared once finished)",
+            "title": "Customer Phone"
+          },
+          "delivery_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online delivery: where to deliver (cleared once finished)",
+            "title": "Delivery Address"
           },
           "delivery_fee": {
             "title": "Delivery Fee",
@@ -18242,7 +18292,7 @@
     },
     "/api/v1/public/o/{slug}/orders": {
       "post": {
-        "description": "C4/C5 \"Pesan & bayar\": a pay-first `web_online` order, pickup or delivery.",
+        "description": "C4/C5 \"Pesan & bayar\": a pay-first `web_online` order, pickup or delivery. The page\nmakes the access key and sends it as `X-Order-Key`; only its hash is stored.",
         "operationId": "place_order_api_v1_public_o__slug__orders_post",
         "parameters": [
           {
@@ -18268,6 +18318,24 @@
                 }
               ],
               "title": "Idempotency-Key"
+            }
+          },
+          {
+            "description": "Access key made by the page (32-128 URL-safe characters); required",
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Access key made by the page (32-128 URL-safe characters); required",
+              "title": "X-Order-Key"
             }
           }
         ],
@@ -18984,6 +19052,24 @@
                 }
               ],
               "title": "Idempotency-Key"
+            }
+          },
+          {
+            "description": "Access key made by the page (32-128 URL-safe characters); recommended",
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Access key made by the page (32-128 URL-safe characters); recommended",
+              "title": "X-Order-Key"
             }
           }
         ],

@@ -826,6 +826,10 @@ def _card(
         "qris_checked": qris_checked,
         "table": order["table_name"],
         "customer_name": order.get("customer_name") or order.get("guest_name"),
+        # Web chat orders from the outlet link: who to call and where to deliver (S2, T-146).
+        # Both are cleared once the order is finished (FR12.2).
+        "customer_phone": order.get("customer_phone"),
+        "delivery_address": order.get("delivery_address"),
         "note": order.get("note"),
         # S2 web-order card: "Pelanggan bilang sudah bayar · 12:44" → S4 review of this proof.
         "proof_id": order.get("pending_proof_id"),

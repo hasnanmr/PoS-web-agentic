@@ -39,9 +39,15 @@ def pool(request: Request) -> Any:
     return p
 
 
-# Rate limit: per scope and per client address, per API process (like the tablet pairing limit).
+# Rate limits per API process (like the tablet pairing limit), per minute:
+# - per chat session (`X-Chat-Session`, one per phone): the main budget. Status polls every 5 s
+#   (C7, 12/min) plus taps fit easily;
+# - per client address: high, because a cafe's customers often share one Wi-Fi address;
+# - per scope (outlet link or table): only requests WITHOUT a chat session count, so a busy
+#   outlet's polling customers never use up each other's budget.
 _WINDOW_SECONDS = 60
-_LIMIT_PER_CLIENT = 120
+_LIMIT_PER_SESSION = 120
+_LIMIT_PER_CLIENT = 1200
 _LIMIT_PER_SCOPE = 300
 _hits: dict[str, deque[float]] = {}
 
@@ -68,10 +74,11 @@ def rate_limit(key: str, limit: int) -> None:
 
 def limit_scope(request: Request, scope_key: str) -> None:
     rate_limit(f"ip:{client_address(request)}", _LIMIT_PER_CLIENT)
-    rate_limit(f"scope:{scope_key}", _LIMIT_PER_SCOPE)
     session = request.headers.get("x-chat-session")
     if session:
-        rate_limit(f"session:{session}", _LIMIT_PER_CLIENT)
+        rate_limit(f"session:{scope_key}:{session}", _LIMIT_PER_SESSION)
+    else:
+        rate_limit(f"scope:{scope_key}", _LIMIT_PER_SCOPE)
 
 
 async def expire_unpaid(request: Request, scope: web_chat.ChatScope) -> None:
@@ -271,25 +278,42 @@ async def create_order(
     response: Response,
     scope: web_chat.ChatScope,
     idempotency_key: str | None,
+    client_key: str | None,
     body: BaseModel,
     build: Callable[[Any, str], Any],
 ) -> WebOrderCreated:
     """Shared "Pesan & bayar": idempotent per scope (FR6.4); `build(conn, key_hash)` returns
-    the `orders.WebOrder` inside the transaction (so customer rows roll back with it)."""
+    the `orders.WebOrder` inside the transaction (so customer rows roll back with it).
+
+    The access key is never stored in plaintext, not even in the idempotency cache (FR2.15):
+    - the web chat creates the key itself and sends it as `X-Order-Key`; only its hash is
+      stored, it is part of the request fingerprint, so a replay must carry the same key,
+      and the response echoes it;
+    - without `X-Order-Key` (the old Q3 page) the server makes one; a replay then gets a new
+      key and the earlier one stops working, because the cache cannot return it."""
     key = idempotency.check_key(idempotency_key)
     if key is None:
         raise ApiError(422, "validation_failed", "Idempotency-Key is required")
+    client_key = web_chat.check_client_key(client_key)
     scope_name = f"web_order.create:{scope.outlet_id}:{scope.table_id or 'online'}"
-    fp = idempotency.fingerprint(str(scope.outlet_id), body.model_dump(mode="json"))
+    fp = idempotency.fingerprint(
+        str(scope.outlet_id),
+        body.model_dump(mode="json"),
+        web_chat.hash_key(client_key) if client_key else None,
+    )
     ctx = scope.actor()
-    access_key = web_chat.new_access_key()
+    access_key = client_key or web_chat.new_access_key()
     try:
         async with db.transaction(pool(request), ctx) as conn:
             cached = await idempotency.lookup(conn, ctx, scope_name, key, fp)
             if cached is not None:
                 response.status_code = status.HTTP_200_OK
                 response.headers["Idempotent-Replay"] = "true"
-                return WebOrderCreated(**cached)
+                if client_key is None:
+                    await web_chat.replace_order_key(
+                        conn, scope, UUID(cached["order_id"]), web_chat.hash_key(access_key)
+                    )
+                return WebOrderCreated(**{**cached, "access_key": access_key})
             draft = await build(conn, web_chat.hash_key(access_key))
             created = await web_chat.place_order(conn, ctx, scope, draft)
             out = WebOrderCreated(
@@ -304,7 +328,8 @@ async def create_order(
                 total=created["total"],
                 pay_by=created["pay_by"],
             )
-            await idempotency.store(conn, ctx, scope_name, key, fp, out.model_dump(mode="json"))
+            cache = {**out.model_dump(mode="json"), "access_key": ""}  # never the key itself
+            await idempotency.store(conn, ctx, scope_name, key, fp, cache)
     except psycopg.errors.UniqueViolation as exc:
         if "idempotency_keys" in str(exc):
             raise ApiError(409, "conflict", "the same request is already being processed") from None
@@ -360,6 +385,8 @@ def register(router: APIRouter, param: str, current: Callable[..., Any]) -> None
     ) -> ChatSessionOut:
         """Save step + cart (no personal data: name, phone, and address stay on the phone)."""
         key = web_chat.check_session(session)
+        cart = body.cart.model_dump(mode="json")
+        web_chat.check_cart_size(cart)
         async with db.transaction(pool(request), scope.actor()) as conn:
             row = await web_chat.put_session(
                 conn,
@@ -367,7 +394,7 @@ def register(router: APIRouter, param: str, current: Callable[..., Any]) -> None
                 scope,
                 key,
                 step=body.step,
-                cart=body.cart.model_dump(mode="json"),
+                cart=cart,
                 fulfillment=body.fulfillment,
             )
         return ChatSessionOut(**row)
@@ -445,8 +472,9 @@ def register(router: APIRouter, param: str, current: Callable[..., Any]) -> None
     ) -> list[RecommendationCard]:
         """C9 cards: owner's picks first, then 30-day best sellers; no sold-out items, ≤ 30."""
         async with db.transaction(pool(request), scope.actor()) as conn:
-            menu = {m["product_id"]: m for m in await catalog.counter_menu(conn, scope.outlet_id)}
-            listing = await recommendations.recommendation_list(conn, scope.outlet_id)
+            menu_rows = await catalog.counter_menu(conn, scope.outlet_id)
+            listing = await recommendations.recommendation_list(conn, scope.outlet_id, menu_rows)
+        menu = {m["product_id"]: m for m in menu_rows}
         rows: list[dict[str, Any]] = []
         for badge, entries in (
             ("owner_pick", listing["picks"]),

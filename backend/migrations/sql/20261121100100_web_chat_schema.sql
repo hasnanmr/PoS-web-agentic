@@ -26,15 +26,42 @@ language sql immutable set search_path = '' as $$
            lower(coalesce(p_text, '')), '[^a-z0-9]+', '-', 'g')), 30), ''), 'outlet')
 $$;
 
--- `kopi-senja-dago-3f9a`: readable, and the id suffix keeps it unique; the owner can change it.
-create function app.default_outlet_slug(p_name text, p_id uuid) returns text
-language sql immutable set search_path = '' as $$
-  select trim(both '-' from app.slugify(p_name)) || '-' || left(replace(p_id::text, '-', ''), 4)
+-- `kopi-senja-dago-3f9a`: readable, and the id suffix makes it unique; the owner can change it.
+-- When that slug is already taken (same name and id prefix, or an owner-chosen slug), the suffix
+-- grows (8, 12, then all 32 hex characters of the id, which is unique).
+create function app.default_outlet_slug(p_name text, p_id uuid, p_suffix integer default 4)
+returns text language sql immutable set search_path = '' as $$
+  -- The name part is shortened so the whole slug stays within 40 characters.
+  select coalesce(nullif(trim(both '-' from left(app.slugify(p_name), 39 - p_suffix)), ''), 'o')
+         || '-' || left(replace(p_id::text, '-', ''), p_suffix)
 $$;
+
+-- Definer: the check must see every tenant's slugs (RLS would hide them from app_backend).
+create function app.unique_outlet_slug(p_name text, p_id uuid) returns text
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  v_len integer;
+  v_slug text;
+begin
+  foreach v_len in array array[4, 8, 12, 32] loop
+    v_slug := app.default_outlet_slug(p_name, p_id, v_len);
+    if not exists (select 1 from app.outlets o where o.public_slug = v_slug and o.id <> p_id) then
+      return v_slug;
+    end if;
+  end loop;
+  return v_slug;  -- the full id: unique
+end $$;
 
 alter table app.outlets add column public_slug text
   check (public_slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$' and public_slug !~ '--');
-update app.outlets set public_slug = app.default_outlet_slug(name, id);
+do $$
+declare
+  r record;
+begin
+  for r in select id, name from app.outlets order by created_at, id loop
+    update app.outlets set public_slug = app.unique_outlet_slug(r.name, r.id) where id = r.id;
+  end loop;
+end $$;
 alter table app.outlets alter column public_slug set not null;
 create unique index outlets_public_slug_key on app.outlets (public_slug);
 
@@ -42,12 +69,14 @@ create function app.outlet_default_slug() returns trigger
 language plpgsql set search_path = '' as $$
 begin
   if new.public_slug is null then
-    new.public_slug := app.default_outlet_slug(new.name, new.id);
+    new.public_slug := app.unique_outlet_slug(new.name, new.id);
   end if;
   return new;
 end $$;
 create trigger default_slug before insert on app.outlets
   for each row execute function app.outlet_default_slug();
+revoke execute on function app.unique_outlet_slug(text, uuid) from public;
+grant execute on function app.unique_outlet_slug(text, uuid) to app_backend;
 
 -- Customers (personal data, FR12) ---------------------------------------------------------------
 create table app.customers (
@@ -130,7 +159,7 @@ create table app.chat_sessions (
   session_key_hash  text not null check (session_key_hash ~ '^[0-9a-f]{64}$'),
   step              text not null default 'main_menu' check (step ~ '^[a-z0-9_.:-]{1,60}$'),
   cart              jsonb not null default '{"lines": []}'::jsonb
-                    check (jsonb_typeof(cart) = 'object' and pg_column_size(cart) <= 16384),
+                    check (jsonb_typeof(cart) = 'object' and pg_column_size(cart) <= 65536),
   fulfillment       text check (fulfillment in ('pickup', 'delivery')),
   last_activity_at  timestamptz not null default now(),
   created_at        timestamptz not null default now(),
