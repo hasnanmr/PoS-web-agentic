@@ -1,10 +1,11 @@
-// Customer web chat — page 07 · Web Chat Pelanggan, screens C1–C13 (T-145; C9 cards only, the
-// AI parts of C9/C14/C15 come with the agent, T-085–T-088). One public app on two routes, no
+// Customer web chat — page 07 · Web Chat Pelanggan, screens C1–C15 (T-145; the agent parts of
+// C9/C14/C15 are T-115, T-087, T-088: AgentReply.tsx, agent.ts). One public app on two routes, no
 // sign-in: the outlet link /o/<slug> (C1: Pesan, Rekomendasi, Reservasi, Reservasi Saya) and
 // the table QR /t/<token> (C8: Pesan, Rekomendasi). Endpoints: screen-endpoint map → C1–C15.
 // Behaviour notes (canvas):
-// - Every step works with buttons; the text box takes "menu", the kitchen note, and (later)
-//   the agent. "☰ Menu utama" / "menu" returns to the main menu without creating anything;
+// - Every step works with buttons; the text box takes "menu", the kitchen note, and free text
+//   for the agent (when the outlet has it: `agent_enabled`). The agent only reads; it never
+//   creates a cart, order, or booking — the customer's tap does, through the same endpoints. "☰ Menu utama" / "menu" returns to the main menu without creating anything;
 //   the cart stays.
 // - The server keeps the step and cart for this phone's chat session; a cart idle for 2 hours
 //   comes back empty (C13 card 4). Name, phone, and address stay on the phone only.
@@ -18,8 +19,10 @@ import { createPortal } from 'react-dom'
 import { ApiError, createApi, type Api } from '../lib/api'
 import { formatRupiah } from '../lib/format'
 import { Photo } from '../ui/Photo'
+import { sendToAgent, type AgentBookingDraft, type AgentContext, type AgentOrderDraft } from './agent'
+import { AgentReply, type AgentTurn } from './AgentReply'
 import { chatApi, scopeKey, type ChatApi, type OrderBody } from './api'
-import { BookedCard, BookingFlow, MyBookings, type Person } from './Booking'
+import { BookedCard, BookingFlow, MyBookings, type BookingPreset, type Person } from './Booking'
 import { friendly, isRetryable } from './copy'
 import { cartTotal, describeLine, lineUnitPrice } from './cart'
 import {
@@ -47,12 +50,14 @@ type Step =
   | { name: 'order'; saved: SavedOrder }
   | { name: 'myOrders' }
   | { name: 'recs' }
-  | { name: 'book' }
+  | { name: 'book'; preset?: BookingPreset }
   | { name: 'reschedule'; booking: Booking; key: string }
   | { name: 'booked'; booking: Booking; saved: SavedBooking }
   | { name: 'myBookings' }
 
-type Msg = { id: number; kind: 'me' | 'ok' | 'info' | 'warn' | 'expired'; text: string }
+type Msg =
+  | { id: number; kind: 'me' | 'ok' | 'info' | 'warn' | 'expired'; text: string }
+  | { id: number; kind: 'ai'; turn: AgentTurn }
 
 export interface HashLocation {
   read: () => string
@@ -103,7 +108,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
   const restored = useRef(false)
 
   const byId = useMemo(() => new Map(menu.map((m) => [m.product_id, m])), [menu])
-  const say = useCallback((kind: Msg['kind'], text: string) => {
+  const say = useCallback((kind: Exclude<Msg['kind'], 'ai'>, text: string) => {
     setMsgs((m) => [...m.slice(-20), { id: nextId.current++, kind, text }])
   }, [])
 
@@ -219,8 +224,53 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       addLine(step.item, step.optionIds, text.slice(0, 200))
       return
     }
+    if (page?.agent_enabled) { void askAgent(text.trim().slice(0, 500)); return }
     say('me', text)
     say('info', 'Untuk sekarang pakai tombol di atas ya. Ketik "menu" kapan saja untuk kembali ke menu utama.')
+  }
+
+  // C9 AI / C14 / C15: one message to the agent, the reply streamed into its bubble.
+  const agentBusy = useRef(false)
+  function updateTurn(id: number, change: (t: AgentTurn) => AgentTurn) {
+    setMsgs((all) => all.map((m) => (m.id === id && m.kind === 'ai' ? { ...m, turn: change(m.turn) } : m)))
+  }
+  async function askAgent(text: string) {
+    if (!text) return
+    if (agentBusy.current) {
+      say('me', text)
+      say('info', 'Tunggu sebentar ya, asistennya masih menjawab pesan sebelumnya.')
+      return
+    }
+    agentBusy.current = true
+    const context: AgentContext = step.name === 'recs' ? 'recommend' : step.name === 'book' ? 'book'
+      : ['menu', 'addons', 'cart', 'details', 'summary'].includes(step.name) ? 'order' : 'auto'
+    say('me', text)
+    const id = nextId.current++
+    setMsgs((m) => [...m.slice(-20), { id, kind: 'ai', turn: { context, text: '', result: null } }])
+    try {
+      const result = await sendToAgent({
+        apiBaseUrl, base: chat.base, session: chat.session, text, context,
+        onDelta: (d) => updateTurn(id, (t) => ({ ...t, text: t.text + d })),
+      })
+      updateTurn(id, (t) => ({ ...t, result }))
+    } finally {
+      agentBusy.current = false
+    }
+  }
+
+  function applyOrderDraft(draft: AgentOrderDraft, edit: boolean) {
+    setCart(draft.lines.map((l) => ({
+      product_id: l.product_id, quantity: l.quantity, addon_option_ids: [...l.addon_option_ids].sort(), note: l.note,
+    })))
+    const chosen = scope.kind === 'o' ? draft.fulfillment ?? fulfillment : null
+    if (scope.kind === 'o' && draft.fulfillment) setFulfillment(draft.fulfillment)
+    if (edit || (scope.kind === 'o' && !chosen)) { go(edit ? 'Ubah' : 'Pesan & bayar', { name: 'cart' }); return }
+    const missing = !details.name.trim() || (scope.kind === 'o' && (!details.phone.trim() || (chosen === 'delivery' && !details.address.trim())))
+    go('Pesan & bayar', { name: missing ? 'details' : 'summary' })
+  }
+
+  function applyBookingDraft(draft: AgentBookingDraft) {
+    go('Lanjut isi nama & no HP', { name: 'book', preset: { party_size: draft.party_size, start_at: draft.start_at, label: draft.label } })
   }
 
   if (load === 'loading') {
@@ -259,8 +309,10 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
     <ChatHeader initials={page.outlet.short_name} title={outletName}
       subtitle={page.table ? `${tableLabel(page.table.name)} · ${page.table.area ? `${page.table.area} · ` : ''}dine-in` : outletSubtitle(page)} />
   )
-  const placeholder = step.name === 'note' ? 'Tulis catatan…' : step.name === 'main' || step.name === 'menu'
-    ? 'Ketik pesanan atau "menu"…' : 'Ketik "menu"…'
+  const placeholder = step.name === 'note' ? 'Tulis catatan…'
+    : page.agent_enabled && step.name === 'recs' ? 'Ceritakan seleramu…'
+      : page.agent_enabled && step.name === 'menu' ? 'Tulis pesananmu…'
+        : step.name === 'main' || step.name === 'menu' ? 'Ketik pesanan atau "menu"…' : 'Ketik "menu"…'
 
   let footer: ReactNode = null
   if (step.name === 'menu' && cart.length > 0) {
@@ -275,7 +327,13 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
     <Shell header={header} footer={<>{footer}<div ref={setFooterSlot} /></>}
       bottom={<BottomBar placeholder={placeholder} onMainMenu={mainMenu} onSend={onText} />}>
       {msgs.map((m) => (
-        m.kind === 'me' ? <Mine key={m.id}>{m.text}</Mine>
+        m.kind === 'ai' ? (
+          <AgentReply key={m.id} turn={m.turn} byId={byId} webOrdering={page.web_ordering}
+            canBook={scope.kind === 'o' && page.reservations_enabled}
+            onAdd={startAdd} onQuick={(q) => void askAgent(q)} onOrder={applyOrderDraft} onBook={applyBookingDraft}
+            onPick={(target) => go(target === 'menu' ? 'Pesan' : target === 'recs' ? 'Rekomendasi' : 'Reservasi meja', { name: target })} />
+        )
+          : m.kind === 'me' ? <Mine key={m.id}>{m.text}</Mine>
           : m.kind === 'expired' ? (
             <Bubble key={m.id}>
               <p className="font-semibold">Keranjangmu sudah kosong lagi</p>
@@ -300,7 +358,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         <NotePrompt onSkip={() => { say('me', 'Tanpa catatan'); addLine(step.item, step.optionIds, null) }} />
       )}
       {step.name === 'recs' && (
-        <Recommendations chat={chat} byId={byId} webOrdering={page.web_ordering} onAdd={startAdd} />
+        <Recommendations chat={chat} byId={byId} webOrdering={page.web_ordering} agent={page.agent_enabled} onAdd={startAdd} />
       )}
       {(step.name === 'cart' || step.name === 'details' || step.name === 'summary') && (
         <Checkout footerSlot={footerSlot} chat={chat} page={page} scope={scope} step={step.name} mode={mode} cart={cart} byId={byId}
@@ -351,9 +409,10 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         }} />
       )}
       {scope.kind === 'o' && (step.name === 'book' || step.name === 'reschedule') && (
-        <BookingFlow api={chat} outletName={outletName} timezone={page.outlet.timezone} privacyUrl={page.privacy_notice.url}
+        <BookingFlow key={step.name === 'book' && step.preset ? step.preset.start_at : step.name} api={chat} outletName={outletName} timezone={page.outlet.timezone} privacyUrl={page.privacy_notice.url}
           privacyVersion={page.privacy_notice.version}
           reschedule={step.name === 'reschedule' ? { booking: step.booking, key: step.key } : null}
+          preset={step.name === 'book' ? step.preset ?? null : null}
           person={{ name: details.name, phone: details.phone }} prefilled={prefilled} remember={remember}
           onRemember={(on) => { setRemember(on); if (!on) { clearDetails(); setPrefilled(false) } }}
           onBooked={(created, person: Person) => {
@@ -460,10 +519,10 @@ function MainMenu({ page, scope, active, onPick }: {
   )
 }
 
-// C9 (cards; the AI part comes with the agent) ---------------------------------------------------------
+// C9 (cards; the AI answers render in AgentReply) ---------------------------------------------------------
 
-function Recommendations({ chat, byId, webOrdering, onAdd }: {
-  chat: ChatApi; byId: Map<string, ChatMenuItem>; webOrdering: boolean; onAdd: (item: ChatMenuItem) => void
+function Recommendations({ chat, byId, webOrdering, agent, onAdd }: {
+  chat: ChatApi; byId: Map<string, ChatMenuItem>; webOrdering: boolean; agent: boolean; onAdd: (item: ChatMenuItem) => void
 }) {
   const [cards, setCards] = useState<RecommendationCard[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -474,7 +533,9 @@ function Recommendations({ chat, byId, webOrdering, onAdd }: {
   }, [chat])
   return (
     <div className="space-y-2">
-      <Bubble><p>Pilihan owner &amp; terlaris di outlet ini.</p></Bubble>
+      <Bubble>
+        <p>Pilihan owner &amp; terlaris di outlet ini{agent ? ' — atau ceritakan seleramu di kotak teks ↓' : '.'}</p>
+      </Bubble>
       {error && <Bubble tone="danger">{error}</Bubble>}
       {cards && cards.length === 0 && <Bubble>Belum ada rekomendasi di outlet ini. Coba lihat menunya ya.</Bubble>}
       {cards && cards.length > 0 && (

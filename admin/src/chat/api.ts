@@ -44,6 +44,7 @@ export function chatApi(api: Api, scope: Scope, session: string) {
 
   return {
     base,
+    session,
     async page(): Promise<ChatPage> {
       const raw = await api.get<RawPage>(base, h)
       return {
@@ -78,8 +79,8 @@ export function chatApi(api: Api, scope: Scope, session: string) {
       api.get<Availability>(`${base}/availability?party_size=${partySize}&date=${date}`, h),
     book: (body: {
       party_size: number; start_at: string; customer: { name: string; phone: string }; privacy_notice_version: string
-    }, keys: CreateKeys) =>
-      api.post<BookingCreated>(`${base}/reservations`, { ...body, source: 'buttons' },
+    }, keys: CreateKeys, source: 'buttons' | 'agent' = 'buttons') =>
+      api.post<BookingCreated>(`${base}/reservations`, { ...body, source },
         { ...bookingKey(keys.accessKey), 'Idempotency-Key': keys.idempotencyKey }),
     booking: (id: string, key: string) => api.get<Booking>(`${base}/reservations/${id}`, bookingKey(key)),
     bookingsStatus: (reservations: { id: string; key: string }[]) =>
