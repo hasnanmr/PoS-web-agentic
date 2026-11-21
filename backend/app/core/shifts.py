@@ -53,8 +53,16 @@ async def drawers_with_shift(conn: AsyncConnection, outlet_id: UUID) -> list[dic
     """S8 drawer cards. No expected cash before the count (blind count)."""
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
-        "select id, name from app.cash_drawers where outlet_id = %s and is_active"
-        " order by created_at",
+        # number: same 1-based numbering as open_shifts (Kasir, Open Bills) and the cash-count
+        # report, counting deleted (inactive) drawers too so removing one never renumbers the rest.
+        """
+        select d.id, d.name,
+               (select count(*) from app.cash_drawers d2
+                where d2.outlet_id = d.outlet_id and d2.created_at <= d.created_at) as number
+        from app.cash_drawers d
+        where d.outlet_id = %s and d.is_active
+        order by d.created_at
+        """,
         (outlet_id,),
     )
     drawers = await cur.fetchall()

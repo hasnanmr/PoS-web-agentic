@@ -350,7 +350,7 @@ export interface ShiftRow {
 }
 
 export interface DrawerCard {
-  drawer: { id: string; name: string }
+  drawer: { id: string; name: string; number: number }
   shift: { id: string; opened_at: string; starting_cash: number; opened_by: string | null; cash_in: number;
     cash_in_count: number; cash_refunds: number } | null
 }

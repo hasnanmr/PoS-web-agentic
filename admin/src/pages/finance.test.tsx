@@ -72,8 +72,9 @@ describe('S4 Review Pembayaran QRIS', () => {
 
 describe('S8 blind count', () => {
   it('hides the expected cash until the count is submitted', async () => {
+    // Drawer 1 was deleted: the card keeps the server's number, not its list position (#74).
     const drawers: DrawerCard[] = [{
-      drawer: { id: 'd1', name: 'Kasir depan' },
+      drawer: { id: 'd1', name: 'Kasir depan', number: 2 },
       shift: { id: 's1', opened_at: '2026-11-18T01:00:00Z', starting_cash: 500000, opened_by: 'Rina', cash_in: 1240000,
         cash_in_count: 26, cash_refunds: 61600 },
     }]
@@ -85,7 +86,8 @@ describe('S8 blind count', () => {
     const api = fakeApi({ 'GET /ops/outlets/o-dago/drawers': drawers, 'POST /ops/shifts/s1/close': closed })
     render(<WithSession session={fakeSession('staff', { api })}><ShiftsPage /></WithSession>)
     await userEvent.click(await screen.findByRole('button', { name: 'Tutup shift & hitung kas' }))
-    const panel = screen.getByText('Tutup shift · Drawer 1').closest('section') as HTMLElement
+    expect(screen.getByText('Drawer 2 · Kasir depan')).toBeInTheDocument()
+    const panel = screen.getByText('Tutup shift · Drawer 2').closest('section') as HTMLElement
     for (const [note, count] of [['100.000', '12'], ['50.000', '6'], ['20.000', '9'], ['10.000', '5'], ['5.000', '4'], ['2.000', '3']]) {
       await userEvent.type(within(panel).getByLabelText(`Jumlah lembar Rp ${note}`), count)
     }

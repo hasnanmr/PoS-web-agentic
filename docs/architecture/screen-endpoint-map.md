@@ -298,7 +298,7 @@ Before every read or write of an outlet's reservations the server releases expir
 
 | Part | Endpoint | Fields |
 |---|---|---|
-| Drawer cards | `GET /ops/outlets/{id}/drawers` ✅ (always includes the current shift; no query parameters) | `[{drawer:{id, name}, shift?:{id, opened_by, opened_at, starting_cash, cash_in, cash_in_count, cash_refunds}}]` — **no expected cash** before the count. |
+| Drawer cards | `GET /ops/outlets/{id}/drawers` ✅ (always includes the current shift; no query parameters) | `[{drawer:{id, name, number (1-based by creation order among all of the outlet's drawers, deleted ones included — the same number Kasir S1 and Open Bills show)}, shift?:{id, opened_by, opened_at, starting_cash, cash_in, cash_in_count, cash_refunds}}]` — **no expected cash** before the count. |
 | Buka shift | `POST /ops/drawers/{id}/shifts` ✅ | `starting_cash`. `conflict` if one is open. |
 | Submit hitungan & tutup shift | `POST /ops/shifts/{id}/close` ✅ (`Idempotency-Key`) | `count_breakdown:{"100000":12, "50000":6, "20000":9, "10000":5, "5000":4, "2000":3, "coins":4400}` (note counts; `coins` = "Rp 1.000 & koin" as an amount) → server sums `counted_cash`; the response then reveals `drawer:{id, name}, starting_cash, cash_in, cash_refunds, cash_paid_out, expected_cash (= starting + cash in − cash refunds − cash paid to suppliers from this drawer), counted_cash, difference, kind: shortage\|surplus\|none, counted_by, closed_at, timezone`. A non-zero difference posts `cash_shortage`/`cash_surplus` to the ledger. `shift_closed` (409) when already closed; cash payments wait for or refuse a shift being closed. |
 
