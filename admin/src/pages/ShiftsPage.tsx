@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatNumber, formatRupiah, formatSignedRupiah, formatTime, ZONE_LABEL } from '../lib/format'
+import { newKey } from '../lib/newKey'
 import type { DrawerCard, ShiftClosed } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
@@ -116,7 +117,7 @@ function CloseShiftPanel({ closing, onClosed, onDismiss }: {
   const [error, setError] = useState<string>()
   const [result, setResult] = useState<ShiftClosed>()
   // One key per count panel: a retry after a lost response replays instead of failing.
-  const [idempotencyKey] = useState(() => `shift-close-${closing.shiftId}-${crypto.randomUUID()}`)
+  const [idempotencyKey] = useState(() => `shift-close-${closing.shiftId}-${newKey()}`)
   const total = NOTES.reduce((sum, n) => sum + n * Number(counts[n] || 0), 0) + Number(coins || 0)
 
   async function submit() {

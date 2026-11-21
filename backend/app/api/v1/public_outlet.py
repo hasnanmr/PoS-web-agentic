@@ -349,6 +349,9 @@ _LOOKUP_WINDOW = 600.0
 _misses: dict[str, deque[float]] = {}
 
 
+_MAX_MISS_KEYS = 10_000
+
+
 def _lookup_guard(request: Request, *, miss: bool = False) -> None:
     """Refuse after too many misses from one client address. Entries are made only on a miss
     and dropped once stale, so memory stays bounded (like `public_chat.rate_limit`)."""
@@ -363,9 +366,8 @@ def _lookup_guard(request: Request, *, miss: bool = False) -> None:
             hits = None
     if miss:
         _misses.setdefault(key, deque()).append(now)
-        if len(_misses) > 10_000:
-            for k in [k for k, v in _misses.items() if not v or v[-1] < now - _LOOKUP_WINDOW]:
-                del _misses[k]
+        while len(_misses) > _MAX_MISS_KEYS:  # hard cap, oldest first: no scan per request
+            del _misses[next(iter(_misses))]
     elif hits is not None and len(hits) >= _LOOKUP_MISSES:
         raise ApiError(429, "too_many_requests", "too many wrong attempts; wait a moment")
 

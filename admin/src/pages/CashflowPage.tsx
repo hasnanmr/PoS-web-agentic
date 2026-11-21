@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { MONTHS, formatDay, formatRange, formatRupiah, formatSignedRupiah, shortOutlet, todayIn } from '../lib/format'
+import { newKey } from '../lib/newKey'
 import type { Cashflow, Expense, ExpensePage, Granularity, Tile } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
@@ -398,7 +399,7 @@ export function ExpenseForm({ defaultOutletId, onSaved }: { defaultOutletId: str
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
-  const [key, setKey] = useState(() => crypto.randomUUID())
+  const [key, setKey] = useState(newKey)
   const tooLarge = Number(amount) > EXPENSE_MAX
 
   async function save() {
@@ -413,7 +414,7 @@ export function ExpenseForm({ defaultOutletId, onSaved }: { defaultOutletId: str
       }, { 'Idempotency-Key': `expense-${key}` })
       setAmount('')
       setDescription('')
-      setKey(crypto.randomUUID())
+      setKey(newKey())
       setNotice({ tone: 'success', text: 'Pengeluaran tersimpan di ledger.' })
       onSaved()
     } catch (e) {
