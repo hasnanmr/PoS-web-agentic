@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
@@ -226,5 +226,34 @@ describe('Q3 per-item note', () => {
       const order = api.calls.find(([m, p]) => m === 'POST' && p === `${BASE}/orders`)
       expect(order?.[2]).toMatchObject({ items: [{ product_id: 'p-americano', quantity: 1, note: 'tanpa es' }] })
     })
+  })
+})
+
+describe('Q3 quote follows the cart', () => {
+  it('never shows or sends the total of an older cart (#68)', async () => {
+    const quote = (total: number) => ({ lines: [], subtotal: total, pb1_rate_bps: null, pb1_amount: 0, total })
+    const pending: ((q: ReturnType<typeof quote>) => void)[] = []
+    const api = fakeApi({ [`GET ${BASE}`]: PAGE, [`GET ${BASE}/menu`]: MENU })
+    const base = api.post
+    api.post = vi.fn(async (path: string, body?: unknown) => {
+      if (path === `${BASE}/quote`) return new Promise((resolve) => { pending.push(resolve as never) })
+      return base(path, body)
+    }) as typeof api.post
+    render(<TableScreens api={api} token={TOKEN} redirect={vi.fn()} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Americano' }))
+    await userEvent.click(screen.getByRole('button', { name: /Lihat pesanan/ }))
+    await act(async () => { pending[0](quote(22000)) })
+    const submit = () => screen.getByRole('button', { name: /Pesan & bayar/ })
+    await waitFor(() => expect(submit()).toHaveTextContent('Pesan & bayar · Rp 22.000'))
+    expect(submit()).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah Americano' })) // 2×, new quote on its way
+    expect(submit()).toHaveTextContent('Pesan & bayar · …')
+    expect(submit()).toBeDisabled()
+    expect(screen.queryByText('Rp 22.000', { selector: 'dd' })).not.toBeInTheDocument()
+    await act(async () => { pending[1](quote(44000)) })
+    await waitFor(() => expect(submit()).toHaveTextContent('Pesan & bayar · Rp 44.000'))
+    expect(submit()).toBeEnabled()
   })
 })

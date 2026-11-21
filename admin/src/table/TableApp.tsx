@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ApiError, createApi, errorMessage, type Api } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
+import { newKey } from '../lib/newKey'
 import type { MenuItem, Quote } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { usePolling } from '../lib/usePolling'
@@ -547,23 +548,31 @@ function CartScreen({ api, base, page, cart, onQuantity, onNote, onBack, onStale
 }) {
   const [name, setName] = useState('')
   const [editing, setEditing] = useState<{ key: string; text: string }>()
-  const [quote, setQuote] = useState<Quote>()
+  // The server quote for exactly this cart (item, quantity, add-ons; a note never changes the
+  // price). A quote for an older cart is never shown or sent as `expected_total`.
+  const [quoted, setQuoted] = useState<{ key: string; quote: Quote }>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   // One key per cart: a retry after a lost connection returns the same order, not a second one.
-  const idempotencyKey = useRef(crypto.randomUUID())
+  const idempotencyKey = useRef('')
   const items = useMemo(() => cart.map((l) => ({
     product_id: l.product_id, quantity: l.quantity, addon_option_ids: l.addon_option_ids, note: l.note || null,
   })), [cart])
+  const quoteKey = useMemo(() => JSON.stringify(cart.map((l) => (
+    { product_id: l.product_id, quantity: l.quantity, addon_option_ids: l.addon_option_ids }
+  ))), [cart])
+  const quote = quoted?.key === quoteKey ? quoted.quote : undefined
+
+  useEffect(() => { idempotencyKey.current = newKey() }, [items])
 
   useEffect(() => {
-    idempotencyKey.current = crypto.randomUUID()
-    if (items.length === 0) return
+    if (quoteKey === '[]') return
     let cancelled = false
-    api.post<Quote>(`${base}/quote`, { items }).then((q) => { if (!cancelled) { setQuote(q); setError(undefined) } })
+    api.post<Quote>(`${base}/quote`, { items: JSON.parse(quoteKey) as unknown })
+      .then((q) => { if (!cancelled) { setQuoted({ key: quoteKey, quote: q }); setError(undefined) } })
       .catch((e: unknown) => { if (!cancelled) setError(errorMessage(e)) })
     return () => { cancelled = true }
-  }, [api, base, items])
+  }, [api, base, quoteKey])
 
   async function submit() {
     if (!quote) return
@@ -586,7 +595,8 @@ function CartScreen({ api, base, page, cart, onQuantity, onNote, onBack, onStale
     } catch (e) {
       if (e instanceof ApiError && (e.code === 'price_changed' || e.code === 'item_sold_out')) onStale()
       if (e instanceof ApiError && e.code === 'price_changed') {
-        setQuote(await api.post<Quote>(`${base}/quote`, { items }).catch(() => quote))
+        const fresh = await api.post<Quote>(`${base}/quote`, { items }).catch(() => undefined)
+        if (fresh) setQuoted({ key: quoteKey, quote: fresh })
       }
       setError(errorMessage(e))
       setBusy(false)
