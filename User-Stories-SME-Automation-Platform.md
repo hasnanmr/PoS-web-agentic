@@ -1,6 +1,6 @@
 # User Stories — SME Business Automation Platform
 
-Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story (baseline PRD v0.20: kanal pelanggan MVP adalah web chat; WhatsApp pindah ke Phase 3). Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
+Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user story (baseline PRD v0.21: kanal pelanggan MVP adalah web chat dengan agent AI terbatas untuk pesan, rekomendasi, dan reservasi; WhatsApp pindah ke Phase 3). Acceptance criteria merujuk ke ID AC pada PRD; seluruh AC yang dirujuk wajib lulus sebelum story dianggap selesai.
 
 ## Konvensi
 
@@ -658,30 +658,47 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
   - HP boleh mengingat nama, no HP, dan alamat terakhir milik pelanggan di perangkat saja untuk mengisi otomatis; pelanggan bisa menghapusnya dari chat; server tidak pernah menghubungkan order dari kunjungan berbeda menjadi profil.
 - **Traceability:** FR12.2–FR12.4, AC12.2–AC12.4
 
-## Epic J — Agent layer (Phase 2)
+## Epic J — Agent layer (US-042, US-043, US-066 MVP; lainnya Phase 2)
 
-### US-042 — Memproses order free-text dengan konfirmasi
+### US-042 — Memesan dengan bahasa sendiri lewat AI
 
-**Sebagai** pelanggan, **saya ingin** menulis order dengan bahasa natural, **sehingga** saya tidak harus mengikuti format menu yang kaku.
+**Sebagai** pelanggan, **saya ingin** mengetik pesanan dengan bahasa sendiri di web chat (misalnya "2 es kopi susu oat, satu less sugar, roti bakar 1, ambil sendiri"), **sehingga** saya tidak perlu menelusuri menu dan tombol satu per satu.
 
-- **Fase/Prioritas:** P2 / P0 untuk Phase 2
+- **Fase/Prioritas:** MVP / P0 (PRD v0.21)
 - **Acceptance criteria:**
-  - Agent mengekstrak item, add-on, kuantitas, dan total termasuk PB1.
-  - Agent menampilkan ringkasan terstruktur dan menunggu konfirmasi eksplisit.
-  - Sebelum konfirmasi tidak ada order dan tidak ada pengurangan stok.
-  - Setelah konfirmasi, agent memanggil fungsi pembuatan order deterministik yang sama dengan staff.
-- **Traceability:** FR2.4, FR6.3, AC6.2, AC6.4
+  - Teks bebas di Pesan/menu utama dijawab agent AI dengan tool baca menu (item, add-on, harga outlet), stok, dan quote server; pelanggan cukup menjawab dengan kata biasa ("keju") dan agent mencocokkannya ke opsi add-on di menu.
+  - AI bertanya bila ada yang kurang atau ambigu (grup add-on wajib, item yang tidak cocok) dengan tombol jawaban.
+  - Item yang tidak ada di menu atau habis disebutkan dan tidak ditambahkan.
+  - Ringkasan menampilkan item, add-on, catatan, pickup/delivery, subtotal, PB1, ongkir, dan total; semua angka dari quote server, bukan dari AI.
+  - Pelanggan bisa mengubah ringkasan dengan tombol (Ubah) sebelum memesan.
+  - Order baru dibuat saat pelanggan menekan `Pesan & bayar`, lewat fungsi order yang sama dengan staf dan web chat (aktor `agent`), lalu alur bayar QRIS normal (US-062).
+  - Sebelum `Pesan & bayar` tidak ada order dan tidak ada pengurangan stok; AI tidak punya tool untuk mengubah stok.
+  - Chat langsung menampilkan acknowledgement dan indikator mengetik; AI gagal atau lebih dari 30 detik → chat lanjut ke alur tombol (kartu menu) tanpa membuat apa pun.
+- **Traceability:** FR2.4, FR2.9, FR6.3, FR6.6, AC2.22, AC2.23, AC6.2, AC6.4 · wireframe C14
 
-### US-043 — Memproses reservasi free-text dengan konfirmasi
+### US-043 — Reservasi dengan bahasa sendiri lewat AI
 
-**Sebagai** pelanggan, **saya ingin** meminta reservasi dengan bahasa natural, **sehingga** saya dapat memesan meja dengan lebih mudah.
+**Sebagai** pelanggan, **saya ingin** meminta reservasi dengan kalimat biasa (misalnya "meja buat 4 besok jam 7 malam"), **sehingga** saya tidak perlu memilih tanggal dan jam satu per satu.
 
-- **Fase/Prioritas:** P2 / P0 untuk Phase 2
+- **Fase/Prioritas:** MVP / P0 (PRD v0.21)
 - **Acceptance criteria:**
-  - Agent mengekstrak jumlah orang, tanggal, waktu, dan konteks outlet.
-  - Agent mengonfirmasi detail kepada pelanggan sebelum membuat booking.
-  - Booking dibuat melalui fungsi deterministik yang sama dengan alur terstruktur dan tetap tunduk pada aturan kapasitas/ketersediaan.
-- **Traceability:** FR9.9, FR6.3, AC6.4
+  - Agent membaca ketersediaan meja (tool baca) dalam zona waktu outlet dan menawarkan jam terdekat yang tersedia bila jam yang diminta penuh.
+  - Agent menanyakan yang kurang, lalu masuk ke langkah nama + no HP + privasi dan "Cek lagi" yang sama dengan US-023.
+  - Booking dibuat hanya saat pelanggan menekan `Konfirmasi booking`, lewat fungsi booking yang sama; batas party dan batas 2 booking tetap berlaku.
+  - AI gagal atau lebih dari 30 detik → chat lanjut ke alur tombol reservasi.
+- **Traceability:** FR9.9, FR6.3, FR6.6, AC9.13, AC6.4 · wireframe C15
+
+### US-066 — Membatasi lingkup agent AI
+
+**Sebagai** owner, **saya ingin** agent AI di web chat hanya mengurus pesanan, rekomendasi, dan reservasi outlet saya dengan akses baca saja, **sehingga** AI tidak membocorkan data, tidak keluar topik, dan tidak membuat apa pun tanpa pelanggan.
+
+- **Fase/Prioritas:** MVP / P0
+- **Acceptance criteria:**
+  - Tool hanya baca dan hanya untuk outlet sesi chat: menu (item, add-on, harga, tag), stok/sold out, ketersediaan meja, terlaris, dan quote. Tidak ada tool tulis dan tidak ada akses ke data pelanggan, order, booking, staf, atau keuangan.
+  - Maksimal 4 tool call dan 30 detik per pesan; lewat dari itu chat kembali ke tombol.
+  - Pertanyaan di luar topik, outlet lain, data orang lain, atau upaya mengubah instruksi → ditolak singkat lalu tampil tombol menu utama.
+  - Setiap tool call dicatat (sesi, tool, ukuran hasil) tanpa data pribadi.
+- **Traceability:** FR6.3, FR6.6, AC6.8, AC6.9
 
 ### US-044 — Menjawab FAQ dan upsell
 
@@ -863,7 +880,7 @@ Dokumen ini menerjemahkan `PRD-SME-Automation-Platform.md` menjadi backlog user 
 | FR3 Cashflow | US-030–US-032, US-045, US-057–US-061 |
 | FR4 Menu, stock, inventory | US-005–US-008, US-014, US-021, US-045, US-060 |
 | FR5 Staff attendance (MVP) and scheduling (Phase 3) | US-046, US-053–US-055 |
-| FR6 Web chat | US-009, US-015, US-023, US-025, US-036–US-037, US-042–US-045, US-052 |
+| FR6 Web chat | US-009, US-015, US-023, US-025, US-036–US-037, US-042–US-045, US-052, US-066 |
 | FR7 Admin web app | US-003, US-033–US-035, US-056 |
 | FR8 Recommendations | US-028–US-029, US-052 |
 | FR9 Reservations | US-022–US-027, US-043 |
