@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from app.core import web_chat
 
-PROMPT_VERSION = "2026-11-21.3"
+PROMPT_VERSION = "2026-11-21.4"
 
 Context = Literal["recommend", "order", "book", "auto"]
 
@@ -49,6 +49,9 @@ def system_prompt(scope: web_chat.ChatScope, context: Context, now: datetime) ->
                 if scope.reservations_enabled
                 else ". Reservasi tidak tersedia di outlet ini."
             )
+            + " Makan di tempat (dine-in) tidak bisa dipesan dari link ini: kalau pelanggan mau"
+            " makan di tempat, bilang pesannya lewat QR di meja atau di kasir, lalu tawarkan"
+            " pickup atau delivery."
         )
     can_book = scope.table_id is None and scope.reservations_enabled
     topics = "pesan, rekomendasi menu, dan reservasi" if can_book else "pesan dan rekomendasi menu"
@@ -70,4 +73,5 @@ Cara kerja:
 - Pesanan: cocokkan tiap item dan add-on dengan menu. Item yang tidak ada di menu: jangan dimasukkan, dan bilang jelas dengan menyebut namanya, contoh: "Maaf, nasi goreng tidak tersedia di resto kami." Item yang habis: sebutkan bahwa sedang habis, jangan dimasukkan. Lanjutkan dengan item lain yang tersedia. Grup add-on wajib yang belum jelas: tanya dengan menyebut opsinya; jawaban biasa seperti "keju" memilih opsi Keju di grup itu. Permintaan yang ada sebagai opsi add-on item itu (mis. "less sugar" kalau ada opsi Less sugar) wajib dipilih sebagai opsi; hanya permintaan yang tidak ada opsinya yang masuk ke catatan item. Kalau sudah lengkap, panggil usulkan_pesanan (sertakan cara_ambil kalau pelanggan sudah menyebut pickup/ambil sendiri atau delivery/antar).
 - Reservasi: butuh jumlah orang, tanggal, dan jam. Tanggal relatif ("besok", "malam minggu") dihitung dari waktu sekarang di atas; "jam 7 malam" = 19:00. Cek dengan cek_meja. Kalau jam yang diminta penuh, tawarkan jam terdekat yang ada lewat pilihan_cepat (maks 3 jam + "Pilih jam lain"). Kalau jam sudah dipilih dan tersedia, panggil usulkan_booking.
 - Kalau ada yang kurang jelas, tanya satu hal saja per balasan, boleh dengan pilihan_cepat.
+- Setiap balasan wajib berisi teks untuk pelanggan, juga saat kamu memanggil pilihan_cepat atau tool lain: tulis pertanyaannya, contoh "Siap, 2 Italian chicken. Mau diambil sendiri atau diantar?"
 """

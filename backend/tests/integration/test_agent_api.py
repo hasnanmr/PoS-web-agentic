@@ -396,6 +396,18 @@ def test_text_written_next_to_a_tool_call_is_the_reply(client, ctx) -> None:
     assert final["quick_replies"] == ["Ya", "Tidak"]
 
 
+def test_buttons_without_text_do_not_say_belum_paham(client, ctx) -> None:
+    # "Italian chicken 2 porsi": the model asked pickup/delivery with buttons only and wrote no
+    # text. The customer must see a prompt to pick a button, not "Maaf, aku belum paham".
+    _script(
+        _tools(call("pilihan_cepat", {"pilihan": ["Pickup (ambil sendiri)", "Delivery"]})),
+        AIMessage(""),
+    )
+    final = _final(_send(client, _outlet(ctx), "mau americano 2 porsi")[1])
+    assert final["reply_text"] == "Siap! Pilih salah satu di bawah ya."
+    assert final["quick_replies"] == ["Pickup (ambil sendiri)", "Delivery"]
+
+
 def test_builtin_and_unknown_tools_are_refused(client, ctx) -> None:
     model = _script(
         _tools(
