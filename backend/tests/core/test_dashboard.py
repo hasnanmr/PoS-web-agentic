@@ -11,6 +11,7 @@ from app.core.dashboard import (
     hour_summary,
     mark_hours,
     open_hours,
+    parse_order_no,
     period_range,
     previous_range,
 )
@@ -92,3 +93,13 @@ def test_hours_after_midnight_follow_the_evening() -> None:
     assert circular_order([5]) == [5] and circular_order([]) == []
     marks = mark_hours({23: 10, 0: 10, 19: 1}, [19, 20, 21, 22, 23, 0])
     assert [m["hour"] for m in marks] == [19, 20, 21, 22, 23, 0]
+
+
+def test_order_number_search_ignores_numbers_that_cannot_be_an_order() -> None:
+    assert parse_order_no("1036") == (None, 1036)
+    assert parse_order_no("#a-1036") == ("A", 1036)
+    assert parse_order_no("2147483647") == (None, 2**31 - 1)
+    # A pasted phone number is beyond Postgres `integer`: no match, never a 500.
+    assert parse_order_no("081234567890") is None
+    assert parse_order_no("2147483648") is None
+    assert parse_order_no("kopi") is None

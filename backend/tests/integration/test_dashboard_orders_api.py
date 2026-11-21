@@ -202,6 +202,8 @@ def test_chips_channel_and_search_filter_only_the_list(client, ctx) -> None:
         assert [r["order_no"] for r in _get(client, ctx, outlet_id=dago, q=q)["orders"]] == [label]
     assert _get(client, ctx, outlet_id=dago, q="Z-" + number)["orders"] == []
     assert _get(client, ctx, outlet_id=dago, q="kopi")["orders"] == []
+    # A phone number pasted into the box is no order number (and no 500, #75).
+    assert _get(client, ctx, outlet_id=dago, q="081234567890")["orders"] == []
 
 
 def test_item_row_drawer_matches_top_items(client, ctx) -> None:
