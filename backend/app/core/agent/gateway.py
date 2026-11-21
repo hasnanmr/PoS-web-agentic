@@ -99,7 +99,8 @@ def openai_model_factory(settings: Any) -> ModelFactory | None:
             model=settings.model_name,
             base_url=str(settings.openai_base_url),
             api_key=key,
-            temperature=0.2,
+            # No temperature: Claude 4.7+ through Anthropic's OpenAI-compatible endpoint
+            # rejects any value below 1 (400), and the provider default is fine for tool calls.
             timeout=TURN_SECONDS,
             max_retries=1,
             streaming=True,
