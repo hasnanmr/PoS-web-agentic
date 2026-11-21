@@ -88,7 +88,12 @@ CASES: list[Case] = [
         "order-unknown-item",
         "An item that is not on the menu is named, not added",
         ["1 nasi goreng spesial sama 1 americano, ambil sendiri"],
-        [no_item_in_draft("Nasi Goreng Spesial"), reply_mentions("nasi goreng"), *MONEY],
+        [
+            no_item_in_draft("Nasi Goreng Spesial"),
+            reply_mentions("nasi goreng"),
+            reply_mentions("tidak tersedia", "tidak ada", "belum tersedia", "nggak ada", "gak ada"),
+            *MONEY,
+        ],
         context="order",
         critical=True,
     ),
