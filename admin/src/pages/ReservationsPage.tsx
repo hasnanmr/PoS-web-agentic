@@ -21,6 +21,12 @@ const SOURCE: Record<ReservationRow['source'], string> = {
   phone: 'Telepon',
   in_person: 'Langsung',
   walk_in: 'Tanpa reservasi',
+  web_chat: 'Web chat',
+}
+
+/** Source label; a source this build doesn't know yet must never break the page. */
+function sourceLabel(source: string): string {
+  return (SOURCE as Record<string, string>)[source] ?? source
 }
 
 const ACTION_LABEL: Record<ReservationAction, string> = {
@@ -55,6 +61,21 @@ function useNow(ms: number): number {
     return () => window.clearInterval(timer)
   }, [ms])
   return now
+}
+
+/** True at the `md` breakpoint and up. Without matchMedia (tests) it counts as desktop. */
+function useIsDesktop(): boolean {
+  const query = '(min-width: 768px)'
+  const [desktop, setDesktop] = useState(() => typeof window.matchMedia !== 'function' || window.matchMedia(query).matches)
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia(query)
+    const onChange = () => setDesktop(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return desktop
 }
 
 function look(r: ReservationRow, now: number): Look {
@@ -121,6 +142,7 @@ export default function ReservationsPage() {
   )
   usePolling(board, 30_000) // holds turn into no-shows and other staff's changes show up
   const now = useNow(30_000)
+  const desktop = useIsDesktop()
   const [selected, setSelected] = useState<string>()
   const [form, setForm] = useState<'booking' | 'walk_in'>()
   const [notice, setNotice] = useState<string>()
@@ -181,10 +203,11 @@ export default function ReservationsPage() {
         {board.error && !data ? <Alert>{errorMessage(board.error)}</Alert> : !data ? <Loading /> : (
           <>
             <Timeline board={data} now={now} selected={selected} onSelect={setSelected} />
-            <MobileList board={data} now={now} selected={selected} onSelect={setSelected} onChanged={refresh} />
+            <MobileList board={data} now={now} selected={desktop ? undefined : selected} onChanged={refresh}
+              onSelect={(id) => setSelected((cur) => (cur === id ? undefined : id))} />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="hidden md:block">
-                {selected && data.reservations.some((r) => r.id === selected) ? (
+                {!desktop ? null : selected && data.reservations.some((r) => r.id === selected) ? (
                   <DetailCard key={selected} id={selected} board={data} now={now} onChanged={refresh} />
                 ) : (
                   <Card title="Detail"><p className="text-[12px] text-text-muted">Pilih reservasi di timeline untuk melihat detail dan aksi.</p></Card>
@@ -273,30 +296,65 @@ function MobileList({ board, now, selected, onSelect, onChanged }: {
   onChanged: (text?: string) => Promise<void>
 }) {
   const tz = board.timezone
+  const rows = [...board.reservations].sort((a, b) => a.starts_at.localeCompare(b.starts_at))
   return (
     <section aria-label="Daftar reservasi" className="space-y-2 md:hidden">
-      {board.reservations.map((r) => {
+      {rows.map((r) => {
         const kind = look(r, now)
+        const open = selected === r.id
         const name = r.source === 'walk_in' ? 'Tanpa reservasi' : r.guest_name
         const status = kind === 'hold' ? null : kind === 'walk_in' ? 'terisi' : kind === 'no_show' ? 'no-show'
           : kind === 'completed' ? 'selesai' : r.status
+        // M4: the hold card shows its actions right away; other cards on tap.
+        const showActions = r.allowed_actions.length > 0 && (open || kind === 'hold')
         return (
-          <div key={r.id} className={`rounded-lg border bg-surface p-3 text-[12px] ${selected === r.id ? 'border-primary' : 'border-border'}`}>
-            <button type="button" className="w-full text-left" onClick={() => onSelect(r.id)}>
-              <span className="block font-semibold">
-                {formatTime(r.starts_at, tz)} · {name} · {r.party_size} org · {r.table_name}{status ? ` · ${status}` : ''}
+          <div key={r.id} className={`rounded-lg border p-3 text-[12px] ${LOOK[kind]} ${open ? 'ring-2 ring-primary' : ''}`}>
+            <button type="button" aria-expanded={open} className="flex w-full items-start gap-2 text-left text-text"
+              onClick={() => onSelect(r.id)}>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">
+                  {formatTime(r.starts_at, tz)} · {name} · {r.party_size} org · {r.table_name}{status ? ` · ${status}` : ''}
+                </span>
+                {kind === 'hold'
+                  ? <span className="block text-warning">Hold — auto no-show {formatTime(r.hold_until!, tz)}</span>
+                  : <span className="block text-[11px] text-text-muted">
+                      {formatTime(r.starts_at, tz)}–{formatTime(r.ends_at, tz)} · {sourceLabel(r.source)}
+                    </span>}
               </span>
-              {kind === 'hold' && <span className="block text-warning">Hold — auto no-show {formatTime(r.hold_until!, tz)}</span>}
+              <span aria-hidden className={`pt-0.5 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
             </button>
-            {selected === r.id && r.allowed_actions.length > 0 && (
-              <div className="mt-2"><ActionBar row={r} board={board} onChanged={onChanged} /></div>
-            )}
+            {showActions && <div className="mt-2"><ActionBar row={r} board={board} onChanged={onChanged} /></div>}
+            {open && <MobileDetail row={r} tz={tz} now={now} />}
           </div>
         )
       })}
-      {board.reservations.length === 0 && <p className="text-[12px] text-text-muted">Belum ada reservasi hari ini.</p>}
-      <p className="text-[11px] text-text-muted">Timeline per meja di desktop → daftar per jam di mobile.</p>
+      {rows.length === 0 && <p className="text-[12px] text-text-muted">Belum ada reservasi di tanggal ini.</p>}
+      <p className="text-[11px] text-text-muted">Timeline per meja di desktop → daftar per jam di mobile. Ketuk kartu untuk detail &amp; aksi.</p>
     </section>
+  )
+}
+
+/** M4 inline detail: same data as the S6 detail card (GET /ops/reservations/{id}). */
+function MobileDetail({ row, tz, now }: { row: ReservationRow; tz: string; now: number }) {
+  const { api } = useSession()
+  const detail = useLoad(() => api.get<ReservationDetail>(`/ops/reservations/${row.id}`), `${row.id}|${row.status}|${row.table_id}`)
+  const d = detail.data
+  const t = (iso: string) => formatTime(iso, tz)
+  return (
+    <div className="mt-2 space-y-1 border-t border-current/20 pt-2 text-[12px] text-text">
+      <p>Sumber: {sourceLabel(row.source)}{d?.phone_masked ? ` · ${d.phone_masked}` : ''}</p>
+      <p>Status: {statusText(row, now, t)}</p>
+      {detail.error && !d ? <p className="text-danger">{errorMessage(detail.error)}</p> : (
+        <div className="text-text-muted">
+          <p>Riwayat:</p>
+          {d ? (
+            <ul className="space-y-0.5">
+              {d.events.map((e, i) => <li key={i}>• {t(e.created_at)} {eventText(e, row.source)}</li>)}
+            </ul>
+          ) : <p>…</p>}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -352,7 +410,7 @@ function ActionBar({ row, board, onChanged }: {
 
 function eventText(e: ReservationDetail['events'][number], source: ReservationRow['source']): string {
   const who = e.actor_name ? ` (${e.actor_name})` : ''
-  if (e.event === 'created') return `dibuat via ${source === 'whatsapp' ? 'WA' : SOURCE[source].toLowerCase()}${who}`
+  if (e.event === 'created') return `dibuat via ${source === 'whatsapp' ? 'WA' : sourceLabel(source).toLowerCase()}${who}`
   if (e.event === 'table_changed') return `pindah ${e.from_table ?? '?'} → ${e.to_table ?? '?'}${who}`
   if (e.event === 'reminder_sent') return 'reminder terkirim'
   if (e.event === 'status_changed') {
@@ -361,6 +419,15 @@ function eventText(e: ReservationDetail['events'][number], source: ReservationRo
     return `${label[e.to_status ?? ''] ?? e.to_status}${who}`
   }
   return e.event
+}
+
+function statusText(row: ReservationRow, now: number, t: (iso: string) => string): string {
+  const kind = look(row, now)
+  return kind === 'hold' ? `booked → hold (auto no-show ${t(row.hold_until!)})`
+    : row.status === 'booked' && row.hold_until ? `booked (hold sampai ${t(row.hold_until)})`
+    : row.source === 'walk_in' && row.status === 'seated' ? 'terisi tanpa reservasi'
+    : row.status === 'no_show' ? `no-show${row.no_show_at ? ` ${t(row.no_show_at)}` : ''} · meja dilepas`
+    : row.status
 }
 
 function DetailCard({ id, board, now, onChanged }: {
@@ -372,17 +439,12 @@ function DetailCard({ id, board, now, onChanged }: {
   const d = detail.data
   const tz = board.timezone
   const t = (iso: string) => formatTime(iso, tz)
-  const kind = look(row, now)
   const name = row.source === 'walk_in' ? 'Tanpa reservasi' : row.guest_name
-  const status = kind === 'hold' ? `booked → hold (auto no-show ${t(row.hold_until!)})`
-    : row.status === 'booked' && row.hold_until ? `booked (hold sampai ${t(row.hold_until)})`
-    : row.source === 'walk_in' && row.status === 'seated' ? 'terisi tanpa reservasi'
-    : row.status === 'no_show' ? `no-show${row.no_show_at ? ` ${t(row.no_show_at)}` : ''} · meja dilepas`
-    : row.status
+  const status = statusText(row, now, t)
   return (
     <Card title={`Detail: ${name} · ${row.party_size} orang · ${t(row.starts_at)}–${t(row.ends_at)} · ${row.table_name}`}>
       <div className="space-y-1 text-[12px]">
-        <p>Sumber: {SOURCE[row.source]}{d?.phone_masked ? ` · ${d.phone_masked}` : ''}</p>
+        <p>Sumber: {sourceLabel(row.source)}{d?.phone_masked ? ` · ${d.phone_masked}` : ''}</p>
         <p>Status: {status}</p>
         {row.allowed_actions.length > 0 && (
           <div className="flex flex-wrap items-start gap-2 pt-1">

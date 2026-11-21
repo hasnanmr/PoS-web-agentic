@@ -222,6 +222,47 @@ describe('S6 / M4 Reservasi & Meja', () => {
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/reservations/r-lina/seat', undefined]))
   })
 
+  it('opens a web chat booking without crashing (source web_chat)', async () => {
+    const hasnan = { ...BOARD.reservations[1], id: 'r-web', guest_name: 'Hasnan', source: 'web_chat' as const }
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/reservations': { ...BOARD, reservations: [hasnan] },
+      'GET /ops/reservations/r-web': { ...LINA, ...hasnan },
+    })
+    render(<WithSession session={fakeSession('staff', { api })}><ReservationsPage /></WithSession>)
+    const timeline = await screen.findByRole('region', { name: 'Timeline meja' })
+    await userEvent.click(within(timeline).getByTitle(/^Hasnan/))
+    expect(await screen.findByText('Sumber: Web chat · +62 813-xxxx-090')).toBeInTheDocument()
+    expect(screen.getByText('Riwayat: 09:12 dibuat via web chat')).toBeInTheDocument()
+  })
+
+  it('M4 mobile: tapping a card opens its detail and actions inline', async () => {
+    const matchMedia = vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    vi.stubGlobal('matchMedia', matchMedia)
+    try {
+      const api = fakeApi({
+        'GET /ops/outlets/o-dago/reservations': BOARD,
+        'GET /ops/reservations/r-walk': { ...LINA, ...BOARD.reservations[0], events: [] },
+      })
+      render(<WithSession session={fakeSession('staff', { api })}><ReservationsPage /></WithSession>)
+      const list = await screen.findByRole('region', { name: 'Daftar reservasi' })
+      // The hold card shows its actions without a tap (wireframe M4).
+      expect(within(list).getByRole('button', { name: 'Seated' })).toBeInTheDocument()
+      expect(within(list).queryByRole('button', { name: 'Selesai' })).toBeNull()
+      const walk = within(list).getByRole('button', { name: /Tanpa reservasi · 2 org · M01/ })
+      expect(walk).toHaveAttribute('aria-expanded', 'false')
+      await userEvent.click(walk)
+      expect(walk).toHaveAttribute('aria-expanded', 'true')
+      expect(within(list).getByRole('button', { name: 'Selesai' })).toBeInTheDocument()
+      expect(await within(list).findByText('Status: terisi tanpa reservasi')).toBeInTheDocument()
+      // No hidden desktop detail card is mounted on a phone.
+      expect(screen.queryByText(/^Detail:/)).toBeNull()
+      await userEvent.click(walk)
+      expect(within(list).queryByRole('button', { name: 'Selesai' })).toBeNull()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('books by phone with the outlet offset and explains a clash', async () => {
     const api = fakeApi({ 'GET /ops/outlets/o-dago/reservations': BOARD })
     render(<WithSession session={fakeSession('staff', { api })}><ReservationsPage /></WithSession>)
