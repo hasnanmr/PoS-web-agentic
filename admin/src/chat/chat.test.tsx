@@ -20,7 +20,7 @@ const OUTLET = {
 }
 const PRIVACY = { version: '2026-11-20', url: '/privasi' }
 const PAGE_O = { outlet: OUTLET, reservations_enabled: true, web_ordering: true, delivery_fee: 10000, agent_enabled: false, privacy_notice: PRIVACY }
-const PAGE_T = { outlet: OUTLET, table: { name: 'M05', area: 'Indoor' }, web_ordering: true, agent_enabled: false, privacy_notice: PRIVACY, target: 'web', whatsapp_url: null }
+const PAGE_T = { outlet: OUTLET, table: { name: 'M05', area: 'Indoor' }, web_ordering: true, agent_enabled: false, privacy_notice: PRIVACY }
 const SESSION = { step: 'main_menu', cart: { lines: [] }, fulfillment: null, last_activity_at: null, cart_expired: false }
 
 const KOPI: ChatMenuItem = {

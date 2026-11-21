@@ -317,6 +317,27 @@ describe('S2 web order from the outlet link (page 07)', () => {
     expect(within(column).getByText('Jl. Dipatiukur No. 35')).toBeInTheDocument()
     expect(within(column).getByRole('link', { name: '📞 Hubungi' })).toHaveAttribute('href', 'tel:081234567221')
   })
+
+  it('a claimed delivery card has "Tolak · 📞 Hubungi"; a ready delivery goes out for delivery', async () => {
+    const claimed: OrderCard = { ...CARD, id: 'o11', order_no: '#A-1050', channel: 'web_online', type: 'delivery',
+      status: 'pending_payment', payment_status: 'proof_submitted', payment_method: null, table: null,
+      customer_name: 'Rina', customer_phone: '081234567221', delivery_address: 'Jl. Dipatiukur No. 35',
+      payment_claimed_at: '2026-11-21T05:44:00Z', allowed_actions: ['cancel'] }
+    const ready: OrderCard = { ...claimed, id: 'o12', order_no: '#A-1049', status: 'ready', payment_status: 'paid',
+      payment_method: 'qris', payment_claimed_at: null, allowed_actions: ['out_for_delivery', 'cancel'] }
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/orders/board': { ...EMPTY, awaiting_payment: [claimed], ready: [ready] },
+    })
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api })}><OrderBoardPage /></WithSession></MemoryRouter>)
+    const waiting = await screen.findByRole('region', { name: 'MENUNGGU BAYAR' })
+    const tolak = within(waiting).getByRole('link', { name: 'Tolak (pembayaran tidak ditemukan)' })
+    expect(tolak.parentElement).toBe(within(waiting).getByRole('link', { name: '📞 Hubungi' }).parentElement)
+    expect(within(waiting).getByRole('link', { name: 'Cek & konfirmasi lunas →' })).toBeInTheDocument()
+
+    const column = screen.getByRole('region', { name: 'READY / DIANTAR' })
+    await userEvent.click(within(column).getByRole('button', { name: 'Out for delivery →' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['POST', '/ops/orders/o12/transitions', { to_status: 'out_for_delivery' }]))
+  })
 })
 
 describe('S2 QRIS cross-check (PoC)', () => {

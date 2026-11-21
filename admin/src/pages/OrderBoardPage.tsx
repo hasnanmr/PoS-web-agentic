@@ -7,9 +7,11 @@
 // transaction is in the receiving account, with the S4 merchant-account step.
 // Behavior notes: order status and payment status are separate badges; buttons come only
 // from the server's allowed_actions; unpaid pay-first orders have no "Mulai siapkan".
-// Web orders from the table QR page (page 06 · "S2 kartu order web", #44): channel "web", table,
-// name and kitchen note; once the customer taps "Saya sudah bayar" the card shows "Pelanggan
-// bilang sudah bayar · 12:44" with "Cek & konfirmasi lunas →" and "Tolak", both opening S4.
+// Web chat orders (page 07 · "S2 Kartu order web", T-146): channel "web"; outlet-link orders
+// (web_online) show 🛵 Delivery / 🛍 Pickup, name, phone, and the delivery address, table orders
+// the table and name. Once the customer taps "Saya sudah bayar" the card shows "Pelanggan bilang
+// sudah bayar · 12:44" with "Cek & konfirmasi lunas →" and "Tolak · 📞 Hubungi" (Tolak opens S4).
+// Delivery orders get "Out for delivery →" before "Selesai" (from allowed_actions).
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { ROUTES } from '../app/nav'
@@ -144,9 +146,6 @@ export default function OrderBoardPage() {
                             <div>{formatRupiah(o.total)}{o.payment_status !== 'unpaid' || o.bill_id ? ` · ${paymentText(o)}` : ''}</div>
                             {o.auto_cancel_at && <div className="text-warning">⏱ Auto-cancel {formatTime(o.auto_cancel_at, outlet.timezone)}</div>}
                           </button>
-                          {o.customer_phone && (
-                            <a href={`tel:${o.customer_phone}`} className="mt-1 mr-1 inline-block text-[11px] font-semibold text-primary">📞 Hubungi</a>
-                          )}
                           {o.payment_status !== 'paid' && !o.bill_id && (
                             <span className="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">{o.payment_status}</span>
                           )}
@@ -167,11 +166,16 @@ export default function OrderBoardPage() {
                               {o.payment_claimed_at ? 'Cek & konfirmasi lunas →' : 'Cek →'}
                             </Link>
                           )}
-                          {o.payment_claimed_at && (
-                            <Link to={`${pathFor(ROUTES.paymentReview.path)}?order=${o.id}#tolak`}
-                              className="mt-1 block text-[11px] font-semibold text-danger hover:underline">
-                              Tolak (pembayaran tidak ditemukan)
-                            </Link>
+                          {(o.payment_claimed_at || o.customer_phone) && (
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] font-semibold">
+                              {o.payment_claimed_at && (
+                                <Link to={`${pathFor(ROUTES.paymentReview.path)}?order=${o.id}#tolak`} className="text-danger hover:underline">
+                                  Tolak (pembayaran tidak ditemukan)
+                                </Link>
+                              )}
+                              {o.payment_claimed_at && o.customer_phone && <span aria-hidden="true" className="text-text-muted">·</span>}
+                              {o.customer_phone && <a href={`tel:${o.customer_phone}`} className="text-primary">📞 Hubungi</a>}
+                            </div>
                           )}
                           {forward && (
                             <Button className={`mt-2 h-8 w-full ${forward === 'completed' ? 'bg-success' : ''}`} onClick={() => void act(o, forward)}>

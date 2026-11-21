@@ -35,7 +35,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
 | O6 Resep & Bahan | US-006, US-007 | T-019, T-021, T-022, T-066 |
 | O7 Rekomendasi (owner's picks & tags) | US-028, US-029 | T-073, T-074 |
-| O8 Meja & Aturan Reservasi (+ table QR: unduh / ganti token / tujuan QR web · WhatsApp) | US-013, US-022, US-063 | T-054, T-057, T-136 |
+| O8 Meja & Aturan Reservasi (+ table QR: unduh / ganti token; link outlet & QR from page 07; the "tujuan QR" choice is removed) | US-013, US-022, US-063 | T-054, T-057, T-136, T-147 |
 | O9 Laporan Cashflow & Pengeluaran (biaya saja; PO tidak lagi di sini) | US-030, US-031, US-032 | T-041, T-042, T-043 |
 | O9b Pengeluaran (menu sidebar: pembayaran PO supplier — PO dibuka staf di S12, dibayar owner — disorot + pengeluaran langsung; KPI, per supplier, riwayat dengan chip sumber, Catat pengeluaran) | US-031, US-057, US-058 | T-042, T-130 |
 | O10 Laporan Cash Count | US-018 | T-040, T-102 |

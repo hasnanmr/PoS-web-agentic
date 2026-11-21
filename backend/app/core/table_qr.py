@@ -1,10 +1,10 @@
-"""Customer table web page (T-134, T-136) — wireframes Q0-Q5 and O8 "Tujuan QR meja".
+"""Table QR (T-134, T-136, T-147) — web chat C8 and O8 "QR meja" on page 07.
 
 One QR per table opens `/t/<qr_token>`. The page has no sign-in: every call resolves the token
 to one outlet and table (`app.resolve_table_qr`) and then runs as the `system` actor for that
 tenant, touching only that outlet's menu and QRIS and the orders placed from that table.
 
-Rules (PRD FR2.13-FR2.16, docs/architecture/screen-endpoint-map.md → Q0-Q5):
+Rules (PRD FR2.13-FR2.16, docs/architecture/screen-endpoint-map.md → C8, O8):
 
 - Ordering, payment, status, and the unpaid timeout are shared with the outlet link and live in
   `app.core.web_chat` (`TableRef.scope`).
@@ -17,8 +17,7 @@ import re
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Literal
-from urllib.parse import quote as urlquote
+from typing import Any
 from uuid import UUID
 
 import segno
@@ -29,8 +28,6 @@ from app.core import crypto, web_chat
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
 from app.core.errors import NotFoundError
-
-Target = Literal["web_whatsapp", "web", "whatsapp"]
 
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 # After an order is completed or cancelled, the phone can still open it for this long (FR2.15).
@@ -52,9 +49,6 @@ class TableRef:
     area: str | None
     outlet_name: str
     timezone: str
-    target: Target
-    whatsapp_connected: bool
-    whatsapp_phone: str | None
     unpaid_timeout_minutes: int
     has_qris: bool
 
@@ -77,22 +71,9 @@ class TableRef:
         )
 
     @property
-    def effective_target(self) -> Target:
-        """While WhatsApp isn't connected the QR always leads to the web page (FR2.16)."""
-        return self.target if self.whatsapp_connected else "web"
-
-    @property
     def web_ordering(self) -> bool:
         """Web orders are paid with the outlet's static QRIS, so they need one (FR2.13)."""
         return self.has_qris
-
-    @property
-    def whatsapp_url(self) -> str | None:
-        if self.effective_target == "web" or not self.whatsapp_phone:
-            return None
-        digits = "".join(c for c in self.whatsapp_phone if c.isdigit())
-        text = urlquote(f"MEJA {self.table_name} · {self.token}")
-        return f"https://wa.me/{digits}?text={text}"
 
 
 async def resolve(conn: AsyncConnection, token: str) -> TableRef | None:
@@ -114,47 +95,12 @@ async def resolve(conn: AsyncConnection, token: str) -> TableRef | None:
         area=row["area"],
         outlet_name=row["outlet_name"],
         timezone=row["timezone"],
-        target=row["table_qr_target"],
-        whatsapp_connected=row["whatsapp_status"] == "connected",
-        whatsapp_phone=row["whatsapp_phone"],
         unpaid_timeout_minutes=row["unpaid_timeout_minutes"],
         has_qris=row["has_qris"],
     )
 
 
 # Owner (O8) ------------------------------------------------------------------------------------
-
-
-async def qr_settings(conn: AsyncConnection, outlet_id: UUID) -> dict[str, Any]:
-    cur = await conn.execute(
-        "select table_qr_target, whatsapp_status = 'connected' from app.outlets where id = %s",
-        (outlet_id,),
-    )
-    row = await cur.fetchone()
-    if row is None:
-        raise NotFoundError("outlet")
-    return {"target": row[0], "whatsapp_connected": row[1]}
-
-
-async def put_qr_settings(
-    conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID, target: Target
-) -> dict[str, Any]:
-    """Saved even while WhatsApp isn't connected: it takes effect once WhatsApp connects."""
-    before = await qr_settings(conn, outlet_id)
-    await conn.execute(
-        "update app.outlets set table_qr_target = %s where id = %s", (target, outlet_id)
-    )
-    if before["target"] != target:
-        await record_audit(
-            conn,
-            ctx,
-            action="table_qr_settings.updated",
-            entity_type="outlet",
-            entity_id=outlet_id,
-            outlet_id=outlet_id,
-            data={"from": before["target"], "to": target},
-        )
-    return await qr_settings(conn, outlet_id)
 
 
 async def table_token(conn: AsyncConnection, table_id: UUID) -> dict[str, Any]:

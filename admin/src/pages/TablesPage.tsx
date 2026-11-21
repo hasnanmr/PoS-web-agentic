@@ -1,15 +1,18 @@
-// Wireframe O8 — Meja & Aturan Reservasi (T-057) with the table QR (T-136, issue #44).
+// Wireframe O8 — Meja & Aturan Reservasi (T-057) with the table QR (T-136, issue #44) and
+// "O8 Link outlet & QR" on page 07 (T-147).
 // Endpoints: GET/POST /owner/outlets/{id}/tables, PATCH/DELETE /owner/tables/{id},
 // GET/PUT /owner/outlets/{id}/reservation-settings, GET /owner/tables/{id}/qr.png,
 // GET /owner/outlets/{id}/tables/qr.pdf, POST /owner/tables/{id}/qr-token,
-// GET/PUT /owner/outlets/{id}/table-qr-settings. All times in the outlet's time zone.
-// Behaviour notes (canvas): the QR opens the Thinker page /t/<token>; "↻ Ganti" makes a new token
-// and the old printed QR stops working; without WhatsApp the QR always goes to the web page.
+// GET/PUT /owner/outlets/{id}/public-link, GET /owner/outlets/{id}/outlet-qr.png | outlet-poster.pdf.
+// All times in the outlet's time zone.
+// Behaviour notes (canvas): the QR always opens the web chat (/o/<slug>, /t/<token>); the
+// "Tujuan QR" choice is gone. Changing the slug or "↻ Ganti" a table token makes the old link
+// or printed QR stop working at once (C13), so both ask for confirmation first. Owner only.
 import { useState } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { hhmm } from '../lib/format'
-import type { OwnerTable, ReservationSettings, TableQrSettings, TableQrTarget } from '../lib/types'
+import type { OutletPublicLink, OwnerTable, ReservationSettings } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { PageHeader } from '../layout/PageHeader'
 import { Alert, Button, Card, FieldRow, LinkButton, Loading, TextInput } from '../ui/kit'
@@ -47,6 +50,8 @@ export default function TablesPage() {
     <>
       <PageHeader title={`Meja & Reservasi · ${outlet.name}`} />
       <div className="grid gap-4 p-4 md:p-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <OutletLinkCard key={outletId} outletId={outletId} outletName={outlet.name} tableCount={tables.data?.length ?? null}
+          onDownload={(path, accept, filename) => void download(path, accept, filename)} error={qrError} />
         <Card title="Daftar meja" actions={(
           <div className="flex items-center gap-3">
             {(tables.data?.length ?? 0) > 0 && (
@@ -58,7 +63,6 @@ export default function TablesPage() {
             <Button onClick={() => setEditing('new')}>+ Meja</Button>
           </div>
         )}>
-          {qrError && <div className="mb-2"><Alert>{qrError}</Alert></div>}
           {editing && (
             <TableForm key={editing === 'new' ? 'new' : editing.id} table={editing === 'new' ? undefined : editing}
               onDone={async () => {
@@ -106,12 +110,10 @@ export default function TablesPage() {
             </div>
           )}
           <p className="mt-3 text-[11px] leading-[18px] text-text-muted">
-            QR membuka halaman pesan Thinker untuk meja itu (thinker…/t/‹token›). Pelanggan memilih “Pesan di sini”
-            (web, channel web_table, bayar dulu dengan QRIS statis outlet, dikonfirmasi staf) atau “Pesan via WhatsApp”
-            (chat outlet dengan kode meja, channel whatsapp_table, mengikuti mode bayar outlet). “↻ Ganti” membuat
-            token baru: QR lama berhenti berfungsi dan harus dicetak ulang.
+            QR meja membuka web chat untuk meja itu (/t/‹token›): pelanggan pesan dine-in dan bayar dulu dengan QRIS
+            statis outlet, lalu staf mengonfirmasi. “↻ Ganti” membuat token baru: QR lama langsung tidak berlaku dan
+            harus dicetak ulang.
           </p>
-          <QrTargetSection key={outletId} outletId={outletId} />
         </Card>
         <Card title="Aturan reservasi">
           {settings.data ? (
@@ -160,27 +162,45 @@ function QrCell({ table, onDownload }: { table: OwnerTable; onDownload: () => vo
   )
 }
 
-const QR_TARGETS: { value: TableQrTarget; label: string; whatsapp: boolean }[] = [
-  { value: 'web_whatsapp', label: 'Web + WhatsApp', whatsapp: true },
-  { value: 'web', label: 'Web saja', whatsapp: false },
-  { value: 'whatsapp', label: 'WhatsApp saja', whatsapp: true },
-]
-
-function QrTargetSection({ outletId }: { outletId: string }) {
+// O8 "Link outlet & QR" (page 07): the outlet link /o/<slug> for Instagram, Google Maps, posters,
+// and the counter, its QR, and the table QR downloads.
+function OutletLinkCard({ outletId, outletName, tableCount, onDownload, error }: {
+  outletId: string; outletName: string; tableCount: number | null; error?: string
+  onDownload: (path: string, accept: string, filename: string) => void
+}) {
   const { api } = useSession()
-  const settings = useLoad(() => api.get<TableQrSettings>(`/owner/outlets/${outletId}/table-qr-settings`), outletId)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
+  const link = useLoad(() => api.get<OutletPublicLink>(`/owner/outlets/${outletId}/public-link`), outletId)
+  const [draft, setDraft] = useState<string>()
+  const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
-  const data = settings.data
+  const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string }>()
+  const data = link.data
+  const slug = draft ?? data?.slug ?? ''
+  const cleaned = slug.trim().toLowerCase()
+  const changed = data !== undefined && cleaned !== data.slug
+  const prefix = data?.url ? data.url.slice(0, data.url.length - data.slug.length).replace(/^https?:\/\//, '') : '/o/'
 
-  async function choose(target: TableQrTarget) {
+  async function copy() {
+    if (!data?.url) return
+    try {
+      await navigator.clipboard.writeText(data.url)
+      setNotice({ tone: 'success', text: 'Link outlet disalin.' })
+    } catch {
+      setNotice({ tone: 'danger', text: 'Link belum bisa disalin. Salin manual dari kolom di atas.' })
+    }
+  }
+
+  async function save() {
     setBusy(true)
     setNotice(undefined)
     try {
-      await api.put(`/owner/outlets/${outletId}/table-qr-settings`, { target })
-      await settings.reload()
-      setNotice({ tone: 'success', text: 'Tujuan QR disimpan. QR yang sudah dicetak tetap berlaku.' })
+      await api.put(`/owner/outlets/${outletId}/public-link`, { slug: cleaned })
+      await link.reload()
+      setDraft(undefined)
+      setConfirming(false)
+      setNotice({ tone: 'success', text: 'Link outlet disimpan. Link & QR outlet lama sudah tidak berlaku — unduh & pasang QR baru.' })
     } catch (e) {
+      setConfirming(false)
       setNotice({ tone: 'danger', text: errorMessage(e) })
     } finally {
       setBusy(false)
@@ -188,29 +208,72 @@ function QrTargetSection({ outletId }: { outletId: string }) {
   }
 
   return (
-    <fieldset className="mt-4 border-t border-border pt-4">
-      <legend className="text-[13px] font-semibold text-text">Tujuan QR meja</legend>
-      {!data ? (settings.error ? <Alert>{errorMessage(settings.error)}</Alert> : <Loading />) : (
+    <Card className="lg:col-span-2" title={`Link outlet & QR · ${outletName}`}>
+      <p className="text-[12px] text-text-muted">
+        Pelanggan membuka chat pemesanan dari link ini (pesan online, rekomendasi, reservasi). Pasang di Instagram,
+        Google Maps, poster, dan kasir.
+      </p>
+      {!data ? (link.error ? <div className="mt-2"><Alert>{errorMessage(link.error)}</Alert></div> : <Loading />) : (
         <>
-          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-[12px]">
-            {QR_TARGETS.map((t) => (
-              <label key={t.value} className={`flex items-center gap-2 ${t.whatsapp && !data.whatsapp_connected ? 'text-text-muted' : ''}`}>
-                <input type="radio" name="qr-target" value={t.value} checked={data.target === t.value}
-                  disabled={busy || (t.whatsapp && !data.whatsapp_connected)} onChange={() => void choose(t.value)} />
-                {t.label}
-              </label>
-            ))}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <label htmlFor="outlet-slug" className="text-[13px] font-semibold">Link outlet</label>
+            <div className="flex h-9 min-w-0 flex-1 items-center rounded-md border border-border bg-surface px-2.5 text-[13px] focus-within:border-primary">
+              <span className="shrink-0 text-text-muted">{prefix}</span>
+              <input id="outlet-slug" aria-label="Slug outlet" className="min-w-0 flex-1 bg-transparent outline-none" value={slug}
+                maxLength={40} onChange={(e) => { setDraft(e.target.value); setConfirming(false); setNotice(undefined) }} />
+            </div>
+            <span className="flex items-center gap-2 text-[12px]">
+              <LinkButton className="text-[12px]" aria-label="Salin link outlet" disabled={!data.url || changed} onClick={() => void copy()}>Salin</LinkButton>
+              <span aria-hidden="true" className="text-text-muted">·</span>
+              <LinkButton className="text-[12px]" aria-label="Simpan link outlet" disabled={!changed || busy || cleaned === ''}
+                onClick={() => { setNotice(undefined); setConfirming(true) }}>Simpan</LinkButton>
+            </span>
           </div>
-          {notice && <div className="mt-2"><Alert tone={notice.tone}>{notice.text}</Alert></div>}
-          <p className="mt-2 text-[11px] leading-[18px] text-text-muted">
-            Web + WhatsApp: pelanggan memilih di layar pertama (Q1). Web saja: langsung ke menu web (Q2). WhatsApp saja:
-            langsung membuka chat WhatsApp outlet. Selama WhatsApp outlet belum terhubung (O12), QR selalu ke web dan
-            pilihan WhatsApp nonaktif. Pesan di web perlu QRIS statis outlet (O3); tanpa QRIS, QR hanya menampilkan menu.
-            QR yang sudah dicetak tetap berlaku saat pilihan ini diubah.
+          {confirming && (
+            <div role="alertdialog" aria-label="Konfirmasi ganti link" className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-danger bg-danger-soft px-3 py-2 text-[12px] text-danger">
+              <span>Ganti link ke <b>{cleaned}</b>? Link & QR outlet lama langsung tidak berlaku.</span>
+              <Button variant="danger" className="h-7 px-2 text-[12px]" disabled={busy} onClick={() => void save()}>Ya, ganti</Button>
+              <LinkButton className="text-[12px]" onClick={() => setConfirming(false)}>Batal</LinkButton>
+            </div>
+          )}
+          <p role="note" className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-[12px] text-warning">
+            Slug unik di seluruh Thinker (huruf kecil, angka, tanda hubung). Mengganti slug membuat link & QR outlet lama
+            langsung tidak berlaku — konfirmasi dulu.
           </p>
+          {notice && <div className="mt-2"><Alert tone={notice.tone}>{notice.text}</Alert></div>}
         </>
       )}
-    </fieldset>
+      {error && <div className="mt-2"><Alert>{error}</Alert></div>}
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="rounded-md border border-border p-3">
+          <p className="text-[13px] font-semibold">QR outlet (link di atas)</p>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-[12px]">
+            <LinkButton className="text-[12px]" disabled={!data || changed} onClick={() => onDownload(
+              `/owner/outlets/${outletId}/outlet-qr.png`, 'image/png', `qr-${data?.slug ?? 'outlet'}.png`)}>↓ Unduh PNG</LinkButton>
+            <span aria-hidden="true" className="text-text-muted">·</span>
+            <LinkButton className="text-[12px]" disabled={!data || changed} onClick={() => onDownload(
+              `/owner/outlets/${outletId}/outlet-poster.pdf`, 'application/pdf', `poster-${data?.slug ?? 'outlet'}.pdf`)}>↓ Poster PDF</LinkButton>
+          </p>
+        </div>
+        <div className="rounded-md border border-border p-3">
+          <p className="text-[13px] font-semibold">QR meja{tableCount !== null ? ` (${tableCount} meja)` : ''} — dine-in</p>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-text-muted">
+            <span>↓ PNG · ↻ Ganti per meja di Daftar meja</span>
+            {(tableCount ?? 0) > 0 && (
+              <>
+                <span aria-hidden="true">|</span>
+                <LinkButton className="text-[12px]" onClick={() => onDownload(
+                  `/owner/outlets/${outletId}/tables/qr.pdf`, 'application/pdf', 'qr-meja.pdf')}>↓ Semua QR meja (PDF)</LinkButton>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+      <p className="mt-3 text-[11px] leading-[18px] text-text-muted">
+        QR selalu ke web chat. “Ganti” membuat token meja baru; QR lama langsung tidak berlaku. Hanya owner yang bisa
+        mengubah link dan QR.
+      </p>
+    </Card>
   )
 }
 

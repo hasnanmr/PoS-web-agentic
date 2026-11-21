@@ -4,8 +4,9 @@
 // Behavior note (canvas): Tolak → order langsung cancelled, bahan dikembalikan, tidak ada ledger entry,
 // pelanggan dapat pesan WA "hubungi outlet". Paid → ledger dibuat dengan aktor & waktu.
 // "✓ Tandai paid" is enabled only after the merchant-account checkbox.
-// A web order from the table QR page (#44) arrives as `kind: customer_claim`: the customer tapped
-// "Saya sudah bayar" and there is no screenshot, so staff confirm only from the merchant account.
+// A web chat order (web_table from a table QR, web_online from the outlet link; page 07, T-146)
+// arrives as `kind: customer_claim`: the customer tapped "Saya sudah bayar" and there is no
+// screenshot, so staff confirm only from the merchant account.
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useSession } from '../app/session'
@@ -23,6 +24,12 @@ const TYPE_LABEL: Record<ProofQueueItem['order_type'], string> = {
 
 function where(p: { table: string | null; order_type: ProofQueueItem['order_type'] }): string {
   return p.table ? p.table : TYPE_LABEL[p.order_type]
+}
+
+const WEB_CHANNELS: string[] = ['web_table', 'web_online']
+
+function channelLabel(channel: string): string {
+  return WEB_CHANNELS.includes(channel) ? 'web' : channel
 }
 
 export default function PaymentReviewPage() {
@@ -118,11 +125,11 @@ function ProofPanel({ proofId, onDone }: { proofId: string; onDone: (text: strin
           {p.image_url
             ? <img src={p.image_url} alt={`Bukti bayar ${p.order_no}`} className="h-full w-full object-cover" />
             : p.kind === 'customer_claim'
-              ? <span className="px-3">Tanpa screenshot<br />Pelanggan menekan “Saya sudah bayar” di halaman QR meja</span>
+              ? <span className="px-3">Tanpa screenshot<br />Pelanggan menekan “Saya sudah bayar” di web chat</span>
               : <span>Screenshot bukti bayar<br />(klik untuk perbesar)</span>}
         </button>
         <div className="space-y-1 text-[12px]">
-          <p className="text-[13px] font-semibold">{p.order_no} · {p.channel === 'web_table' ? 'web' : p.channel}{p.table ? ` · ${p.table}` : ''}</p>
+          <p className="text-[13px] font-semibold">{p.order_no} · {channelLabel(p.channel)}{p.table ? ` · ${p.table}` : p.channel === 'web_online' ? ` · ${TYPE_LABEL[p.order_type]}` : ''}</p>
           <p className="text-text-muted">Total yang harus diterima</p>
           <p className="text-[20px] font-bold">{formatRupiah(p.total)}</p>
           <p className="pt-2">Pelanggan: {p.customer_phone_masked ?? '—'}</p>
@@ -163,7 +170,7 @@ function ProofPanel({ proofId, onDone }: { proofId: string; onDone: (text: strin
         </Button>
         <p className="rounded-md bg-page p-3 text-[11px] text-text-muted">
           Tolak → order langsung cancelled, bahan dikembalikan (reversal movement), tidak ada ledger entry, pelanggan
-          {p.kind === 'customer_claim' ? ' melihat alasannya di halaman QR meja.' : ' dapat pesan WA “hubungi outlet”.'} Paid → ledger dibuat dengan aktor & waktu.
+          {p.kind === 'customer_claim' ? ' melihat alasannya di web chat.' : ' dapat pesan WA “hubungi outlet”.'} Paid → ledger dibuat dengan aktor & waktu.
         </p>
       </div>
       {zoom && p.image_url && (

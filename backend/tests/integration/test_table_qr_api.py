@@ -170,48 +170,86 @@ def test_table_page_without_whatsapp_or_qris(client, ctx) -> None:
     assert res.status_code == 200, res.text
     page = res.json()
     assert page["outlet"]["name"] == "Dago" and page["table"] == {"name": "M05", "area": "Indoor"}
-    # WhatsApp isn't connected → always the web page (FR2.16); no QRIS yet → menu only.
-    assert page["target"] == "web" and page["whatsapp_url"] is None
+    # No QRIS yet → menu only.
     assert page["web_ordering"] is False
     americano = _menu(client, _token(ctx))["Americano"]["product_id"]
     res = _place(client, _token(ctx), [{"product_id": americano, "quantity": 1}])
     assert res.status_code == 409 and res.json()["error"]["code"] == "web_ordering_unavailable"
 
 
-def test_qr_target_and_whatsapp_link(client, ctx) -> None:
+def test_qr_always_opens_the_web_chat(client, ctx) -> None:
+    """T-147: the "Tujuan QR meja" setting is gone, and so are its fields on the table page."""
+    page = client.get(f"/api/v1/public/t/{_token(ctx)}").json()
+    assert "target" not in page and "whatsapp_url" not in page
     url = f"/api/v1/owner/outlets/{ctx['outlet']}/table-qr-settings"
-    assert client.get(url, headers=ctx["owner"]).json() == {
-        "target": "web_whatsapp",
-        "whatsapp_connected": False,
-    }
-    assert client.put(url, headers=ctx["staff"], json={"target": "web"}).status_code == 403
-    admin_sql(
-        "update app.outlets set whatsapp_status = 'connected', whatsapp_phone = '+6281234567890'"
-        " where id = %s",
-        (ctx["outlet"],),
+    assert client.get(url, headers=ctx["owner"]).status_code == 404
+    cols = admin_sql(
+        "select count(*) from information_schema.columns where table_schema = 'app'"
+        " and table_name = 'outlets' and column_name = 'table_qr_target'"
     )
-    try:
-        page = client.get(f"/api/v1/public/t/{_token(ctx)}").json()
-        assert page["target"] == "web_whatsapp"
-        assert page["whatsapp_url"].startswith("https://wa.me/6281234567890?text=MEJA%20M05")
-        res = client.put(url, headers=ctx["owner"], json={"target": "whatsapp"})
-        assert res.status_code == 200 and res.json()["target"] == "whatsapp"
-        assert client.get(f"/api/v1/public/t/{_token(ctx)}").json()["target"] == "whatsapp"
-        res = client.put(url, headers=ctx["owner"], json={"target": "web"})
-        page = client.get(f"/api/v1/public/t/{_token(ctx)}").json()
-        assert page["target"] == "web" and page["whatsapp_url"] is None
-    finally:
-        admin_sql(
-            "update app.outlets set whatsapp_status = 'not_started', whatsapp_phone = null,"
-            " table_qr_target = 'web_whatsapp' where id = %s",
-            (ctx["outlet"],),
-        )
+    assert cols == [(0,)]
+
+
+# O8 Link outlet & QR (T-147) -------------------------------------------------------------------
+
+
+def test_owner_changes_the_outlet_slug_and_the_old_link_stops(client, ctx) -> None:
+    url = f"/api/v1/owner/outlets/{ctx['outlet']}/public-link"
+    assert client.get(url, headers=ctx["staff"]).status_code == 403
+    assert client.put(url, headers=ctx["staff"], json={"slug": "kopi-qr"}).status_code == 403
+    before = client.get(url, headers=ctx["owner"]).json()
+    old = before["slug"]
+    assert old.startswith("dago-") and before["url"] == f"https://admin.test/o/{old}"
+    assert client.get(f"/api/v1/public/o/{old}").status_code == 200
+
+    for bad in ("ab", "Kopi QR!", "-kopi", "kopi--qr", "k" * 41):
+        res = client.put(url, headers=ctx["owner"], json={"slug": bad})
+        assert res.status_code == 422, bad
+        assert res.json()["error"]["code"] in ("slug_invalid", "validation_failed"), bad
+
+    res = client.put(url, headers=ctx["owner"], json={"slug": "  Kopi-QR-Dago "})
+    assert res.status_code == 200, res.text
+    assert res.json() == {"slug": "kopi-qr-dago", "url": "https://admin.test/o/kopi-qr-dago"}
+    gone = client.get(f"/api/v1/public/o/{old}")
+    assert gone.status_code == 404 and gone.json()["error"]["code"] == "outlet_link_invalid"
+    assert client.get("/api/v1/public/o/kopi-qr-dago").status_code == 200
+    # Saving the same slug again changes nothing (no second audit row).
+    assert client.put(url, headers=ctx["owner"], json={"slug": "kopi-qr-dago"}).status_code == 200
     audit = admin_sql(
-        "select count(*) from app.audit_events where action = 'table_qr_settings.updated'"
-        " and outlet_id = %s",
+        "select data->>'from', data->>'to' from app.audit_events"
+        " where action = 'outlet.slug_changed'"
+        " and entity_id = %s",
         (ctx["outlet"],),
     )
-    assert audit[0][0] >= 2
+    assert audit == [(old, "kopi-qr-dago")]
+
+
+def test_slug_taken_by_another_outlet(client, ctx) -> None:
+    res = client.post(
+        "/api/v1/owner/outlets",
+        headers=ctx["owner"],
+        json={"name": "Buah Batu", "timezone": "Asia/Jakarta"},
+    )
+    assert res.status_code == 201, res.text
+    other = res.json()["id"]
+    mine = client.get(f"/api/v1/owner/outlets/{ctx['outlet']}/public-link", headers=ctx["owner"])
+    res = client.put(
+        f"/api/v1/owner/outlets/{other}/public-link",
+        headers=ctx["owner"],
+        json={"slug": mine.json()["slug"]},
+    )
+    assert res.status_code == 409 and res.json()["error"]["code"] == "slug_taken"
+
+
+def test_owner_downloads_the_outlet_qr_and_poster(client, ctx) -> None:
+    base = f"/api/v1/owner/outlets/{ctx['outlet']}"
+    png = client.get(f"{base}/outlet-qr.png", headers=ctx["owner"])
+    assert png.status_code == 200 and png.content.startswith(b"\x89PNG")
+    assert "attachment" in png.headers["content-disposition"]
+    pdf = client.get(f"{base}/outlet-poster.pdf", headers=ctx["owner"])
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-1.4")
+    assert pdf.content.count(b"/Type /Page ") == 1 and b"(Dago)" in pdf.content
+    assert client.get(f"{base}/outlet-qr.png", headers=ctx["staff"]).status_code == 403
 
 
 # Q2 · Q3 -------------------------------------------------------------------------------------

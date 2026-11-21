@@ -146,6 +146,8 @@ const ERROR_COPY: Record<string, string> = {
   order_not_cancellable: 'Pesanan sudah dibayar; minta bantuan staf untuk membatalkan.',
   too_many_requests: 'Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.',
   admin_app_url_not_configured: 'Alamat aplikasi (ADMIN_APP_URL) belum diatur di server.',
+  slug_taken: 'Link ini sudah dipakai outlet lain. Pilih slug lain.',
+  slug_invalid: 'Slug hanya boleh huruf kecil, angka, dan tanda hubung (3–40 karakter, tanpa "--").',
   tablet_already_paired: 'Outlet ini sudah punya tablet absensi. Lupakan perangkat lama dulu untuk pairing tablet baru.',
 }
 
