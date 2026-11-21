@@ -8,13 +8,11 @@ from app.core.agent import tracing
 
 def test_off_without_both_keys(monkeypatch) -> None:
     assert tracing.configure(load_settings()) is False
-    assert tracing.enabled() is False and tracing.new_trace_id() is None
-    assert (
-        tracing.run_config(
-            trace_id="t", session="a" * 64, outlet_id="o", context="order", prompt_version="v"
-        )
-        == {}
-    )
+    assert tracing.enabled() is False
+    with tracing.turn_trace(
+        session="a" * 64, text="hai", outlet_id="o", context="order", prompt_version="v"
+    ) as trace:
+        assert trace.callbacks == [] and trace.trace_id is None
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     settings = load_settings()
     assert settings.langfuse_configured is False  # a secret key is needed too

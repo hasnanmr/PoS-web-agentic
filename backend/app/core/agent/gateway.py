@@ -105,6 +105,10 @@ def openai_model_factory(settings: Any) -> ModelFactory | None:
             timeout=TURN_SECONDS,
             max_retries=1,
             streaming=True,
+            # Token usage on streamed replies (`stream_options.include_usage`): tracing and
+            # cost reports need it; OpenAI and Anthropic's compatible endpoint support it.
+            stream_usage=True,
+            name="generate-reply",  # run (and trace generation) name, not the model class
         )
 
     return make
@@ -258,17 +262,9 @@ async def run_turn(
     limit_seconds: float | None = None,
     trace_id: str | None = None,
 ) -> AsyncIterator[AgentEvent]:
-    """`trace_id`: the Langfuse trace of this turn (the evaluation set passes its own to score
-    it); a new one when tracing is on and none is given."""
+    """`trace_id`: an explicit Langfuse trace id for this turn (optional; a new one otherwise
+    when tracing is on)."""
     message_id = uuid.uuid4()
-    trace_id = trace_id or tracing.new_trace_id()
-    trace_config = tracing.run_config(
-        trace_id=trace_id,
-        session=session,
-        outlet_id=str(scope.outlet_id),
-        context=context,
-        prompt_version=PROMPT_VERSION,
-    )
     correlation = message_id.hex
     ctx = ActorContext.for_agent(scope.tenant_id, correlation_id=correlation)
     async with db.transaction(pool, ctx) as conn:
@@ -283,40 +279,77 @@ async def run_turn(
     )
     messages = [*_history_messages(history), HumanMessage(text)]
 
-    reply = ""
-    failure: str | None = None
-    try:
-        async with asyncio.timeout(limit_seconds or TURN_SECONDS):
-            async for mode, chunk in agent.astream(
-                {"messages": messages},
-                stream_mode=["messages", "values"],
-                config={"recursion_limit": 40, **trace_config},
-            ):
-                if mode == "messages":
-                    message, meta = chunk
-                    if (
-                        isinstance(message, AIMessageChunk | AIMessage)
-                        and meta.get("langgraph_node") == "model"
-                    ):
-                        delta = _text(message)
-                        if delta:
-                            yield AgentEvent("delta", {"text": delta})
-                elif mode == "values":
-                    last = chunk["messages"][-1] if chunk.get("messages") else None
-                    if isinstance(last, AIMessage) and not last.tool_calls:
-                        reply = _text(last).strip()
-    except AgentLimitReached as exc:
-        failure = "agent_limit"
-        log.info("agent turn stopped", extra={"limit": exc.what, "outlet_id": str(scope.outlet_id)})
-    except TimeoutError:
-        failure = "agent_timeout"
-        log.info("agent turn timed out", extra={"outlet_id": str(scope.outlet_id)})
-    except Exception:  # the model provider failed: fall back to buttons, never a 500
-        failure = "agent_unavailable"
-        log.exception("agent turn failed", extra={"outlet_id": str(scope.outlet_id)})
+    # The agent runs in its own task so the trace context (OpenTelemetry) lives in one task for
+    # the whole run; deltas reach the client through the queue.
+    queue: asyncio.Queue[AgentEvent | None] = asyncio.Queue()
 
-    if failure is None and not reply:
-        reply = _default_reply(turn)
+    async def drive() -> tuple[str, str | None]:
+        reply = ""
+        failure: str | None = None
+        with tracing.turn_trace(
+            session=session,
+            text=text,
+            outlet_id=str(scope.outlet_id),
+            context=context,
+            prompt_version=PROMPT_VERSION,
+            trace_id=trace_id,
+        ) as trace:
+            try:
+                async with asyncio.timeout(limit_seconds or TURN_SECONDS):
+                    async for mode, chunk in agent.astream(
+                        {"messages": messages},
+                        stream_mode=["messages", "values"],
+                        config={
+                            "recursion_limit": 40,
+                            "callbacks": trace.callbacks,
+                            "run_name": "deep-agent",
+                        },
+                    ):
+                        if mode == "messages":
+                            message, meta = chunk
+                            if (
+                                isinstance(message, AIMessageChunk | AIMessage)
+                                and meta.get("langgraph_node") == "model"
+                            ):
+                                delta = _text(message)
+                                if delta:
+                                    queue.put_nowait(AgentEvent("delta", {"text": delta}))
+                        elif mode == "values":
+                            last = chunk["messages"][-1] if chunk.get("messages") else None
+                            if isinstance(last, AIMessage) and not last.tool_calls:
+                                reply = _text(last).strip()
+            except AgentLimitReached as exc:
+                failure = "agent_limit"
+                log.info(
+                    "agent turn stopped",
+                    extra={"limit": exc.what, "outlet_id": str(scope.outlet_id)},
+                )
+            except TimeoutError:
+                failure = "agent_timeout"
+                log.info("agent turn timed out", extra={"outlet_id": str(scope.outlet_id)})
+            except Exception:  # the model provider failed: fall back to buttons, never a 500
+                failure = "agent_unavailable"
+                log.exception("agent turn failed", extra={"outlet_id": str(scope.outlet_id)})
+            if failure is None and not reply:
+                reply = _default_reply(turn)
+            trace.finish(
+                reply=reply,
+                outcome=tracing.outcome_of(failure, turn),
+                failure=failure,
+                metadata=_trace_metadata(turn, budget, len(history)),
+            )
+        return reply, failure
+
+    task = asyncio.create_task(drive())
+    task.add_done_callback(lambda _: queue.put_nowait(None))
+    try:
+        while (event := await queue.get()) is not None:
+            yield event
+        reply, failure = await task
+    finally:
+        if not task.done():  # the client went away mid-stream
+            task.cancel()
+
     if failure is None:
         history = [
             *history,
@@ -334,6 +367,22 @@ async def run_turn(
     yield AgentEvent(
         "final", {"reply_text": reply, **asdict(turn), "prompt_version": PROMPT_VERSION}
     )
+
+
+def _trace_metadata(turn: TurnResult, budget: TurnBudget, history_messages: int) -> dict[str, Any]:
+    """What the root observation records besides the reply: what the chat showed and how the
+    tools were used (names and outcomes only; masked on export like everything else)."""
+    return {
+        "cards": [c["name"] for c in turn.cards],
+        "quick_replies": turn.quick_replies,
+        "order_draft": turn.order_draft,
+        "booking_draft": turn.booking_draft,
+        "out_of_scope": turn.out_of_scope,
+        "tool_calls": [{"tool": e.tool, "outcome": e.outcome} for e in budget.log],
+        "data_calls": budget.data_calls,
+        "model_calls": budget.model_calls,
+        "history_messages": history_messages,
+    }
 
 
 def _default_reply(turn: TurnResult) -> str:
