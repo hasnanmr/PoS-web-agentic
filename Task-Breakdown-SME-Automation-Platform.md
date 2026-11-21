@@ -1,6 +1,6 @@
 # Task Breakdown — SME Business Automation Platform
 
-This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
+This backlog breaks down the 65 user stories in [User-Stories-SME-Automation-Platform.md](User-Stories-SME-Automation-Platform.md) into implementation tasks. Each task is intended to become an issue in Jira, Linear, or a similar tracker.
 
 ## Delivery assumptions
 
@@ -10,29 +10,29 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 - Tasks in the same wave can run in parallel after their dependencies are complete.
 - `P0` is required for the relevant release; `P1` is important follow-up work; `P2` is expansion.
 - Task IDs are stable. Tasks added after the first version use T-100 and up, and some tasks moved to a different wave; IDs were not renumbered so existing tracker issues keep their keys.
-- Hosting: Supabase provides Auth, PostgreSQL, and Storage; Railway runs the FastAPI app, the WhatsApp worker, and RabbitMQ. The demo runs on Supabase Free and Railway Hobby with dummy data only. A pilot with real merchants needs Supabase Pro, a RabbitMQ volume, and the region decision from T-108.
-- Scope decision (2026-11-18): the WhatsApp infrastructure tasks (T-045–T-049, T-100) and the recommendation tasks (T-073–T-074, T-115) are scheduled for the **Pilot** stage, not the MVP. They stay in their waves and keep their IDs and priorities; they are delivered after the POS-core demo, because they depend on the Meta account, business verification, and per-outlet WhatsApp numbers. The MVP release gates below still describe the full scope and need a decision before they are changed.
-- RabbitMQ is used in every environment, including the demo. Fixed-delay retries use TTL + dead-letter queues; business timers (unpaid timeout, reminders, no-show, anonymization) use the database-backed `scheduled_jobs` table. The full topology is in Appendix A.
+- Hosting: Supabase provides Auth, PostgreSQL, and Storage; Railway runs the FastAPI app, the timer worker, and RabbitMQ. The demo runs on Supabase Free and Railway Hobby with dummy data only. A pilot with real merchants needs Supabase Pro, a RabbitMQ volume, and the region decision from T-108.
+- Scope decision (2026-11-20, PRD v0.20): the customer channel is a **web chat** in the phone's browser (outlet link `/o/<slug>`, table QR `/t/<token>`), not WhatsApp. The WhatsApp tasks (T-045–T-048, T-051, T-084, T-100) move to **Phase 3** as an optional channel under T-148 and keep their IDs; the WhatsApp parts of T-036 (screenshot intake) and T-055 (templates) are re-planned under T-148, and those two IDs now carry the web chat versions; their first code is on the branch of PR #54 (closed, kept for reference). Wave 5 is now the web chat. The table QR web page built in PR #47–#51 (T-133–T-136) is reworked into the same chat. Web chat screens must be drawn in `design/` (T-139) before any web chat frontend work.
+- RabbitMQ is used in every environment, including the demo, for timers only: web chat requests are handled by the API directly. Fixed-delay retries use TTL + dead-letter queues; business timers (unpaid timeout, no-show, anonymization, attendance) use the database-backed `scheduled_jobs` table. The full topology is in Appendix A.
 
 ## Wave 0 — Product and technical foundation
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
 | T-001 | Confirm domain glossary, business rules, status enums, payment modes, channel enums, and timezone behavior. | US-001–US-048 | — | P0 |
-| T-002 | Define API boundaries between the deterministic core, WhatsApp workers, admin app, and future agent layer. | US-014, US-036, US-042 | T-001 | P0 |
+| T-002 | Define API boundaries between the deterministic core, the public web chat API (`/api/v1/public/*`), timer workers, admin app, and future agent layer. | US-014, US-036, US-042 | T-001 | P0 |
 | T-003 | Bootstrap FastAPI service, React + TypeScript admin app, shared configuration, environment validation, and local development setup. | US-033–US-035 | — | P0 |
-| T-004 | Create PostgreSQL migrations for tenants, outlets, users, outlet assignments, products, add-ons, prices, ingredients, recipes, orders, bills, payments, shifts, ledger, tables, reservations, customers, messages, and audit events. | US-001–US-041 | T-001 | P0 |
+| T-004 | Create PostgreSQL migrations for tenants, outlets, users, outlet assignments, products, add-ons, prices, ingredients, recipes, orders, bills, payments, shifts, ledger, tables, reservations, customers, chat sessions, and audit events. | US-001–US-041 | T-001 | P0 |
 | T-005 | Add `tenant_id` and `outlet_id` to all operational records and create PostgreSQL row-level security policies that read the tenant and user from per-request session settings set after token verification (T-113) and check outlet access against `staff_outlets` live (Appendix B). | US-002, US-003, US-038 | T-004, T-113 | P0 |
 | T-006 | Integrate Supabase Auth: JWT verification in FastAPI using Supabase asymmetric signing keys (public keys from JWKS and cached, short access-token expiry, shared-secret HS256 tokens rejected), owner/staff roles from the claim contract in T-113, invite-only account creation (public sign-up disabled in Supabase Auth; the owner invites staff by email), session invalidation on deactivation (ban + sign-out through the Supabase admin API), and outlet-scope authorization. No custom password storage. | US-003, US-033, US-038 | T-004, T-079, T-113 | P0 |
 | T-007 | Build shared money, tax, rounding, inventory-unit, and local-timezone utilities. | US-011, US-012, US-019, US-022 | T-001, T-004 | P0 |
 | T-008 | Create a standard actor/audit context for named users, system jobs, and `agent`, including timestamp and reason fields. | US-004, US-006, US-016, US-030 | T-004, T-006 | P0 |
 | T-009 | Add CI checks, migration checks, unit-test framework, API contract checks, and seed data for local development. | All | T-003, T-004 | P0 |
-| T-079 | Provision a Supabase project per environment (PostgreSQL, Auth, private Storage buckets for menu photos, QRIS images, and payment screenshots), backups, and access policies. Region follows the T-108 decision. | US-039, US-049 | T-003, T-108 | P0 |
-| T-104 | Build scheduled job infrastructure: a `scheduled_jobs` table (source of truth with `run_at`, status, idempotency key, cancellation) and a poller that publishes due jobs to RabbitMQ `jobs.due.q`, with at-least-once delivery, idempotent handlers that re-check current state, and late-job handling. Used for unpaid-order timeout, reservation reminders, no-show release, and anonymization. Fixed-delay retries use the TTL queues from T-110, not this table. | US-021, US-025, US-027, US-041, US-051 | T-003, T-004, T-110, T-111 | P0 |
+| T-079 | Provision a Supabase project per environment (PostgreSQL, Auth, private Storage buckets for menu photos, QRIS images, and attendance selfies), backups, and access policies. Region follows the T-108 decision. | US-039, US-049 | T-003, T-108 | P0 |
+| T-104 | Build scheduled job infrastructure: a `scheduled_jobs` table (source of truth with `run_at`, status, idempotency key, cancellation) and a poller that publishes due jobs to RabbitMQ `jobs.due.q`, with at-least-once delivery, idempotent handlers that re-check current state, and late-job handling. Used for unpaid-order timeout, no-show release, anonymization, and attendance checks. Fixed-delay retries use the TTL queues from T-110, not this table. | US-021, US-027, US-041, US-051 | T-003, T-004, T-110, T-111 | P0 |
 | T-105 | Set up Railway environments (demo, staging, production), container builds, GitHub-triggered deploys with a pre-deploy migration step and rollback, and secret management. Staging region follows the T-108 decision. | US-038, US-039, US-049 | T-003, T-009, T-079, T-109 | P0 |
 | T-106 | Draft the customer privacy notice (PDP Law) with legal review and publish it at a stable URL per tenant. | US-040 | T-001 | P0 |
-| T-108 | Decide how to meet the Indonesia data-residency requirement (US-039, NFR1). Checked on 2026-11-18 against the providers' region pages: neither Supabase nor Railway lists an Indonesia region; the nearest for both is Singapore (`ap-southeast-1` on Supabase, `asia-southeast1` on Railway). Demo: use Singapore with dummy data only. Pilot with real data: auth and the database stay on Supabase (Singapore), so obtain a legally reviewed cross-border transfer basis under the PDP Law, record the decision, and reflect it in the privacy notice (T-106) and consent text (T-076). | US-039, US-049 | T-001 | P0 |
-| T-109 | Create the Railway project and service topology: `app` (FastAPI API and WhatsApp worker as separate processes; split into two services for the pilot) and `rabbitmq` (single node, memory watermark set, volume optional in the demo and required in the pilot), private networking, health checks, and environment variables. Host the admin app on Cloudflare Pages or Vercel. | US-049 | T-003, T-108 | P0 |
+| T-108 | Decide how to meet the Indonesia data-residency requirement (US-039, NFR1). Checked on 2026-11-18 against the providers' region pages: neither Supabase nor Railway lists an Indonesia region; the nearest for both is Singapore (`ap-southeast-1` on Supabase, `asia-southeast1` on Railway). Demo: use Singapore with dummy data only. Pilot with real data: auth and the database stay on Supabase (Singapore), so obtain a legally reviewed cross-border transfer basis under the PDP Law, record the decision, and reflect it in the privacy notice (T-106) and the web chat privacy step (T-076). | US-039, US-049 | T-001 | P0 |
+| T-109 | Create the Railway project and service topology: `app` (FastAPI API and timer worker as separate processes; split into two services for the pilot) and `rabbitmq` (single node, memory watermark set, volume optional in the demo and required in the pilot), private networking, health checks, and environment variables. Host the admin app and web chat on Cloudflare Pages or Vercel. | US-049 | T-003, T-108 | P0 |
 | T-110 | Declare the RabbitMQ topology as code (exchanges, queues, bindings, TTL and dead-letter arguments, policies) per Appendix A, with idempotent declaration at startup and a topology test. | US-050, US-036 | T-003, T-109 | P0 |
 | T-111 | Build the shared consumer framework: manual ack after DB commit, publisher confirms, prefetch, attempt counter, retryable/permanent error classification, tiered retry routing, dead-letter routing with failure reason, and correlation ID propagation. | US-050, US-037 | T-110 | P0 |
 | T-112 | Build dead-letter visibility and replay: list, inspect, and requeue or discard dead-lettered messages (CLI or protected admin endpoint), with an audit record for each action. | US-050 | T-006, T-008, T-111 | P0 |
@@ -44,18 +44,17 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
 | T-010 | Implement tenant creation with restaurant/cafe validation and owner assignment. | US-001 | T-004, T-006 | P0 |
-| T-011 | Implement outlet CRUD and configuration for address, hours, timezone, WhatsApp number, delivery fee, PB1, payment mode, reservation settings, and QRIS. | US-002, US-019, US-022 | T-005, T-007 | P0 |
+| T-011 | Implement outlet CRUD and configuration for address, hours, timezone, public outlet slug, delivery fee, PB1, payment mode, reservation settings, and QRIS. | US-002, US-019, US-022 | T-005, T-007 | P0 |
 | T-012 | Implement owner-created staff accounts (Supabase Auth email invitation), outlet assignments, deactivation, and login/session rejection after deactivation. | US-003 | T-006, T-011 | P0 |
 | T-013 | Implement permission matrix for owner and staff actions at both API and UI route levels. | US-003, US-033 | T-006, T-012 | P0 |
 | T-014 | Implement secure QRIS image upload to a private Supabase Storage bucket (signed URLs), storage metadata, replacement, and outlet-level access. | US-017 | T-011, T-079 | P0 |
 | T-015 | Add API and integration tests for cross-tenant and cross-outlet access attempts, including direct API requests, tokens signed with a wrong key or algorithm, and sign-up attempts without an invitation. | US-002, US-003, US-038 | T-005, T-006, T-013 | P0 |
-| T-084 | Create the Meta template library and submit order-update, auto-cancellation, payment-rejected, payment-request, reservation-confirmation, and reservation-reminder templates as early as possible, since Meta's review is outside our control. Keep template names and parameters in a shared registry used by T-055. | US-015, US-021, US-025 | T-001 | P0 |
 
 ## Wave 2 — Menu, add-ons, recipes, and inventory
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-016 | Implement menu item CRUD with required photo, description, active/inactive state, and shared tenant-level data. | US-005 | T-004, T-006, T-079 | P0 |
+| T-016 | Implement menu item CRUD with optional photo (placeholder when missing), description, active/inactive state, and shared tenant-level data. | US-005 | T-004, T-006, T-079 | P0 |
 | T-017 | Implement add-on groups and options with required/optional selection rules, price delta, recipe delta, and a maximum of 10 options. | US-005, US-011 | T-016, T-007 | P0 |
 | T-018 | Implement outlet-specific prices for menu items and add-on options. | US-002, US-005 | T-011, T-016, T-017 | P0 |
 | T-019 | Implement ingredients, units, low-stock thresholds, and menu/add-on recipes. | US-006, US-007 | T-016, T-017 | P0 |
@@ -64,18 +63,18 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 | T-022 | Implement stock projection, low-stock warnings, sold-out calculation, and outlet-specific availability. | US-007, US-010, US-028 | T-020, T-021 | P0 |
 | T-023 | Add tests for exact recipe quantities, add-on ingredient changes, no negative stock, immutable movements, and sold-out recovery after restock. | US-005–US-007, US-014 | T-020–T-022 | P0 |
 | T-024 | Seed editable sample menu, sample photos, prices, and add-ons for every new tenant/outlet. | US-008 | T-016–T-018, T-107 | P0 |
-| T-107 | Prepare sample menu content: items, descriptions, recipes, add-ons, and photos with usage rights that meet Meta catalog image rules. | US-008 | T-001 | P1 |
+| T-107 | Prepare sample menu content: items, descriptions, recipes, add-ons, and photos with usage rights. | US-008 | T-001 | P1 |
 
 ## Wave 3 — Order and bill domain
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
 | T-025 | Define order, order-item, add-on, payment, bill, order-event, and status-transition models. | US-014, US-016, US-020 | T-004, T-007, T-008 | P0 |
-| T-026 | Implement a single order-creation service used by WhatsApp, table QR, counter, and future agent tools. | US-014, US-034, US-042 | T-021, T-025 | P0 |
+| T-026 | Implement a single order-creation service used by the web chat (outlet link and table QR), counter, and future agent tools. | US-014, US-034, US-042 | T-021, T-025 | P0 |
 | T-027 | Implement quote calculation for subtotal, add-ons, PB1, delivery fee, pickup, and total using outlet settings. | US-011, US-012, US-019 | T-007, T-018, T-025 | P0 |
 | T-028 | Implement confirmation-time stock recheck and atomic order creation; return item-level sold-out errors with replacement/remove options. | US-011, US-014 | T-021, T-026, T-027 | P0 |
-| T-029 | Implement duplicate-safe order creation using message/request idempotency keys. | US-014, US-037 | T-026, T-028 | P0 |
-| T-030 | Implement order and payment status machines for online, pay-first dine-in, open-bill dine-in, and takeaway orders. | US-016, US-020 | T-025, T-027 | P0 |
+| T-029 | Implement duplicate-safe customer actions: an `idempotency_keys` store keyed by the key sent from the page, covering place order, Saya sudah bayar, cancel, book, and cancel or reschedule a booking; a processed key returns the earlier result (FR6.4, NFR8). | US-014, US-037 | T-026, T-028 | P0 |
+| T-030 | Implement order and payment status machines for web chat orders (always pay first), counter pay-first dine-in, counter open-bill dine-in, and takeaway orders. | US-016, US-020 | T-025, T-027 | P0 |
 | T-031 | Implement status transition validation and immutable order event history with actor, timestamp, and reason where required. | US-004, US-016 | T-008, T-030 | P0 |
 | T-032 | Implement cancellation and paid-order reversal workflows, including stock return versus waste behavior and refund ledger hooks. | US-004, US-021 | T-020, T-030, T-031 | P0 |
 | T-033 | Implement open bills per table or guest name, one open bill per table, order attachment, running total, duration, and full-bill close. | US-020 | T-025, T-027, T-030 | P0 |
@@ -86,8 +85,8 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-037 | Implement the payment-proof model, `proof_submitted` payment status, staff payment-review queue, merchant-account confirmation step, mark-paid action, and reject-proof action (required reason, immediate cancellation with stock reversal, no ledger entry, customer notification hook); actor and time recorded on both. Customer screenshot intake from WhatsApp is in T-036. | US-017 | T-014, T-030, T-032 | P0 |
-| T-038 | Implement cash payment capture, payment-method validation, amount received, change due, and online cash restriction. | US-018 | T-025, T-027 | P0 |
+| T-037 | Implement the payment-proof model, `proof_submitted` payment status, staff payment-review queue, merchant-account confirmation step, mark-paid action, and reject-proof action (required reason, immediate cancellation with stock reversal, no ledger entry, reason shown in the customer's chat); actor and time recorded on both. The customer claim ("Saya sudah bayar", no screenshot) is in T-036. | US-017 | T-014, T-030, T-032 | P0 |
+| T-038 | Implement cash payment capture, payment-method validation, amount received, change due, and no cash for web chat orders. | US-018 | T-025, T-027 | P0 |
 | T-039 | Implement owner-configured cash drawers per outlet (one created by default with each outlet), cashier shift open/close per drawer, starting cash, one active shift per drawer, and payment/refund linkage. | US-018 | T-038 | P0 |
 | T-040 | Implement blind end-of-shift cash count, expected-cash calculation, difference, actor tracking, and shortage/surplus ledger entries. | US-018, US-030 | T-039 | P0 |
 | T-041 | Implement append-only ledger posting for revenue, PB1, delivery fee, cash/QRIS payment, refund, expense, cash difference, and reversal. | US-019, US-030 | T-008, T-027, T-032, T-037–T-040 | P0 |
@@ -102,50 +101,52 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 | T-130 | Build the owner Dashboard tab **PO & Supplier** (O15–O17; PRD v0.15, Pengeluaran stays for direct expenses), the PO create/detail/payment/cancel flows, supplier management, the staff goods-receipt view, and the supplier debt cards, following the T-129 wireframes. | US-031, US-057–US-061 | T-072, T-126, T-127, T-128, T-129 | P0 |
 | T-131 | Add PO tests: scheme 1 (open → check → close → dashboard reminder → instalments, overpayment refused, overdue by outlet time zone), scheme 2 (open → dashboard payment request → pay → check → close; close refused while unpaid), partial delivery and difference found (staff close refused, PO listed on the owner dashboard), owner close with a required note adjusting the amount owed, over-receipt refused, restock movements in base units, cash payment lowering a shift's expected cash, cancellation rules, ledger cash-basis (no entry at open, check, or close), staff opening a PO for an assigned outlet (and refused for others), and staff refused from payments, cancellation, suppliers, reminders, and debt through the API. | US-057–US-061 | T-126–T-128 | P0 |
 
-## Wave 5 — WhatsApp integration and deterministic flows
+## Wave 5 — Web chat and deterministic customer flows
+
+The web chat (PRD §5.2, §5.6) serves both entry points from one frontend build: the outlet link `/o/<slug>` (online orders, recommendations, reservations) and the table QR `/t/<token>` (dine-in). Every step is a button or a short text input; free text goes to the AI only in Rekomendasi (T-115).
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-045 | Configure Meta WhatsApp Cloud API/BSP credentials, webhook verification, signature validation, and outlet-number mapping. | US-002, US-036 | T-011 | P0 |
-| T-100 | Build per-outlet WhatsApp onboarding: Meta Embedded Signup or BSP flow, business verification status, phone number registration, catalog creation and linking, and setup status shown to the owner. | US-002, US-036 | T-011, T-045 | P0 |
-| T-046 | Implement inbound webhook persistence and publishing to `wa.inbound` with immediate acknowledgement; process one conversation at a time (Postgres advisory lock on conversation id). | US-036 | T-045, T-008, T-110, T-111 | P0 |
-| T-047 | Implement outbound WhatsApp worker on `wa.outbound.q` and catalog sync worker on `catalog.sync.q`, using the retry tiers and error classification from T-111 (429 and 5xx retry; 4xx dead-letter; outside-24-hour-window error falls back to a template once). | US-015, US-036, US-050 | T-046, T-111 | P0 |
-| T-048 | Implement processed-message store and idempotent worker behavior for webhook retries and RabbitMQ redelivery. | US-037 | T-046 | P0 |
-| T-049 | Implement conversation state for main menu, active order, active reservation, and safe restart/recovery behavior. | US-009–US-011, US-023 | T-046, T-048 | P0 |
-| T-050 | Implement the main menu list message (Pesan, Rekomendasi, Data Saya, plus Reservasi and Reservasi Saya when reservations are enabled) and the "menu" keyword that returns to it from any flow without creating anything. | US-009 | T-049 | P0 |
-| T-051 | Implement catalog sync for item metadata, photos, outlet prices, active state, and unavailable/sold-out state. | US-008, US-010 | T-016–T-018, T-022, T-047, T-100 | P0 |
-| T-052 | Implement catalog cart intake and post-cart add-on collection through reply buttons/list messages. | US-010, US-011 | T-017, T-049, T-051 | P0 |
-| T-053 | Implement WhatsApp order summary, pickup/delivery selection, address capture, explicit confirmation, and order creation call. | US-011, US-012, US-014 | T-026–T-029, T-049, T-052 | P0 |
-| T-054 | Implement table QR generation with outlet number, table identifier, and optional rotating token validation. | US-013 | T-011, T-045 | P0 |
-| T-133 | Schema for the table QR web page (issue #44): order channel `web_table`, the outlet's table QR target (`web_whatsapp`, `web`, `whatsapp`), `orders.customer_name`, a per-order access key for public orders, and a customer payment claim on `payment_proofs` (no image, `claimed_at`); `tables.qr_token` already exists (replaceable), with migrations and RLS; update `docs/domain/domain-glossary-and-rules.md` (FR2.7, FR2.8, FR2.16). | US-062, US-063 | T-004, T-054 | P0 |
-| T-134 | Public table API scoped by the table token: resolve the table (outlet, table, QR target, WhatsApp link when allowed, whether web ordering is possible), menu with outlet prices/add-ons/sold-out, place a pay-first `web_table` order through the shared order-creation function with server-side pricing and an idempotency key (returns a per-order access key), the outlet's static QRIS for that order, "Saya sudah bayar" (payment claim → `proof_submitted` without screenshot, stops auto-cancel), customer cancel while unpaid, and order status read with the access key. Staff confirm/reject reuse the S4 proof endpoints; add `payment_claimed_at` and `customer_name` to the S2/S4 responses. Reject unknown or replaced tokens, rate-limit per token and IP, never expose other orders. Update `docs/architecture/screen-endpoint-map.md` (Q0–Q5) (FR2.13–FR2.15, NFR5, ACN6). | US-062 | T-026–T-030, T-036, T-037, T-133 | P0 |
-| T-036 | Implement the QRIS payment request (outlet QRIS image, exact total, screenshot request) and inbound screenshot intake: download Meta media to storage, attach it to the order via T-037, and stop the unpaid timer. | US-017 | T-014, T-027, T-037, T-047, T-049 | P0 |
-| T-034 | Implement configurable unpaid-order timeout, screenshot timer pause, automatic cancellation, stock reversal, and customer notification. | US-015, US-021 | T-030, T-032, T-036, T-047, T-104 | P0 |
-| T-055 | Implement order confirmation, status notifications, shared notification templates, and approved-template selection outside the 24-hour window. | US-015, US-025 | T-047, T-053, T-084 | P0 |
-| T-056 | Add end-to-end WhatsApp tests for online, table QR, pickup, delivery, add-ons, sold-out confirmation, duplicate messages, unpaid timeout, and template fallback. | US-009–US-015, US-037 | T-034, T-036, T-048–T-055 | P0 |
+| T-139 | Draw the web chat wireframes in figcraft before any frontend work (360 px first, Bahasa Indonesia): greeting and main menu from the outlet link and from a table QR, menu cards by category, add-on buttons, kitchen note, cart, summary with Pesan & bayar, name/phone/address step with the privacy notice, pickup/delivery choice, static QRIS payment with deadline and Saya sudah bayar, live order status, Pesanan Saya, Rekomendasi with the AI acknowledgement and fallback cards, the reservation flow, booking confirmation with booking code and Tambah ke kalender, Reservasi Saya with code + phone lookup, "Pesan di kasir" (no QRIS), invalid link/QR, and rate-limit messages. Update O8 (outlet slug and outlet QR, QR target setting removed) and the S2/S4 web-order cards for `web_online` (pickup/delivery, phone). Update `design/WIREFRAME-TRACEABILITY.md` and `docs/architecture/screen-endpoint-map.md`; the Q0–Q5 screens are replaced. | US-009–US-013, US-015, US-023, US-025, US-029, US-040, US-052, US-062, US-063 | — | P0 |
+| T-140 | Migration for the web chat (PRD v0.20): add `web_online` to `order_channel`; `outlets.public_slug` (unique across the platform, changeable); `chat_sessions` (outlet, optional table, step, cart, last activity); `idempotency_keys`; `customers` per order or booking (name, phone, address; anonymizable) and `privacy_notice_acknowledgements`; `reservations.booking_code` and access key; drop the table QR target column. Decide whether the WhatsApp tables (`whatsapp_contacts`, `conversations`, `messages`, `processed_messages`, outlet WhatsApp number and catalog) are dropped or kept for Phase 3, and record it. RLS for every new table; update `docs/domain/domain-glossary-and-rules.md` (channels, customer data rules). | US-012, US-013, US-036, US-037, US-040, US-041, US-063 | T-004, T-133 | P0 |
+| T-049 | Implement the web chat session on the server: a session per phone (cookie or device id) holding the current step, cart, chosen add-ons, and entered details, so a refresh or reopening the link on the same phone resumes where the customer left off; a cart with no activity for 2 hours is emptied (orders and bookings stay); no state in API memory (FR6.2, NFR6). | US-036 | T-029, T-140 | P0 |
+| T-141 | Public outlet API scoped by the outlet slug (`/api/v1/public/o/<slug>/…`): resolve the outlet (name, hours, reservations enabled, whether ordering is possible), menu with outlet prices, add-ons, and sold-out; quote; place a pay-first `web_online` order (pickup or delivery, name and phone, address and flat fee for delivery) through the shared order-creation function with server-side pricing and an idempotency key, returning a per-order access key. Reuse the T-134 payment, claim, cancel, and status endpoints for both channels. Unknown or changed slugs return no data; rate limit per session and IP (FR2.6, FR2.10, NFR5, ACN5, ACN6). | US-012, US-036, US-063 | T-026–T-030, T-049, T-134, T-140 | P0 |
+| T-050 | Implement the main menu: outlet link shows Pesan, Rekomendasi, and (when reservations are enabled) Reservasi and Reservasi Saya; table QR shows outlet, table, Pesan, and Rekomendasi; Pesanan Saya while the phone has an active order; Menu utama button and the "menu" keyword return to it from any flow, keeping the cart and creating nothing (FR2.0). | US-009 | T-049 | P0 |
+| T-052 | Implement menu cards by category (photo or placeholder, description, outlet price, sold-out disabled) and add-on collection with buttons (required groups must be answered, optional can be skipped), kitchen note per item, and a cart the customer can open, change, or empty (FR2.1, FR2.2). | US-010, US-011 | T-017, T-022, T-049 | P0 |
+| T-053 | Implement the summary (items, add-ons, notes, subtotal, PB1, delivery fee, total from the server quote), pickup/delivery choice, name and phone (outlet link) or name only (table), address for delivery, the privacy step (T-076), and Pesan & bayar calling the order-creation endpoint with an idempotency key; sold-out at confirmation names the item with remove/replace options (FR2.3, FR2.6, FR2.9). | US-011, US-012, US-014 | T-026–T-029, T-052, T-076, T-141 | P0 |
+| T-054 | Table QR token generation and replacement (`tables.qr_token`, random per table). Built with T-133. | US-013 | T-011 | P0 |
+| T-133 | Schema for the table QR web page (issue #44): order channel `web_table`, `orders.customer_name`, a per-order access key for public orders, and a customer payment claim on `payment_proofs` (no image, `claimed_at`); `tables.qr_token` (replaceable), with migrations and RLS. **Done** (PR #47); the table QR target column is removed by T-140. | US-062, US-063 | T-004, T-054 | P0 |
+| T-134 | Public table API scoped by the table token: resolve the table, menu with outlet prices/add-ons/sold-out, place a pay-first `web_table` order with server-side pricing and an idempotency key (returns a per-order access key), the outlet's static QRIS, Saya sudah bayar (`proof_submitted`, stops auto-cancel), customer cancel while unpaid, and order status read with the access key; reject unknown or replaced tokens, rate limit per token and IP. **Done** (PR #47–#51); rework: drop the WhatsApp link and QR target from the resolve response, and share the payment, claim, cancel, and status endpoints with T-141. | US-062 | T-026–T-030, T-037, T-133 | P0 |
+| T-036 | Implement the payment step in the chat for both web channels: the outlet's static QRIS, exact total, and deadline; Saya sudah bayar (`proof_submitted`, no screenshot) stops the unpaid timer; customer cancel until then; the staff rejection reason shown in the chat (FR2.14, FR11.2). | US-017, US-062 | T-014, T-037, T-134, T-141 | P0 |
+| T-034 | Implement the configurable unpaid-order timeout for pay-first orders, stopped by Saya sudah bayar, with automatic cancellation and stock reversal; the cancellation shows in the chat, no message is sent (FR10.4). | US-021 | T-030, T-032, T-036, T-104 | P0 |
+| T-055 | Implement status in the chat: an order and booking status endpoint polled while the chat is open so a change shows within 10 seconds without a reload; Pesanan Saya lists the phone's own orders (by access key) until one hour after they are completed or cancelled; a saveable order link; no messages outside the chat (FR2.15, FR6.5, FR10.3). | US-015 | T-030, T-134, T-141 | P0 |
+| T-145 | Build the web chat frontend on public routes `/o/<slug>` and `/t/<token>` from one build, following the T-139 wireframes: conversation layout (outlet messages, the customer's choices as replies, buttons, menu cards, text box), the flows from T-050–T-055 and T-036, device-only prefill of name/phone/address with a clear option (T-077), retry with the same idempotency key after a lost connection, and the invalid link/QR and rate-limit messages. Replaces the Q0–Q5 table page from T-135. | US-009–US-015, US-062 | T-139, T-049–T-055, T-036 | P0 |
+| T-056 | Add end-to-end web chat tests at 360 px: online pickup and delivery, table order, add-ons and notes, sold-out at confirmation, double tap and retry (one order), unpaid timeout, Saya sudah bayar → confirm/reject, status within 10 s, Pesanan Saya expiry, cart expiry after 2 h, changed slug and replaced token, and "Pesan di kasir" without QRIS. | US-009–US-015, US-036, US-037, US-062 | T-034, T-036, T-049–T-055, T-145 | P0 |
 
 ## Wave 6 — Reservations and tables
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-057 | Implement table CRUD, capacity, area, bookable hours, duration, booking window, party limit, reminder time, and cancellation cutoff. | US-022 | T-011, T-025 | P0 |
+| T-057 | Implement table CRUD, capacity, area, bookable hours, duration, booking window, party limit, reminder time (used for the calendar alert), and cancellation cutoff. | US-022 | T-011, T-025 | P0 |
 | T-058 | Implement timezone-aware availability calculation and smallest-fitting-table assignment. | US-022, US-023 | T-007, T-057 | P0 |
 | T-059 | Add database-level exclusion/locking rule preventing overlapping reservations, including concurrent requests. | US-024 | T-057, T-058 | P0 |
-| T-060 | Implement structured WhatsApp reservation flow: party size, date, available time, review, and confirmation. | US-023 | T-049, T-058, T-059 | P0 |
-| T-061 | Implement reservation confirmation, reminder scheduling, and the Reservasi Saya flow (list upcoming bookings, cancel, reschedule) with cutoff enforcement. | US-025 | T-055, T-060, T-104 | P0 |
+| T-060 | Implement the reservation flow in the web chat and its public API (outlet slug): party size, date, available time, name and phone (privacy step, T-076), review, and confirmation with an idempotency key; at most 2 upcoming bookings per phone number per outlet, refused without holding a table (FR9.2, AC9.11). | US-023 | T-049, T-058, T-059, T-076, T-141 | P0 |
+| T-061 | Implement booking confirmation and Reservasi Saya: booking code and access key, a saveable booking link, Tambah ke kalender (an `.ics` file with the booking in the outlet's time zone and an alert at the outlet's reminder time; no reminder message); Reservasi Saya lists upcoming bookings from this phone, finds a booking on another phone by booking code + phone number with rate-limited wrong attempts, and cancels or reschedules up to the cutoff (FR9.4, FR9.5, AC9.5, AC9.6, AC9.12). | US-025 | T-055, T-060 | P0 |
 | T-062 | Implement staff reservation board with phone/in-person booking, table reassignment, seated/completed/cancelled/no-show states, and event audit. | US-026 | T-006, T-057, T-060 | P0 |
 | T-063 | Implement table occupancy for walk-in guests (no reservation) and availability blocking. | US-027 | T-057, T-058, T-062 | P0 |
-| T-064 | Implement 15-minute post-booking hold, automatic no-show, table release, and seated-before-deadline behavior. | US-027 | T-061, T-062, T-104 | P0 |
-| T-065 | Add reservation tests for capacity limits, timezone display, double-booking, reminders, cutoff, walk-ins, reassignment, and no-show release. | US-022–US-027 | T-057–T-064 | P0 |
+| T-064 | Implement 15-minute post-booking hold, automatic no-show, table release, and seated-before-deadline behavior. | US-027 | T-060, T-062, T-104 | P0 |
+| T-065 | Add reservation tests for capacity limits, timezone display, double-booking, the 2-booking limit, calendar file times, code + phone lookup, cutoff, walk-ins, reassignment, and no-show release. | US-022–US-027 | T-057–T-064 | P0 |
 
 ## Wave 7 — Admin application and recommendations
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
 | T-066 | Build owner onboarding, outlet settings (including cash drawers), staff management, QRIS upload, menu, add-on, recipe, and price screens. | US-001–US-006, US-017, US-019 | T-010–T-019 | P0 |
-| T-132 | Build menu photo upload (the photo part of T-016, left out of Wave 2): a private Supabase Storage bucket for menu photos, owner-only upload and replacement from the photo box in the menu edit card (wireframe O5) with size and type checks, `photo_path` saved on the item and `has_photo` returned by the API, short-lived signed URLs for previews in the admin app, the required-photo rule enforced before an item can be active or synced to the WhatsApp catalog (FR2.11, US-005), and the photo shown wherever the wireframes show it. Update `docs/architecture/screen-endpoint-map.md` for the new endpoint. | US-005, US-008 | T-014, T-016, T-066, T-079 | P0 |
-| T-135 | Build the customer table web page (wireframe Q0–Q5 + Q2a, 360 px first): choice screen (web / WhatsApp), menu with add-on picker and sold-out, cart with note and optional name, "Pesan & bayar", static QRIS payment screen with deadline and "Saya sudah bayar", live order status, and the invalid-QR page; a separate public entry like `/tablet`, no login; keep the phone's own orders. Staff side: the S2 web-order card ("web", table, name, "Pelanggan bilang sudah bayar", Cek & konfirmasi lunas → S4 review without screenshot, Tolak) (FR2.13–FR2.15). | US-062 | T-134, T-066, T-068 | P0 |
-| T-136 | O8: table QR target setting per outlet (forced to web while WhatsApp isn't connected), download QR per table (PNG) and all tables (PDF), and "Ganti" to replace a table's token with a confirm step. Owner only (FR2.16). | US-063 | T-057, T-133, T-134 | P0 |
+| T-132 | Build menu photo upload (the photo part of T-016, left out of Wave 2): a private Supabase Storage bucket for menu photos, owner-only upload and replacement from the photo box in the menu edit card (wireframe O5) with size and type checks, `photo_path` saved on the item and `has_photo` returned by the API, short-lived signed URLs for previews in the admin app, the photo shown wherever the wireframes show it, with a placeholder when an item has no photo (photos are optional, FR2.11). Update `docs/architecture/screen-endpoint-map.md` for the new endpoint. | US-005, US-008 | T-014, T-016, T-066, T-079 | P0 |
+| T-135 | Customer table web page (wireframe Q0–Q5 + Q2a) and the staff S2 web-order card / S4 claim review. **Done** (PR #48–#51); the customer page is replaced by the web chat (T-145), the staff side stays and gains `web_online` (T-146). | US-062 | T-134, T-066, T-068 | P0 |
+| T-136 | O8: download QR per table (PNG) and all tables (PDF), and "Ganti" to replace a table's token. **Done** (PR #48); the QR target setting is removed by T-147. | US-063 | T-057, T-133, T-134 | P0 |
+| T-146 | Staff side for `web_online` orders, following the T-139 wireframes: S2 order card and S4 review show the channel, pickup or delivery, name, phone, and address, and "Pelanggan bilang sudah bayar"; delivery orders get the out-for-delivery step; buttons only from `allowed_actions`. | US-012, US-017, US-062 | T-068, T-135, T-139, T-141 | P0 |
+| T-147 | O8 update: set and change the outlet slug (unique, old link stops working), download the outlet QR code of the link, remove the QR target setting; owner only, including through the API (FR2.10, FR2.16). | US-063 | T-136, T-139, T-140 | P0 |
 | T-067 | Build staff counter order screen with dine-in and takeaway order types, add-ons, table selection, payment, and order submission. | US-034 | T-026–T-030, T-033, T-038, T-039, T-057 | P0 |
 | T-068 | Build order board with payment review, lifecycle actions, cancellation/reversal, and open-bills view. | US-016–US-021 | T-030–T-033, T-037–T-039 | P0 |
 | T-138 | Build split bill per item in the admin app (wireframe S5 "⇄ Split per item", S5a dialog, S5b QRIS step for one part, S5c bill after partial payment, M3 + M3a + M3b at 360 px): pick unpaid items or portions, part totals from the server, pay each part through the S1 payment popup (cash on the part total; static QRIS showing only the part's amount with the merchant-check list), paid parts list with "Batalkan…" (reason), remaining amount on the bill card, "Bayar sisa"; buttons only from `allowed_actions` (FR10.9). | US-064 | T-068, T-072, T-137 | P0 |
@@ -154,8 +155,8 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 | T-071 | Build owner dashboard for outlet-level and combined sales, cashflow, PB1, payment method, and stock summaries. | US-032, US-033 | T-041–T-043 | P0 |
 | T-072 | Build role-aware navigation and responsive layouts for 360 px mobile width through desktop. | US-003, US-033, US-035 | T-006, T-066–T-071 | P0 |
 | T-073 | Implement owner picks and tags, outlet best-seller query for the last 30 days, sold-out filtering, de-duplication, and 30-item limit. | US-028 | T-016, T-022, T-026 | P0 |
-| T-074 | Implement WhatsApp recommendation product messages and add-to-cart handoff. | US-029 | T-051, T-073, T-052 | P0 |
-| T-115 | Implement AI-assisted recommendations in the Rekomendasi flow: a minimal LangChain gateway with prompt versioning; read-only tools for menu, tags, outlet availability, and 30-day sales; suggestions limited to active, available items at outlet prices with owner's picks first; selected items handed to the T-074 add-to-cart flow; an immediate acknowledgement message ("Sebentar ya, lagi cariin rekomendasi…") is sent before the AI call starts, because a reply can take up to 30 seconds; errors or a 30-second timeout fall back to the T-073 rule-based message; tool calls logged with actor `agent`; a small evaluation set covering sold-out items, price accuracy, and prompt injection. | US-052 | T-008, T-049, T-073, T-074 | P0 |
+| T-074 | Implement Rekomendasi in the web chat: owner's picks and best sellers (T-073) as menu cards, add-to-cart handoff into the normal add-on, summary, and Pesan & bayar flow (FR8.2, FR8.3). | US-029 | T-052, T-073, T-145 | P0 |
+| T-115 | Implement AI-assisted recommendations in the Rekomendasi flow: a minimal LangChain gateway with prompt versioning; read-only tools for menu, tags, outlet availability, and 30-day sales; suggestions limited to active, available items at outlet prices with owner's picks first; selected items handed to the T-074 add-to-cart flow; suggestions shown as menu cards; an immediate acknowledgement ("Sebentar ya, lagi cariin rekomendasi…") with a typing indicator is shown once before the AI call starts, because a reply can take up to 30 seconds; errors or a 30-second timeout fall back to the T-073 rule-based cards; tool calls logged with actor `agent`; a small evaluation set covering sold-out items, price accuracy, and prompt injection. | US-052 | T-008, T-049, T-073, T-074 | P0 |
 | T-101 | Build the owner audit log screen for order reversals and status changes, filterable by outlet, staff member, and date, showing order, actor, time, and reason. | US-004 | T-031, T-032, T-066 | P0 |
 | T-102 | Build the owner cash count report: every shift's starting cash, expected cash, counted cash, difference, and who counted, per outlet. | US-018 | T-040, T-071 | P0 |
 | T-116 | Build the attendance domain: `attendance_records` and append-only `attendance_events` (clock in, clock out, flag, correction) with outlet-local times, one open record per staff member, the tablet and the selfie stored with each clock-in and clock-out (a photo is required), RLS, and API endpoints for clock in and clock out (attendance tablet session only) and own history (staff session). | US-053 | T-005, T-006, T-007, T-008, T-011, T-012, T-121 | P0 |
@@ -167,18 +168,18 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 | T-122 | Store attendance selfies in a private Supabase Storage bucket: upload from the tablet with size and type checks, short-lived signed URLs for the owner and the staff member only, and a scheduled `attendance_photo_purge` job that deletes photos after 45 days while keeping the records (staff cannot delete selfies, not even their own). | US-053, US-054 | T-079, T-104, T-116 | P0 |
 | T-123 | Implement busyness queries for the owner: orders per hour per outlet and period (outlet-local time, opening hours only) with busy (≥ 130% of the hourly average) and quiet (≤ 60%) marking, the day-by-hour average over the last 4 weeks, current crowd per outlet (occupied tables, active orders, Ramai/Normal/Sepi status), and the hour-group filter for dashboard figures. Owner-only at the API. Include tests for time zones, thresholds, and totals. | US-056 | T-007, T-013, T-026, T-030, T-057, T-063 | P1 |
 | T-124 | Build the owner dashboard busyness views (wireframe O2): hour-group filter in the header, day-by-hour busyness map, current crowd per outlet, and orders-per-hour chart with busy and quiet hours marked. | US-056 | T-071, T-123 | P1 |
-| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119, T-124, T-130, T-132, T-135, T-136 | P0 |
+| T-075 | Add frontend accessibility, responsive, permission, and critical-flow tests. | US-033–US-035 | T-066–T-074, T-101, T-102, T-117, T-119, T-124, T-130, T-132, T-135, T-136, T-145–T-147 | P0 |
 
-## Wave 8 — Membership, compliance, and MVP hardening
+## Wave 8 — Customer data, compliance, and MVP hardening
 
 | ID | Task | User stories | Depends on | Priority |
 |---|---|---|---|---|
-| T-076 | Implement customer/contact, consent, privacy-notice link, and business-wide membership state across outlets. | US-040 | T-004, T-045, T-049, T-106 | P0 |
-| T-077 | Implement the Data Saya flow (membership status, end membership) and delete/anonymize personal data without changing orders, ledger, or stock history. | US-041 | T-076, T-041 | P0 |
-| T-103 | Implement the scheduled anonymization job for customers who declined membership, run once their order is completed/cancelled or their booking is finished. | US-040, US-041 | T-076, T-077, T-104 | P0 |
-| T-078 | Ensure personal data is absent from append-only ledger and stock tables; add automated privacy regression tests. | US-040, US-041 | T-077, T-103 | P0 |
-| T-080 | Add security hardening: secret management, token expiry, webhook verification, upload validation, rate limiting, and audit-log protection. | US-003, US-036, US-038, US-039 | T-006, T-008, T-014, T-045 | P0 |
-| T-081 | Add queue metrics (RabbitMQ management API), structured logs, correlation IDs, retry/DLQ dashboards, and alerts for dead-lettered messages, queue backlog, and failed catalog updates. | US-008, US-036, US-037, US-050 | T-047, T-048, T-112 | P0 |
+| T-076 | Implement the privacy step in the web chat: before a name, phone number, or address is submitted, show the short notice and the link to the full notice (T-106); store the customer details per order or booking in `customers` and record the notice version and time (FR12.1). No accounts and no membership. | US-040 | T-004, T-106, T-140 | P0 |
+| T-077 | Implement device-only prefill: the phone may remember the customer's own name, phone number, and last address in local storage and prefill them next time, with a clear option in the chat; the server never links orders from different visits into a profile (FR12.3, AC12.4). | US-041 | T-076, T-145 | P0 |
+| T-103 | Implement the scheduled anonymization job for every customer record, run once its order is completed or cancelled or its booking is completed, cancelled, or no-show; orders and ledger totals stay unchanged (FR12.2). | US-041 | T-076, T-104 | P0 |
+| T-078 | Ensure personal data is absent from append-only ledger and stock tables; add automated privacy regression tests. | US-040, US-041 | T-076, T-103 | P0 |
+| T-080 | Add security hardening: secret management, token expiry, public web chat scoping (slug, table token, access keys, booking code + phone), rate limiting per session and IP, upload validation, and audit-log protection. | US-003, US-036, US-038, US-039 | T-006, T-008, T-014, T-141 | P0 |
+| T-081 | Add queue metrics (RabbitMQ management API), structured logs, correlation IDs, retry/DLQ dashboards, and alerts for dead-lettered jobs and job backlog; web chat request latency (95% within 1 s, ACN4). | US-036, US-037, US-050 | T-111, T-112 | P0 |
 | T-082 | Run performance, concurrency, tenant-isolation, backup-restore, and failure-recovery tests against MVP acceptance criteria. | US-014, US-024, US-030, US-037–US-039 | T-015, T-035, T-044, T-056, T-065, T-075, T-078, T-080, T-081, T-103, T-105, T-120, T-131 | P0 |
 | T-083 | Execute full UAT with owner, cashier/waiter, and customer scenarios; triage defects and produce release checklist. | All MVP stories | T-082 | P0 |
 
@@ -187,12 +188,12 @@ This backlog breaks down the 64 user stories in [User-Stories-SME-Automation-Pla
 The MVP is ready for release only when:
 
 1. T-083 is complete and all MVP acceptance criteria pass.
-2. An online WhatsApp order, table-QR order, and counter order use the same order service and produce correct stock, payment, and ledger outcomes.
+2. A web chat order from the outlet link, a table-QR order, and a counter order use the same order service and produce correct stock, payment, and ledger outcomes.
 3. Pay-first and open-bill outlets both work, including payment restrictions and existing-order behavior after a mode change.
 4. Reservation concurrency, 15-minute no-show release, and timezone behavior pass.
-5. Duplicate webhook delivery cannot create duplicate orders, stock movements, or ledger entries.
+5. A double tap, a retry after a lost connection, or a redelivered timer job cannot create duplicate orders, bookings, stock movements, or ledger entries.
 6. Cross-tenant access tests and append-only audit checks pass, and the data-residency decision from T-108 is met (Indonesia region, or a documented and approved exception) before real merchant data is stored.
-7. Approved WhatsApp templates are available for every required outside-window notification, or the release is explicitly blocked with a documented Meta dependency.
+7. Every web chat flow (order, payment, status, recommendations, reservations) works at 360 px without login, and statuses refresh in the chat within 10 seconds.
 8. Dead-letter queues are empty or triaged, a replay has been rehearsed (T-112), and the demo-to-pilot promotion checklist (T-114) is complete.
 
 ## Phase 2 — Agent layer
@@ -219,17 +220,23 @@ The MVP is ready for release only when:
 | T-097 | Add dropshipper tenant type, non-physical outlet behavior, and dropshipper-specific onboarding. | US-048 | T-010–T-013 | P2 |
 | T-098 | Implement marketplace connector framework and Shopee integration. | US-048 | T-097 | P2 |
 | T-099 | Implement Tokopedia and TikTok Shop integrations, sync monitoring, and conflict resolution. | US-048 | T-098 | P2 |
+| T-148 | WhatsApp as an optional customer channel (PRD §4 Phase 3): reuse the moved tasks below and the PR #54 branch; old screenshot intake (former T-036) and template notifications (former T-055) are re-planned here. Re-check Meta's country restriction for Indonesian numbers (error 130497) before starting. The web chat stays the main channel. | US-065 | MVP web chat | P2 |
+| T-045 | Configure Meta WhatsApp Cloud API/BSP credentials, webhook verification, signature validation, and outlet-number mapping. | US-065 | T-011 | P2 |
+| T-100 | Build per-outlet WhatsApp onboarding: Meta Embedded Signup or BSP flow, business verification status, phone number registration, catalog creation and linking, and setup status shown to the owner. | US-065 | T-011, T-045 | P2 |
+| T-046 | Implement inbound webhook persistence and publishing to `wa.inbound` with immediate acknowledgement; process one conversation at a time (Postgres advisory lock on conversation id). | US-065 | T-045, T-008, T-110, T-111 | P2 |
+| T-047 | Implement outbound WhatsApp worker on `wa.outbound.q` and catalog sync worker on `catalog.sync.q`, using the retry tiers and error classification from T-111 (429 and 5xx retry; 4xx dead-letter; outside-24-hour-window error falls back to a template once). | US-065 | T-046, T-111 | P2 |
+| T-048 | Implement processed-message store and idempotent worker behavior for webhook retries and RabbitMQ redelivery. | US-065 | T-046 | P2 |
+| T-051 | Implement catalog sync for item metadata, photos, outlet prices, active state, and unavailable/sold-out state. | US-065 | T-016–T-018, T-022, T-047, T-100 | P2 |
+| T-084 | Create the Meta template library and submit order-update, auto-cancellation, payment-rejected, payment-request, reservation-confirmation, and reservation-reminder templates as early as possible, since Meta's review is outside our control. Keep template names and parameters in a shared registry used by T-055. | US-065 | T-001 | P2 |
 
 ## Critical path
 
 The shortest dependency path to a usable MVP is:
 
-`T-001 → T-004 + T-108 → T-079 → T-113 → T-005/T-006 → T-016–T-022 → T-025–T-033 → T-037–T-041 → T-045–T-053 → T-036/T-034 → T-055 → T-066–T-072 → T-076–T-078/T-103 → T-082 → T-083`
+`T-001 → T-004 + T-108 → T-079 → T-113 → T-005/T-006 → T-016–T-022 → T-025–T-033 → T-037–T-041 → T-139 + T-140 → T-049–T-053, T-141 → T-036/T-034 → T-055 → T-145 → T-066–T-072 → T-076–T-078/T-103 → T-082 → T-083`
 
-Two external dependencies run alongside it and can block release regardless of engineering progress, so start them early:
+One external dependency runs alongside it and can block release regardless of engineering progress, so start it early:
 
-- Meta template approval (T-084), started in Wave 1.
-- Per-outlet WhatsApp number and catalog onboarding (T-100), including Meta business verification.
 - The Supabase and Railway region decision (T-108), which gates any real merchant data.
 
 The following work can proceed in parallel once the foundation is ready:
@@ -239,9 +246,9 @@ The following work can proceed in parallel once the foundation is ready:
 - Menu and inventory: T-016–T-024
 - Purchase orders and supplier debt: T-125–T-131 (after the ledger, T-041; not on the order critical path)
 - Admin shell and screens: T-066–T-072
-- WhatsApp infrastructure: T-045–T-049, T-100 (**Pilot**, not MVP)
-- Reservations: T-057–T-065 (not on the order critical path; needs T-055 and T-104 only for reminders and no-show release)
-- Recommendations: T-073–T-074, T-115 (**Pilot**, not MVP)
+- Web chat wireframes: T-139 (first; no web chat frontend before it)
+- Reservations: T-057–T-065 (not on the order critical path; the chat flow needs T-049 and T-141, no-show release needs T-104)
+- Recommendations: T-073–T-074, T-115
 - Legal and content: T-106, T-107
 
 ## Suggested issue labels
@@ -249,7 +256,7 @@ The following work can proceed in parallel once the foundation is ready:
 Use these labels when importing the backlog:
 
 - `phase:mvp`, `phase:p2`, `phase:p3`
-- `domain:platform`, `domain:auth`, `domain:menu`, `domain:inventory`, `domain:orders`, `domain:payments`, `domain:whatsapp`, `domain:reservations`, `domain:admin`, `domain:agent`
+- `domain:platform`, `domain:auth`, `domain:menu`, `domain:inventory`, `domain:orders`, `domain:payments`, `domain:webchat`, `domain:reservations`, `domain:admin`, `domain:agent`
 - `type:backend`, `type:frontend`, `type:worker`, `type:database`, `type:qa`, `type:devops`
 - `risk:financial`, `risk:privacy`, `risk:concurrency`, `risk:external-api`
 
@@ -260,9 +267,9 @@ Use these labels when importing the backlog:
 | Component | Runs on | Demo | Pilot |
 |---|---|---|---|
 | PostgreSQL, Auth, Storage | Supabase | Free plan, dummy data | Pro plan, backups, region per T-108 |
-| FastAPI API + WhatsApp worker | Railway service `app` | One service, two processes | Two services (`api`, `worker`) |
+| FastAPI API + timer worker | Railway service `app` | One service, two processes | Two services (`api`, `worker`) |
 | RabbitMQ | Railway service `rabbitmq` | Single node, no volume, memory watermark ~256 MiB | Single node with volume |
-| Admin app (React) | Cloudflare Pages or Vercel | Free tier | Same |
+| Admin app and web chat (React) | Cloudflare Pages or Vercel | Free tier | Same |
 | DB connections | Supabase transaction pooler (port 6543) | Small pool per process | Same |
 
 ### A.2 Exchanges and queues
@@ -271,13 +278,10 @@ All queues are durable, messages are persistent, and everything lives in one vho
 
 | Exchange | Queue | Producer | Consumer | Notes |
 |---|---|---|---|---|
-| `wa.inbound` (direct) | `wa.inbound.q` | Webhook handler (T-046) | Inbound worker | Prefetch 10. Per-conversation ordering through a Postgres advisory lock on conversation id. Max 4 attempts. |
-| `wa.outbound` (direct) | `wa.outbound.q` | Order, reservation, and notification services | Outbound worker (T-047) | Prefetch 5, paced to Meta rate limits. Max 6 attempts. |
-| `catalog.sync` (direct) | `catalog.sync.q` | Menu, price, and stock changes | Catalog worker (T-047) | Coalesce by outlet + item key (latest wins). Max 8 attempts. |
 | `jobs` (direct) | `jobs.due.q` | Scheduler poller (T-104) | Job handlers | Handlers are idempotent and re-check current state. |
-| `wa.dlx` (direct) | `wa.dead.q`, `catalog.dead.q`, `jobs.dead.q` | Consumer framework (T-111) | Replay tool (T-112) | No TTL. Kept until an admin replays or discards. |
+| `jobs.dlx` (direct) | `jobs.dead.q` | Consumer framework (T-111) | Replay tool (T-112) | No TTL. Kept until an admin replays or discards. |
 
-That is 4 working queues, 3 dead-letter queues, and 3 retry queues (A.3), 10 in total.
+That is 1 working queue, 1 dead-letter queue, and 3 retry queues (A.3), 5 in total. The WhatsApp queues of earlier drafts (`wa.inbound`, `wa.outbound`, `catalog.sync`) come back only with the Phase 3 WhatsApp channel (T-148).
 
 ### A.3 Retry tiers (TTL + dead-letter)
 
@@ -289,44 +293,42 @@ Retry delays are fixed, so queue-level TTL is safe here (no head-of-line blockin
 | `retry.30s` | `retry.30s.q` | 30 s | `retry.return` |
 | `retry.2m` | `retry.2m.q` | 2 min | `retry.return` |
 
-- The consumer republishes a failed message to a retry exchange using the original routing key (for example `wa.outbound`). After the TTL, RabbitMQ dead-letters it to `retry.return` (topic) with the same routing key, and `retry.return` is bound to the matching working queue.
+- The consumer republishes a failed message to a retry exchange using the original routing key (for example `jobs`). After the TTL, RabbitMQ dead-letters it to `retry.return` (topic) with the same routing key, and `retry.return` is bound to the matching working queue.
 - The app increments an `x-attempt` header on each republish. Attempt 1 uses 5 s, attempt 2 uses 30 s, attempt 3 and later use 2 min, until the queue's maximum is reached. Then the message goes to the matching dead-letter queue with `x-failure-reason`.
-- **Retryable:** network timeout, HTTP 429, HTTP 5xx, DB deadlock or serialization failure, lock timeout.
-- **Permanent (dead-letter immediately):** HTTP 4xx other than 429, invalid payload, unknown message type, template rejected.
-- **Special case:** a Meta "outside 24-hour window" error switches to an approved template and resends once. It does not count as a plain retry.
+- **Retryable:** network timeout, DB deadlock or serialization failure, lock timeout.
+- **Permanent (dead-letter immediately):** invalid payload, unknown job type.
 
 ### A.4 Scheduled jobs (not TTL)
 
-Business timers have variable delays (the unpaid timeout is configured per outlet, and reminders and no-show depend on booking time). Per-message TTL in one queue blocks behind the oldest message, and delayed messages are lost if the broker restarts without a volume. So the source of truth is the database:
+Business timers have variable delays (the unpaid timeout is configured per outlet, and no-show depends on booking time). Per-message TTL in one queue blocks behind the oldest message, and delayed messages are lost if the broker restarts without a volume. So the source of truth is the database:
 
 1. A job is inserted into `scheduled_jobs` (`job_key`, `type`, `run_at`, `status`, `payload`) in the same transaction as the business change, for example order creation.
 2. A poller (every 15 s) selects due jobs with `FOR UPDATE SKIP LOCKED`, publishes to `jobs` with publisher confirms, and marks them `enqueued`.
-3. The handler checks the current state before acting (for example the order is still unpaid and has no screenshot), then marks the job `done`. A job cancelled earlier (screenshot received, booking seated) is skipped.
+3. The handler checks the current state before acting (for example the order is still unpaid and the customer has not tapped Saya sudah bayar), then marks the job `done`. A job cancelled earlier (Saya sudah bayar tapped, booking seated) is skipped.
 4. Jobs that are overdue after downtime run immediately on the next poll.
 
 | Job type | Created when | Runs at | Spec |
 |---|---|---|---|
 | `unpaid_timeout` | Pay-first order created (T-034) | Order time + outlet timeout | US-021 |
-| `reservation_reminder` | Reservation confirmed (T-061) | Booking time − reminder offset | US-025 |
 | `no_show_release` | Reservation confirmed (T-064) | Booking time + 15 min | US-027 |
-| `anonymize_declined` | Order completed or cancelled, or booking finished (T-103) | Immediately after the end event | US-040, US-041 |
+| `anonymize_customer` | Order completed or cancelled, or booking completed, cancelled, or no-show (T-103) | Immediately after the end event | US-041 |
 | `attendance_flag` | Staff member clocks in (T-118) | Outlet closing time + grace period | US-053 |
 | `attendance_photo_purge` | Selfie stored (T-122) | Photo time + 45 days | US-053 |
 
 ### A.5 Consumer rules
 
 - Manual ack, sent only after the DB transaction commits. Publisher confirms on every publish.
-- Idempotency keys: Meta message id for inbound (T-048), `order_id:event` for outbound, `job_key` for jobs.
+- Idempotency keys: the page's key for customer actions (T-029), `job_key` for jobs.
 - Heartbeat 30 s, automatic reconnect with backoff, correlation id carried in message headers.
 - RabbitMQ memory bound set with an absolute `vm_memory_high_watermark` so Railway usage stays predictable.
-- Alert when any dead-letter queue is non-empty or `wa.inbound.q` backlog stays above a threshold (T-081).
+- Alert when the dead-letter queue is non-empty or `jobs.due.q` backlog stays above a threshold (T-081).
 
 ### A.6 Demo readiness checklist
 
 - [ ] Supabase project created, Auth hook adds `tenant_id` and `app_role` to the JWT (T-113)
 - [ ] RLS verified through the backend with a non-bypass role (T-005, T-015)
 - [ ] Railway `app` and `rabbitmq` deployed, topology declared by code (T-109, T-110)
-- [ ] Duplicate webhook, retry, and dead-letter replay rehearsed (T-111, T-112)
+- [ ] Double-tap Pesan & bayar, job retry, and dead-letter replay rehearsed (T-029, T-111, T-112)
 - [ ] Keep-alive and usage alerts active (T-114)
 - [ ] Only dummy data loaded; region decision recorded (T-108)
 
@@ -437,7 +439,7 @@ The same pattern repeats for every table that carries `tenant_id` and `outlet_id
 ### B.6 Workers and system actions
 
 - Workers and the scheduler have no user token. They set `app.actor` to `system` (or `agent` in Phase 2) and `app.tenant_id` from the message or job.
-- The webhook needs to find the tenant from the receiving WhatsApp number before any tenant is known. A narrow `security definer` function `app.resolve_outlet_by_phone(phone)` returns only `tenant_id` and `outlet_id`. It is the only lookup that crosses tenants.
+- The public web chat API needs to find the tenant from the outlet slug or table token before any tenant is known. A narrow `security definer` function (`app.resolve_public_scope(slug | token)`) returns only `tenant_id`, `outlet_id`, and the table if any. It is the only lookup that crosses tenants.
 - Every ledger and stock write still records the actor (NFR3), whether `user`, `system`, or `agent`.
 
 ### B.7 What happens when access changes
