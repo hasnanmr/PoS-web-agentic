@@ -21,6 +21,7 @@
   --pos-danger-soft: #fdecec;
   --pos-teal: #0f766e;
   --pos-teal-soft: #e6f4f2;
+  --pos-ai: #6d28d9; /* "◆ ASISTEN AI" label and the agent's order summary border (page 07) */
   --pos-sidebar-width: 220px;
 }
 
@@ -42,6 +43,7 @@
   --color-danger-soft: var(--pos-danger-soft);
   --color-teal: var(--pos-teal);
   --color-teal-soft: var(--pos-teal-soft);
+  --color-ai: var(--pos-ai);
   --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
 
   /* Side drawers (O2b, Order Board S3): dark area fades, panel slides in from the right. */

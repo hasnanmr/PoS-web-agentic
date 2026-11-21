@@ -29,7 +29,7 @@ function localDate(iso: string, timezone: string): string {
 }
 
 export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVersion, reschedule, preset = null, person,
-  prefilled, remember, onRemember, onBooked, onRescheduled }: {
+  prefilled, onBooked, onRescheduled }: {
   api: ChatApi
   outletName: string
   timezone: string
@@ -39,8 +39,6 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
   preset?: BookingPreset | null
   person: Person
   prefilled: boolean
-  remember: boolean
-  onRemember: (on: boolean) => void
   onBooked: (created: BookingCreated, person: Person) => void
   onRescheduled: (booking: Booking) => void
 }) {
@@ -132,7 +130,7 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tanggal">
             {[0, 1, 2].map((n) => addDays(today, n)).filter((d) => d <= limits.last).map((d, i) => (
               <Chip key={d} selected={day === d && !otherDay} onClick={() => { setOtherDay(false); setDay(d); setSlot(null) }}>
-                {i === 0 ? `Hari ini · ${dayLabel(d, false)}` : dayLabel(d, true)}
+                {i === 0 ? `Hari ini · ${dayLabel(d, false)}` : dayLabel(d, i === 1)}
               </Chip>
             ))}
             {addDays(today, 3) <= limits.last && (
@@ -159,6 +157,7 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
               {slots.map((s) => <Chip key={s.start_at} selected={slot !== null && Date.parse(slot.start_at) === Date.parse(s.start_at)} onClick={() => setSlot(s)}>{s.label}</Chip>)}
             </div>
           )}
+          <p className="mt-2 text-[11px] text-text-muted">Hanya jam di dalam jam booking &amp; batas hari outlet yang masih ada meja muat.</p>
         </Bubble>
       )}
       {!reschedule && slot && (
@@ -173,14 +172,10 @@ export function BookingFlow({ api, outletName, timezone, privacyUrl, privacyVers
               <input className={inputClass} value={who.phone} inputMode="tel" maxLength={20} autoComplete="tel"
                 onChange={(e) => { setWho({ ...who, phone: e.target.value }); setWhoDone(false) }} />
             </Field>
-            <p className="text-[11px] text-text-muted">
+            <p className="text-[11px] text-primary">
               🔒 Nama &amp; no HP hanya untuk booking ini, dihapus setelah booking selesai.{' '}
               <a href={privacyUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary">Kebijakan privasi ›</a>
             </p>
-            <label className="flex items-center gap-2 text-[12px]">
-              <input type="checkbox" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
-              Ingat data di HP ini (tidak disimpan di server)
-            </label>
             {!whoDone && <Action type="submit" disabled={!who.name.trim() || !who.phone.trim()}>Lanjut</Action>}
           </form>
         </Bubble>

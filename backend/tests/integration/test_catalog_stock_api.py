@@ -212,6 +212,41 @@ def test_addon_group_limits_and_replace(client, ctx) -> None:
     )
 
 
+def test_addon_group_max_select(client, ctx) -> None:
+    """O5 / C3 "maks 2": only for multiple-choice groups, below the option count."""
+    kopi = _product(client, ctx, "Americano")
+    url = f"/api/v1/owner/products/{kopi['id']}/addon-groups"
+    opts = [{"name": n} for n in ("Extra shot", "Gula aren", "Jelly")]
+    bad = [
+        {"name": "Tambahan", "selection": "single", "max_select": 2, "options": opts},
+        {"name": "Tambahan", "selection": "multiple", "max_select": 3, "options": opts},
+        {"name": "Tambahan", "selection": "multiple", "max_select": 1, "options": opts},
+    ]
+    for body in bad:
+        res = client.post(url, headers=ctx["owner"], json=body)
+        assert res.status_code == 422, body
+    res = client.post(
+        url,
+        headers=ctx["owner"],
+        json={"name": "Tambahan", "selection": "multiple", "max_select": 2, "options": opts},
+    )
+    assert res.status_code == 201, res.text
+    group = next(g for g in res.json()["addon_groups"] if g["name"] == "Tambahan")
+    assert group["max_select"] == 2
+    # Clearing the cap on edit.
+    res = client.patch(
+        f"/api/v1/owner/addon-groups/{group['id']}",
+        headers=ctx["owner"],
+        json={
+            "name": "Tambahan",
+            "selection": "multiple",
+            "options": [{"id": o["id"], "name": o["name"]} for o in group["options"]],
+        },
+    )
+    group = next(g for g in res.json()["addon_groups"] if g["name"] == "Tambahan")
+    assert group["max_select"] is None
+
+
 def test_addon_group_slot_freed_by_removing_an_option(client, ctx) -> None:
     """Regression: removed options are deactivated, and only active ones count toward 10."""
     kopi = _product(client, ctx, "Americano")

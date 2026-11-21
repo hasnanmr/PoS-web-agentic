@@ -226,17 +226,23 @@ def test_recommendation_streams_text_and_cards(client, ctx) -> None:
 
 
 def test_tool_log_has_no_personal_data(client, ctx) -> None:
-    _script(_tools(call("lihat_menu", {"cari": "Bima 0812-3456-7890"})), AIMessage("Hmm."))
-    _send(client, _outlet(ctx), "nama saya Bima 0812-3456-7890")
+    # Issue #97: the markers must not turn up by chance in the rest of the row. A bare "0812" or
+    # "Bima" can (hex UUIDs and timestamps in the log row, base64 in the encrypted history), so
+    # look for the name with its space (never in hex, a timestamp, or base64) and the phone as
+    # typed, with its dashes in places a UUID never has them.
+    name, phone = "Bima Sakti", "0812-3456-7890"
+    _script(_tools(call("lihat_menu", {"cari": f"{name} {phone}"})), AIMessage("Hmm."))
+    _send(client, _outlet(ctx), f"nama saya {name} {phone}")
     rows = admin_sql(
         "select row_to_json(c)::text from app.agent_tool_calls c where outlet_id = %s",
         (ctx["outlet"],),
     )
-    assert rows and all("Bima" not in r[0] and "0812" not in r[0] for r in rows)
+    assert rows and all(name not in r[0] and phone not in r[0] for r in rows)
     history = admin_sql(
         "select agent_history from app.chat_sessions where outlet_id = %s", (ctx["outlet"],)
     )
-    assert history[0][0].startswith("enc:v1:") and "Bima" not in history[0][0]
+    assert history[0][0].startswith("enc:v1:")
+    assert name not in history[0][0] and phone not in history[0][0]
 
 
 # C14 free-text order -------------------------------------------------------------------------

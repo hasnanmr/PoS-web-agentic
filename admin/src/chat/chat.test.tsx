@@ -64,9 +64,9 @@ function renderChat(routes: Record<string, unknown>, scope: 'o' | 't' = 'o', loc
     [`POST ${base}/orders/status`]: [],
     ...routes,
   })
-  render(<ChatScreens api={api} apiBaseUrl="https://api.test"
+  const view = render(<ChatScreens api={api} apiBaseUrl="https://api.test"
     scope={scope === 'o' ? { kind: 'o', slug: SLUG } : { kind: 't', token: TOKEN }} location={location} />)
-  return { api, location }
+  return { api, location, unmount: view.unmount }
 }
 
 beforeEach(() => {
@@ -494,6 +494,16 @@ describe('C9 AI / C14 / C15 agent', () => {
     expect(await screen.findByText('Hai!')).toBeInTheDocument()
   })
 
+  it('agent fails in Rekomendasi: the owner pick + best seller cards come back (C9 fallback)', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['error', { code: 'agent_timeout', fallback: 'cards' }]]))
+    renderChat({ [`GET ${O}`]: AGENT_O, [`GET ${O}/recommendations`]: [] })
+    await user.click(await screen.findByRole('button', { name: /Rekomendasi/ }))
+    await user.type(screen.getByPlaceholderText('Ceritakan seleramu…'), 'yang manis{Enter}')
+    expect(await screen.findByText(/Ini pilihan owner & terlaris di outlet ini ya/)).toBeInTheDocument()
+    expect(await screen.findByText(/Belum ada rekomendasi di outlet ini/)).toBeInTheDocument()
+  })
+
   it('rate limited in Rekomendasi: the buttons the copy points at are shown', async () => {
     const user = userEvent.setup()
     stubAgent(sse([['error', { code: 'too_many_requests', fallback: 'cards' }]]))
@@ -508,15 +518,16 @@ describe('C9 AI / C14 / C15 agent', () => {
   it('a quick reply tapped on the note step goes to the agent, not into the kitchen note', async () => {
     const user = userEvent.setup()
     const fetchMock = stubAgent(
-      sse([['final', { ...FINAL, reply_text: 'Mau jam berapa?', quick_replies: ['18:30'] }]]),
+      sse([['final', { ...FINAL, reply_text: 'Mau jam berapa?', quick_replies: ['18:30'],
+        cards: [{ product_id: 'p-kopi', name: 'Es Kopi Susu Senja', description: null, price: 25000, photo_url: null, badge: null }] }]]),
       sse([['final', { ...FINAL, reply_text: 'Oke, jam 18:30.' }]]),
     )
     renderChat({ [`GET ${O}`]: AGENT_O })
     await user.click(await screen.findByRole('button', { name: /Pesan/ }))
     await user.type(screen.getByPlaceholderText('Tulis pesananmu…'), 'reservasi{Enter}')
     await screen.findByText('Mau jam berapa?')
-    const menu = screen.getByRole('list', { name: 'Menu' })
-    await user.click(within(menu).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    const cards = screen.getByRole('list', { name: 'Rekomendasi asisten' })
+    await user.click(within(cards).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
     await user.click(screen.getByRole('radio', { name: /Oat milk/ }))
     await user.click(screen.getByRole('button', { name: 'Lanjut' }))
     expect(await screen.findByText(/Catatan untuk dapur\?/)).toBeInTheDocument()
@@ -524,5 +535,173 @@ describe('C9 AI / C14 / C15 agent', () => {
     expect(await screen.findByText('Oke, jam 18:30.')).toBeInTheDocument()
     expect(sent(fetchMock, 1).body.text).toBe('18:30')
     expect(screen.queryByText(/Masuk keranjang/)).not.toBeInTheDocument()
+  })
+
+  // FR6.2: a refresh keeps the chat. The transcript stays on this phone only.
+  const TRANSCRIPT = 'thinker.chat.transcript.v1'
+
+  it('a refresh shows the same chat, agent replies included', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['final', { ...FINAL, reply_text: 'Italian chicken 2 porsi, mau diambil atau diantar?', quick_replies: ['Pickup'] }]]))
+    const first = renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'mau italian chicken 2 porsi{Enter}')
+    await screen.findByText(/mau diambil atau diantar\?/)
+    await waitFor(() => expect(localStorage.getItem(TRANSCRIPT)).toContain('mau diambil atau diantar'))
+    first.unmount()
+
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    expect(await screen.findByText('mau italian chicken 2 porsi')).toBeInTheDocument()
+    expect(screen.getByText('Italian chicken 2 porsi, mau diambil atau diantar?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pickup' })).toBeInTheDocument()
+  })
+
+  it('a reply cut off by the refresh shows the friendly fallback, not a spinner', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))
+    const first = renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'halo{Enter}')
+    await waitFor(() => expect(localStorage.getItem(TRANSCRIPT)).toContain('halo'))
+    first.unmount()
+
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    expect(await screen.findByText('halo')).toBeInTheDocument()
+    expect(screen.getByText(/asistennya lagi belum bisa jawab/)).toBeInTheDocument()
+  })
+
+  it('after 2 idle hours the old chat is gone with the cart', async () => {
+    const user = userEvent.setup()
+    stubAgent()
+    const first = renderChat({})
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'pesan lama{Enter}')
+    await waitFor(() => expect(localStorage.getItem(TRANSCRIPT)).toContain('pesan lama'))
+    first.unmount()
+
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, cart_expired: true } })
+    expect(await screen.findByText('Keranjangmu sudah kosong lagi')).toBeInTheDocument()
+    expect(screen.queryByText('pesan lama')).not.toBeInTheDocument()
+    expect(localStorage.getItem(TRANSCRIPT) ?? '').not.toContain('pesan lama')
+  })
+})
+
+describe('C3 add-on limits', () => {
+  it('"Tambahan · opsional, maks 2" stops a third choice', async () => {
+    const user = userEvent.setup()
+    const roti: ChatMenuItem = { ...AMERICANO, product_id: 'p-roti', name: 'Roti Bakar', addon_groups: [{
+      id: 'g-tambah', name: 'Tambahan', selection: 'multiple', is_required: false, max_select: 2,
+      options: ['Keju', 'Cokelat', 'Susu'].map((n) => ({ id: `o-${n}`, name: n, price: 3000, available: true })),
+    }] }
+    renderChat({ [`GET ${O}/menu`]: [roti] })
+    await user.click(await screen.findByRole('button', { name: /Pesan/ }))
+    await user.click(await screen.findByRole('button', { name: 'Tambah Roti Bakar' }))
+    expect(screen.getByText('Tambahan · opsional, maks 2')).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /Keju/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Cokelat/ }))
+    expect(screen.getByRole('checkbox', { name: /Susu/ })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: /Keju/ }))
+    expect(screen.getByRole('checkbox', { name: /Susu/ })).toBeEnabled()
+  })
+})
+
+describe('C5 delivery details', () => {
+  it('the bottom text box ("Ketik alamat…") fills the address field', async () => {
+    const user = userEvent.setup()
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'cart', fulfillment: 'delivery',
+      cart: { lines: [{ product_id: 'p-americano', quantity: 1, addon_option_ids: [], note: null }] } } })
+    await user.click(await screen.findByRole('button', { name: /Diantar/ }))
+    const box = await screen.findByPlaceholderText('Ketik alamat…')
+    await user.type(box, 'Jl. Dipatiukur No. 35, kos hijau{Enter}')
+    expect(screen.getByLabelText(/Alamat antar/)).toHaveValue('Jl. Dipatiukur No. 35, kos hijau')
+  })
+})
+
+describe('resume after a refresh (FR6.2)', () => {
+  it('the menu comes back even with an empty cart', async () => {
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, last_activity_at: new Date().toISOString(), step: 'menu' } })
+    expect(await screen.findByText(/Pilih kategori/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Reservasi meja/ })).not.toBeInTheDocument()
+  })
+
+  it('Rekomendasi comes back even with an empty cart', async () => {
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, last_activity_at: new Date().toISOString(), step: 'recs' }, [`GET ${O}/recommendations`]: [] })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Reservasi meja/ })).not.toBeInTheDocument())
+    expect(screen.queryByText(/Selamat datang/)).not.toBeInTheDocument()
+  })
+
+  it('a refresh after talking to the agent shows the divider and keeps the menu out of the way', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      `event: final\ndata: ${JSON.stringify({ reply_text: 'Mau berapa porsi?', cards: [], quick_replies: ['1', '2'], order_draft: null, booking_draft: null, out_of_scope: false, prompt_version: 'v' })}\n\n`,
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } })))
+    const page = { [`GET ${O}`]: { ...PAGE_O, agent_enabled: true } }
+    const first = renderChat(page)
+    await user.click(await screen.findByRole('button', { name: /Pesan/ }))
+    expect(screen.getByRole('list', { name: 'Menu' })).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Tulis pesananmu…'), 'italian chicken{Enter}')
+    await screen.findByText('Mau berapa porsi?')
+    // The menu is not drawn again under the reply.
+    expect(screen.queryByRole('list', { name: 'Menu' })).not.toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('thinker.chat.transcript.v1')).toContain('Mau berapa porsi?'))
+    first.unmount()
+
+    renderChat({ ...page, [`GET ${O}/chat-session`]: { ...SESSION, last_activity_at: new Date().toISOString(), step: 'menu' } })
+    expect(await screen.findByText('Mau berapa porsi?')).toBeInTheDocument()
+    expect(screen.getByRole('separator')).toHaveTextContent('Lanjut dari chat sebelumnya')
+    expect(screen.queryByRole('list', { name: 'Menu' })).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('only the latest agent reply keeps its buttons active', async () => {
+    const user = userEvent.setup()
+    const reply = (text: string, quick: string[]) => new Response(
+      `event: final\ndata: ${JSON.stringify({ reply_text: text, cards: [], quick_replies: quick, order_draft: null, booking_draft: null, out_of_scope: false, prompt_version: 'v' })}\n\n`,
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+    const replies = [reply('Diambil atau diantar?', ['Pickup']), reply('Berapa porsi?', ['2 porsi'])]
+    vi.stubGlobal('fetch', vi.fn(async () => replies.shift()!))
+    renderChat({ [`GET ${O}`]: { ...PAGE_O, agent_enabled: true } })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'italian chicken{Enter}')
+    expect(await screen.findByRole('button', { name: 'Pickup' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Pickup' }))
+    expect(await screen.findByRole('button', { name: '2 porsi' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Pickup' })).toBeDisabled()
+    vi.unstubAllGlobals()
+  })
+
+  it('an empty-cart session idle for 2 hours starts again from the greeting', async () => {
+    const old = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'menu', last_activity_at: old } })
+    expect(await screen.findByRole('button', { name: /Reservasi meja/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Pilih kategori/)).not.toBeInTheDocument()
+  })
+
+  it('checkout steps with an empty cart start from the main menu', async () => {
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'summary' } })
+    expect(await screen.findByRole('button', { name: /Reservasi meja/ })).toBeInTheDocument()
+  })
+})
+
+describe('chat transcript storage', () => {
+  it('is per session and dropped after 2 hours without activity', async () => {
+    const { loadTranscript, saveTranscript, TRANSCRIPT_IDLE_MS } = await import('./storage')
+    const now = Date.parse('2026-11-21T10:00:00Z')
+    saveTranscript('o:x', 'sess-1', [{ id: 1 }], now)
+    expect(loadTranscript('o:x', 'sess-1', now + TRANSCRIPT_IDLE_MS - 1)).toEqual([{ id: 1 }])
+    expect(loadTranscript('o:x', 'sess-1', now + TRANSCRIPT_IDLE_MS)).toEqual([])
+    expect(loadTranscript('o:x', 'sess-2', now)).toEqual([])
+    expect(loadTranscript('t:y', 'sess-1', now)).toEqual([])
+  })
+
+  it('removes every expired transcript from the phone, not only the one opened', async () => {
+    const { loadTranscript, saveTranscript, TRANSCRIPT_IDLE_MS } = await import('./storage')
+    const now = Date.parse('2026-11-21T10:00:00Z')
+    saveTranscript('o:old', 's-old', [{ id: 1, text: 'Rina 0812' }], now)
+    saveTranscript('t:fresh', 's-new', [{ id: 2 }], now + TRANSCRIPT_IDLE_MS - 10)
+    expect(loadTranscript('t:fresh', 's-new', now + TRANSCRIPT_IDLE_MS + 1)).toEqual([{ id: 2 }])
+    expect(localStorage.getItem('thinker.chat.transcript.v1')).not.toContain('Rina')
+    loadTranscript('t:fresh', 's-new', now + 3 * TRANSCRIPT_IDLE_MS)
+    expect(localStorage.getItem('thinker.chat.transcript.v1')).toBeNull()
   })
 })

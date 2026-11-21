@@ -12,8 +12,8 @@ import { Action, Bubble, Chip, Choice, Field, FromPhone, TextLink, inputClass } 
 
 // C2 ------------------------------------------------------------------------------------------------
 
-export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
-  outletName: string; menu: ChatMenuItem[]; cart: CartLine[]; webOrdering: boolean; onAdd: (item: ChatMenuItem) => void
+export function MenuCards({ outletName, menu, cart, webOrdering, canBook = false, onAdd }: {
+  outletName: string; menu: ChatMenuItem[]; cart: CartLine[]; webOrdering: boolean; canBook?: boolean; onAdd: (item: ChatMenuItem) => void
 }) {
   const [category, setCategory] = useState<string | null>(null)
   const categories = useMemo(() => [...new Set(menu.map((m) => m.category).filter((c): c is string => Boolean(c)))], [menu])
@@ -32,7 +32,7 @@ export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
       </Bubble>
       {!webOrdering && (
         <Bubble tone="warning">
-          🧾 Untuk outlet ini, pesanan dilayani langsung di kasir ya. Menunya bisa kamu lihat dulu di sini.
+          🧾 Untuk outlet ini, pesanan dilayani langsung di kasir ya. Menunya bisa kamu lihat dulu di sini{canBook ? ', dan reservasi meja tetap bisa.' : '.'}
         </Bubble>
       )}
       <ul className="space-y-2" aria-label="Menu">
@@ -41,7 +41,7 @@ export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
           const hint = item.description || (item.addon_groups.length ? 'ada pilihan' : '')
           return (
             <li key={item.product_id}
-              className={`flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5 ${item.sold_out ? 'opacity-60' : ''}`}>
+              className="flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5">
               {item.photo_url ? (
                 <Photo src={item.photo_url} className="h-14 w-14 shrink-0 rounded-lg" />
               ) : (
@@ -50,14 +50,14 @@ export function MenuCards({ outletName, menu, cart, webOrdering, onAdd }: {
               <div className="min-w-0 flex-1 text-[13px]">
                 <p className="font-semibold">{item.name}</p>
                 {hint && <p className="truncate text-[11px] text-text-muted">{item.description && item.addon_groups.length ? `${item.description} · ada pilihan` : hint}</p>}
-                <p className="font-semibold">{formatRupiah(item.price)}</p>
+                <p className={item.sold_out ? 'text-[12px] text-text-muted' : 'font-semibold'}>{formatRupiah(item.price)}</p>
               </div>
               {item.sold_out ? (
                 <span className="shrink-0 rounded-full bg-danger-soft px-2 py-1 text-[11px] font-semibold text-danger">Habis</span>
               ) : webOrdering ? (
                 count > 0 ? (
                   <button type="button" onClick={() => onAdd(item)} aria-label={`Tambah lagi ${item.name}`}
-                    className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1.5 text-[11px] font-semibold text-primary">
+                    className="shrink-0 rounded-lg bg-primary-soft px-2.5 py-1.5 text-[11px] font-semibold text-primary">
                     {count} di keranjang
                   </button>
                 ) : (
@@ -87,7 +87,9 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
     setPicked((p) => {
       const cur = p[groupId] ?? []
       if (single) return { ...p, [groupId]: cur[0] === optionId ? [] : [optionId] }
-      return { ...p, [groupId]: cur.includes(optionId) ? cur.filter((o) => o !== optionId) : [...cur, optionId] }
+      if (cur.includes(optionId)) return { ...p, [groupId]: cur.filter((o) => o !== optionId) }
+      const max = item.addon_groups.find((g) => g.id === groupId)?.max_select
+      return max && cur.length >= max ? p : { ...p, [groupId]: [...cur, optionId] }
     })
   }
   const requiredOnly = () => item.addon_groups.filter((g) => g.is_required).flatMap((g) => picked[g.id] ?? [])
@@ -95,10 +97,13 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
     <div className="space-y-2">
       {item.addon_groups.map((g) => {
         const single = g.selection === 'single'
+        // C3: "Pilih susu · wajib, pilih 1", "Tambahan · opsional, maks 2".
+        const limit = single ? 'pilih 1' : g.max_select ? `maks ${g.max_select}` : ''
+        const full = !single && !!g.max_select && (picked[g.id] ?? []).length >= g.max_select
         return (
           <Bubble key={g.id}>
             <p className="mb-2 font-semibold">
-              {g.name} · {g.is_required ? (single ? 'wajib, pilih 1' : 'wajib') : 'opsional'}
+              {g.name} · {[g.is_required ? 'wajib' : 'opsional', limit].filter(Boolean).join(', ')}
             </p>
             <div role={single ? 'radiogroup' : 'group'} aria-label={g.name} className="space-y-1.5">
               {g.options.map((o) => {
@@ -106,7 +111,7 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
                 const mark = single ? (on ? '✓ ' : '') : on ? '☑ ' : '☐ '
                 return (
                   <button key={o.id} type="button" role={single ? 'radio' : 'checkbox'} aria-checked={on}
-                    disabled={!o.available} onClick={() => toggle(g.id, o.id, single)}
+                    disabled={!o.available || (full && !on)} onClick={() => toggle(g.id, o.id, single)}
                     className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-[13px] disabled:opacity-40 ${
                       on ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-primary/40 bg-surface text-primary'}`}>
                     <span>{mark}{o.name}{!o.available ? ' · habis' : ''}</span>
@@ -119,7 +124,7 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
         )
       })}
       <div className="grid max-w-[92%] grid-cols-2 gap-2">
-        <Action tone="ghost" disabled={missing} onClick={() => onDone(requiredOnly())}>Lewati</Action>
+        <Action tone="quiet" disabled={missing} onClick={() => onDone(requiredOnly())}>Lewati</Action>
         <Action disabled={missing} onClick={() => onDone(Object.values(picked).flat())}>Lanjut</Action>
       </div>
     </div>
@@ -204,9 +209,11 @@ export interface Details {
   address: string
 }
 
-export function DetailsForm({ mode, initial, prefilled, remember, privacyUrl, error, onRemember, onClearSaved, onSubmit }: {
+export function DetailsForm({ mode, initial, typedAddress, prefilled, remember, privacyUrl, error, onRemember, onClearSaved, onSubmit }: {
   mode: 'pickup' | 'delivery' | 'table'
   initial: Details
+  /** C5: an address typed in the bottom text box ("Ketik alamat…") fills the address field. */
+  typedAddress?: { text: string; seq: number }
   prefilled: boolean
   remember: boolean
   privacyUrl: string
@@ -217,6 +224,11 @@ export function DetailsForm({ mode, initial, prefilled, remember, privacyUrl, er
 }) {
   const [d, setD] = useState<Details>(initial)
   const [touched, setTouched] = useState(false)
+  const [addressSeq, setAddressSeq] = useState(typedAddress?.seq ?? 0)
+  if (typedAddress && typedAddress.seq !== addressSeq) {
+    setAddressSeq(typedAddress.seq)
+    setD({ ...d, address: typedAddress.text.slice(0, 300) })
+  }
   const needPhone = mode !== 'table'
   const needAddress = mode === 'delivery'
   const ok = d.name.trim() && (!needPhone || d.phone.trim()) && (!needAddress || d.address.trim())
@@ -230,14 +242,10 @@ export function DetailsForm({ mode, initial, prefilled, remember, privacyUrl, er
               onChange={(e) => setD({ ...d, name: e.target.value })} />
           </Field>
           {touched && !d.name.trim() && <p className="mt-1 text-[12px] text-danger">Isi nama dulu ya, biar staf bisa memanggilmu.</p>}
-          <p className="mt-2 text-[11px] text-text-muted">
+          <p className="mt-2 text-[11px] text-primary">
             🔒 Nama hanya untuk pesanan ini dan dihapus setelah selesai.{' '}
             <a href={privacyUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary">Kebijakan privasi ›</a>
           </p>
-          <label className="mt-2 flex items-center gap-2 text-[12px]">
-            <input type="checkbox" checked={remember} onChange={(e) => onRemember(e.target.checked)} />
-            Ingat nama di HP ini (tidak disimpan di server)
-          </label>
           {prefilled && <TextLink className="mt-1" onClick={onClearSaved}>Hapus data tersimpan</TextLink>}
         </Bubble>
         {error && <Bubble tone="danger">{error}</Bubble>}

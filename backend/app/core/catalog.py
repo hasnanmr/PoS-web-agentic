@@ -114,7 +114,7 @@ async def get_product(conn: AsyncConnection, product_id: UUID) -> dict[str, Any]
 async def _addon_groups(conn: AsyncConnection, product_id: UUID) -> list[dict[str, Any]]:
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
-        "select id, name, selection::text as selection, is_required, sort_order"
+        "select id, name, selection::text as selection, is_required, max_select, sort_order"
         " from app.addon_groups where product_id = %s order by sort_order, created_at",
         (product_id,),
     )
@@ -396,6 +396,7 @@ async def save_addon_group(
     selection: str,
     is_required: bool,
     options: list[OptionInput],
+    max_select: int | None = None,
 ) -> UUID:
     """Create (product_id) or replace (group_id) a group with its options and prices.
     Options missing from the list are deactivated (orders may reference them)."""
@@ -404,6 +405,13 @@ async def save_addon_group(
     if len(options) > MAX_OPTIONS:
         raise ValidationFailedError(
             f"at most {MAX_OPTIONS} options per group", {"field": "options"}
+        )
+    # "maks N" only for groups with several choices, and fewer than the number of options
+    # (a cap equal to the option count would mean no cap).
+    if max_select is not None and (selection != "multiple" or not 2 <= max_select < len(options)):
+        raise ValidationFailedError(
+            "max_select needs a multiple-choice group and fewer than the number of options",
+            {"field": "max_select"},
         )
     if group_id is None:
         assert product_id is not None  # noqa: S101
@@ -416,14 +424,23 @@ async def save_addon_group(
         sort = (await cur.fetchone())[0]  # type: ignore[index]
         await conn.execute(
             "insert into app.addon_groups (id, tenant_id, product_id, name, selection, is_required,"
-            " sort_order) values (%s, %s, %s, %s, %s, %s, %s)",
-            (group_id, ctx.tenant_id, product_id, name.strip(), selection, is_required, sort),
+            " max_select, sort_order) values (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                group_id,
+                ctx.tenant_id,
+                product_id,
+                name.strip(),
+                selection,
+                is_required,
+                max_select,
+                sort,
+            ),
         )
     else:
         cur = await conn.execute(
-            "update app.addon_groups set name = %s, selection = %s, is_required = %s"
-            " where id = %s returning product_id",
-            (name.strip(), selection, is_required, group_id),
+            "update app.addon_groups set name = %s, selection = %s, is_required = %s,"
+            " max_select = %s where id = %s returning product_id",
+            (name.strip(), selection, is_required, max_select, group_id),
         )
         row = await cur.fetchone()
         if row is None:
@@ -798,7 +815,7 @@ async def counter_menu(
     await cur.execute(
         """
         select g.id, g.product_id, g.name, g.selection::text as selection, g.is_required,
-               o.id as option_id, o.name as option_name, op.price
+               g.max_select, o.id as option_id, o.name as option_name, op.price
         from app.addon_groups g
         join app.addon_options o on o.group_id = g.id and o.is_active
         join app.outlet_prices op on op.addon_option_id = o.id and op.outlet_id = %s
@@ -816,6 +833,7 @@ async def counter_menu(
                 "name": r["name"],
                 "selection": r["selection"],
                 "is_required": r["is_required"],
+                "max_select": r["max_select"],
                 "options": [],
             },
         )

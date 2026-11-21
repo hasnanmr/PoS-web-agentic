@@ -31,8 +31,9 @@ import {
 import { MyOrders, PayCard, StatusCard } from './PayStatus'
 import { isActive, useObjectUrl } from './status'
 import {
-  bookingFragment, clearDetails, forgetOrder, loadBookings, loadDetails, loadOrders, orderFragment, randomKey,
-  readFragment, rememberBooking, rememberOrder, saveDetails, sessionId, type SavedBooking, type SavedOrder,
+  bookingFragment, clearDetails, clearTranscript, forgetOrder, loadBookings, loadDetails, loadOrders, loadTranscript,
+  orderFragment, randomKey, readFragment, rememberBooking, rememberOrder, saveDetails, saveTranscript, sessionId,
+  type SavedBooking, type SavedOrder,
 } from './storage'
 import type {
   Booking, CartLine, ChatMenuItem, ChatPage, ChatQuote, OrderOverview, OrderStatus, RecommendationCard, Scope,
@@ -41,7 +42,9 @@ import { Action, ActionBar, Bubble, BottomBar, ChatHeader, Choice, Mine, TextLin
 
 type Step =
   | { name: 'main' }
-  | { name: 'menu' }
+  // quiet: the customer is talking to the agent, so the menu / Rekomendasi cards are not drawn
+  // again under every reply (they come back with Pesan / Rekomendasi or Menu utama).
+  | { name: 'menu'; quiet?: boolean }
   | { name: 'addons'; item: ChatMenuItem }
   | { name: 'note'; item: ChatMenuItem; optionIds: string[] }
   | { name: 'cart' }
@@ -49,15 +52,29 @@ type Step =
   | { name: 'summary' }
   | { name: 'order'; saved: SavedOrder }
   | { name: 'myOrders' }
-  | { name: 'recs' }
+  | { name: 'recs'; quiet?: boolean }
   | { name: 'book'; preset?: BookingPreset }
   | { name: 'reschedule'; booking: Booking; key: string }
   | { name: 'booked'; booking: Booking; saved: SavedBooking }
   | { name: 'myBookings' }
 
 type Msg =
-  | { id: number; kind: 'me' | 'ok' | 'info' | 'warn' | 'expired'; text: string }
+  | { id: number; kind: 'me' | 'ok' | 'info' | 'warn' | 'expired' | 'resumed'; text: string }
   | { id: number; kind: 'ai'; turn: AgentTurn }
+
+const RESUME_IDLE_MS = 2 * 60 * 60 * 1000
+
+function recentlyActive(lastActivityAt: string | null, now = Date.now()): boolean {
+  return lastActivityAt !== null && now - Date.parse(lastActivityAt) < RESUME_IDLE_MS
+}
+
+/** A transcript saved on this phone, as it should show after a refresh: a reply that was still
+ * streaming when the page closed can't continue, so it shows the friendly fallback instead. */
+function restoreTranscript(saved: Msg[]): Msg[] {
+  return saved.filter((m) => m.kind !== 'resumed').map((m): Msg => (m.kind === 'ai' && m.turn.result === null
+    ? { ...m, turn: { ...m.turn, result: { kind: 'error', code: 'agent_unavailable', fallback: m.turn.context === 'recommend' ? 'cards' : 'buttons' } } }
+    : m))
+}
 
 export interface HashLocation {
   read: () => string
@@ -96,6 +113,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [cart, setCart] = useState<CartLine[]>([])
   const [fulfillment, setFulfillment] = useState<'pickup' | 'delivery' | null>(null)
+  const [typedAddress, setTypedAddress] = useState({ text: '', seq: 0 })
   const saved = loadDetails()
   const [details, setDetails] = useState<Details>({ name: saved?.name ?? '', phone: saved?.phone ?? '', address: saved?.address ?? '' })
   const [prefilled, setPrefilled] = useState(Boolean(saved))
@@ -121,6 +139,16 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       setMenu(m)
       setCart(session.cart.lines)
       setFulfillment(session.fulfillment)
+      let talking = false
+      // The bubbles of this session come back from the phone (2 hours idle drops them, like the cart).
+      if (session.cart_expired) clearTranscript(key)
+      else {
+        const transcript = restoreTranscript(loadTranscript<Msg>(key, chat.session))
+        nextId.current = Math.max(0, ...transcript.map((m) => m.id)) + 1
+        talking = transcript.at(-1)?.kind === 'ai'
+        // A small divider shows where the earlier chat ends.
+        setMsgs(transcript.length > 0 ? [...transcript, { id: nextId.current++, kind: 'resumed', text: '' }] : [])
+      }
       const fragment = readFragment(location.read())
       if (fragment?.kind === 'order') {
         setOrders(rememberOrder(key, fragment.order))
@@ -138,8 +166,17 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       } else if (session.cart_expired) {
         setMsgs([{ id: nextId.current++, kind: 'expired', text: '' }])
         setStep({ name: 'main' })
+      } else if (session.cart.lines.length === 0 && !recentlyActive(session.last_activity_at)) {
+        // An empty-cart session left for 2 hours or more starts again from the greeting (C1/C8);
+        // the server only resets sessions that had something in the cart.
+        setStep({ name: 'main' })
+      } else if (session.step === 'recs') {
+        // Browsing Rekomendasi or the menu comes back there even with an empty cart.
+        setStep({ name: 'recs', quiet: talking })
+      } else if (session.step === 'menu' || session.step.startsWith('addons') || session.step === 'note') {
+        setStep({ name: 'menu', quiet: talking })
       } else if (session.cart.lines.length > 0 && RESUME_STEPS.has(session.step)) {
-        setStep(session.step === 'menu' || session.step.startsWith('addons') || session.step === 'note' ? { name: 'menu' } : { name: 'cart' })
+        setStep({ name: 'cart' })
       }
       restored.current = true
       setLoad('ready')
@@ -164,6 +201,23 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
     }, 400)
     return () => window.clearTimeout(timer)
   }, [chat, cart, fulfillment, stepName, scope.kind])
+
+  // Keep the transcript on this phone so a refresh shows the same chat (debounced: a streaming
+  // reply changes it many times a second).
+  useEffect(() => {
+    if (!restored.current) return
+    const save = () => saveTranscript(key, chat.session, msgs)
+    const timer = window.setTimeout(save, 300)
+    // A refresh or closing the tab inside the 300 ms keeps the latest bubbles too.
+    const flush = () => { if (document.visibilityState !== 'visible') save() }
+    window.addEventListener('pagehide', save)
+    document.addEventListener('visibilitychange', flush)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pagehide', save)
+      document.removeEventListener('visibilitychange', flush)
+    }
+  }, [chat, key, msgs])
 
   // Pesanan Saya (C1 button, C7 list): the orders this phone kept keys for.
   const refreshOverview = useCallback(async () => {
@@ -224,6 +278,12 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       addLine(step.item, step.optionIds, text.slice(0, 200))
       return
     }
+    // C5 "Ketik alamat…": on the delivery details step the text box fills the address.
+    if (step.name === 'details' && scope.kind === 'o' && fulfillment === 'delivery') {
+      say('me', text)
+      setTypedAddress((a) => ({ text: text.trim(), seq: a.seq + 1 }))
+      return
+    }
     if (page?.agent_enabled) { void askAgent(text.trim().slice(0, 500)); return }
     say('me', text)
     say('info', 'Untuk sekarang pakai tombol di atas ya. Ketik "menu" kapan saja untuk kembali ke menu utama.')
@@ -242,6 +302,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       return
     }
     agentBusy.current = true
+    if ((step.name === 'menu' || step.name === 'recs') && !step.quiet) setStep({ ...step, quiet: true })
     const context: AgentContext = step.name === 'recs' ? 'recommend' : step.name === 'book' ? 'book'
       : ['menu', 'addons', 'cart', 'details', 'summary'].includes(step.name) ? 'order' : 'auto'
     say('me', text)
@@ -253,6 +314,8 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         onDelta: (d) => updateTurn(id, (t) => ({ ...t, text: t.text + d })),
       })
       updateTurn(id, (t) => ({ ...t, result }))
+      // C9 fallback: when the agent fails in Rekomendasi, the owner's pick + best seller cards come back.
+      if (result.kind === 'error' && result.fallback === 'cards') setStep((s) => (s.name === 'recs' ? { name: 'recs' } : s))
     } finally {
       agentBusy.current = false
     }
@@ -293,7 +356,8 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         )}
         {load === 'error' && (
           <Bubble>
-            <p>Sinyalnya lagi putus-putus. Coba lagi sebentar ya.</p>
+            <p className="font-semibold">Sebentar ya…</p>
+            <p className="mt-1">Sinyalnya lagi putus-putus. Coba lagi sebentar ya.</p>
             <TextLink className="mt-1" onClick={() => { setLoad('loading'); void start() }}>Coba lagi</TextLink>
           </Bubble>
         )}
@@ -302,6 +366,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
   }
 
   const outletName = page.outlet.name
+  const lastAgentId = msgs.findLast((m) => m.kind === 'ai')?.id
   const mode: 'pickup' | 'delivery' | 'table' = scope.kind === 't' ? 'table' : fulfillment ?? 'pickup'
   const totals = cartTotal(cart, byId)
   const active = myOrders.filter(isActive)
@@ -310,6 +375,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       subtitle={page.table ? `${tableLabel(page.table.name)} · ${page.table.area ? `${page.table.area} · ` : ''}dine-in` : outletSubtitle(page)} />
   )
   const placeholder = step.name === 'note' ? 'Tulis catatan…'
+    : step.name === 'details' && mode === 'delivery' ? 'Ketik alamat…'
     : page.agent_enabled && step.name === 'recs' ? 'Ceritakan seleramu…'
       : page.agent_enabled && step.name === 'menu' ? 'Tulis pesananmu…'
         : step.name === 'main' || step.name === 'menu' ? 'Ketik pesanan atau "menu"…' : 'Ketik "menu"…'
@@ -328,12 +394,17 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       bottom={<BottomBar placeholder={placeholder} onMainMenu={mainMenu} onSend={onText} />}>
       {msgs.map((m) => (
         m.kind === 'ai' ? (
-          <AgentReply key={m.id} turn={m.turn} byId={byId} webOrdering={page.web_ordering}
+          <AgentReply key={m.id} turn={m.turn} active={m.id === lastAgentId} customer={details} byId={byId} webOrdering={page.web_ordering}
             canBook={scope.kind === 'o' && page.reservations_enabled}
             onAdd={startAdd} onQuick={(q) => void askAgent(q)} onOrder={applyOrderDraft} onBook={applyBookingDraft}
             onPick={(target) => go(target === 'menu' ? 'Pesan' : target === 'recs' ? 'Rekomendasi' : 'Reservasi meja', { name: target })} />
         )
           : m.kind === 'me' ? <Mine key={m.id}>{m.text}</Mine>
+          : m.kind === 'resumed' ? (
+            <p key={m.id} className="flex items-center gap-2 py-1 text-[11px] text-text-muted" role="separator">
+              <span className="h-px flex-1 bg-border" />Lanjut dari chat sebelumnya<span className="h-px flex-1 bg-border" />
+            </p>
+          )
           : m.kind === 'expired' ? (
             <Bubble key={m.id}>
               <p className="font-semibold">Keranjangmu sudah kosong lagi</p>
@@ -348,8 +419,9 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         <MainMenu page={page} scope={scope} active={active[0] ?? null}
           onPick={(label, next) => go(label, next)} />
       )}
-      {step.name === 'menu' && (
-        <MenuCards outletName={outletName} menu={menu} cart={cart} webOrdering={page.web_ordering} onAdd={startAdd} />
+      {step.name === 'menu' && !step.quiet && (
+        <MenuCards outletName={outletName} menu={menu} cart={cart} webOrdering={page.web_ordering}
+          canBook={scope.kind === 'o' && page.reservations_enabled} onAdd={startAdd} />
       )}
       {step.name === 'addons' && (
         <AddonPicker item={step.item} onDone={(ids) => setStep({ name: 'note', item: step.item, optionIds: ids })} />
@@ -357,12 +429,12 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       {step.name === 'note' && (
         <NotePrompt onSkip={() => { say('me', 'Tanpa catatan'); addLine(step.item, step.optionIds, null) }} />
       )}
-      {step.name === 'recs' && (
+      {step.name === 'recs' && !step.quiet && (
         <Recommendations chat={chat} byId={byId} webOrdering={page.web_ordering} agent={page.agent_enabled} onAdd={startAdd} />
       )}
       {(step.name === 'cart' || step.name === 'details' || step.name === 'summary') && (
         <Checkout footerSlot={footerSlot} chat={chat} page={page} scope={scope} step={step.name} mode={mode} cart={cart} byId={byId}
-          fulfillment={fulfillment} details={details} prefilled={prefilled} remember={remember}
+          fulfillment={fulfillment} details={details} prefilled={prefilled} remember={remember} typedAddress={typedAddress}
           onQuantity={setQuantity} onAddMore={() => go('+ Tambah menu', { name: 'menu' })}
           onEmpty={() => { setCart([]); say('info', 'Keranjang sudah dikosongkan.') }}
           onFulfillment={(f) => {
@@ -385,13 +457,14 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
             setOrders(rememberOrder(key, s))
             setCart([])
             setMsgs([])
+            say('me', 'Pesan & bayar')
             location.write(orderFragment(s))
             setStep({ name: 'order', saved: s })
           }} />
       )}
       {step.name === 'order' && (
         <OrderView chat={chat} saved={step.saved} link={location.href(orderFragment(step.saved))}
-          others={myOrders.filter((o) => o.order_id !== step.saved.order_id)} timezone={page.outlet.timezone}
+          others={myOrders} timezone={page.outlet.timezone}
           onGone={() => {
             setOrders(forgetOrder(key, step.saved.order_id))
             mainMenu()
@@ -413,8 +486,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
           privacyVersion={page.privacy_notice.version}
           reschedule={step.name === 'reschedule' ? { booking: step.booking, key: step.key } : null}
           preset={step.name === 'book' ? step.preset ?? null : null}
-          person={{ name: details.name, phone: details.phone }} prefilled={prefilled} remember={remember}
-          onRemember={(on) => { setRemember(on); if (!on) { clearDetails(); setPrefilled(false) } }}
+          person={{ name: details.name, phone: details.phone }} prefilled={prefilled}
           onBooked={(created, person: Person) => {
             if (remember) saveDetails({ name: person.name, phone: person.phone, address: details.address })
             const sb: SavedBooking = { reservation_id: created.reservation_id, access_key: created.access_key,
@@ -422,6 +494,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
             rememberBooking(scope.slug, sb)
             location.write(bookingFragment(sb))
             setMsgs([])
+            say('me', 'Konfirmasi booking')
             setStep({ name: 'booked', booking: created, saved: sb })
           }}
           onRescheduled={(b) => {
@@ -568,7 +641,7 @@ function Checkout(props: {
   footerSlot: HTMLDivElement | null
   chat: ChatApi; page: ChatPage; scope: Scope; step: 'cart' | 'details' | 'summary'; mode: 'pickup' | 'delivery' | 'table'
   cart: CartLine[]; byId: Map<string, ChatMenuItem>; fulfillment: 'pickup' | 'delivery' | null; details: Details
-  prefilled: boolean; remember: boolean
+  prefilled: boolean; remember: boolean; typedAddress: { text: string; seq: number }
   onQuantity: (i: number, q: number) => void; onAddMore: () => void; onEmpty: () => void
   onFulfillment: (f: 'pickup' | 'delivery') => void; onTableNext: () => void
   onRemember: (on: boolean) => void; onClearSaved: () => void; onDetails: (d: Details) => void; onEditDetails: () => void
@@ -649,7 +722,7 @@ function Checkout(props: {
         </>
       )}
       {step === 'details' && (
-        <DetailsForm mode={mode} initial={details} prefilled={props.prefilled} remember={props.remember}
+        <DetailsForm mode={mode} initial={details} typedAddress={props.typedAddress} prefilled={props.prefilled} remember={props.remember}
           privacyUrl={page.privacy_notice.url} error={null} onRemember={props.onRemember}
           onClearSaved={props.onClearSaved} onSubmit={props.onDetails} />
       )}
@@ -748,7 +821,7 @@ function OrderView({ chat, saved, link, others, timezone, onGone, onOpen }: {
           <div className="max-w-[92%] space-y-2">
             <StatusCard order={order} link={link} />
             {error && <Bubble tone="danger">{error}</Bubble>}
-            {others.length > 0 && <MyOrders orders={others} timezone={timezone} onOpen={onOpen} />}
+            {others.some((o) => o.order_id !== saved.order_id) && <MyOrders orders={others} timezone={timezone} onOpen={onOpen} />}
           </div>
         </>
       )}

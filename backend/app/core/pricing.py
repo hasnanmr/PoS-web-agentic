@@ -92,7 +92,8 @@ async def price_lines(
     products = {r["id"]: r for r in await cur.fetchall()}
     await cur.execute(
         """
-        select g.id, g.product_id, g.name, g.selection::text as selection, g.is_required
+        select g.id, g.product_id, g.name, g.selection::text as selection, g.is_required,
+               g.max_select
         from app.addon_groups g where g.product_id = any(%s)
         """,
         (product_ids,),
@@ -168,6 +169,13 @@ async def price_lines(
                 raise InvalidLineError(
                     "addon_invalid",
                     f"choose one {group['name']}",
+                    line.product_id,
+                    group=group["name"],
+                )
+            if group["max_select"] is not None and len(chosen) > group["max_select"]:
+                raise InvalidLineError(
+                    "addon_invalid",
+                    f"choose at most {group['max_select']} {group['name']}",
                     line.product_id,
                     group=group["name"],
                 )

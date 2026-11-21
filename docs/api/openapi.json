@@ -53,6 +53,19 @@
             "title": "Is Required",
             "type": "boolean"
           },
+          "max_select": {
+            "anyOf": [
+              {
+                "maximum": 9.0,
+                "minimum": 2.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Select"
+          },
           "name": {
             "maxLength": 60,
             "minLength": 1,
@@ -95,6 +108,17 @@
           "is_required": {
             "title": "Is Required",
             "type": "boolean"
+          },
+          "max_select": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Select"
           },
           "name": {
             "title": "Name",
@@ -3660,6 +3684,17 @@
           "is_required": {
             "title": "Is Required",
             "type": "boolean"
+          },
+          "max_select": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Select"
           },
           "name": {
             "title": "Name",

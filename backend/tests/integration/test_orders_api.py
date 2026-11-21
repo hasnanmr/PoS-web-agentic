@@ -112,6 +112,41 @@ def _ledger(order_id: str) -> list[tuple[str, int, str | None]]:
     )
 
 
+def test_quote_rejects_more_options_than_max_select(client, ctx) -> None:
+    """C3 / S1 "maks 2": the server refuses a third option even if the screen let it through."""
+    menu = _menu(client, ctx)
+    americano = menu["Americano"]
+    prices = [{"outlet_id": ctx["outlet"], "price": 3000}]
+    res = client.post(
+        f"/api/v1/owner/products/{americano['product_id']}/addon-groups",
+        headers=ctx["owner"],
+        json={
+            "name": "Tambahan maks",
+            "selection": "multiple",
+            "max_select": 2,
+            "options": [{"name": n, "prices": prices} for n in ("Shot", "Aren", "Jelly")],
+        },
+    )
+    assert res.status_code == 201, res.text
+    try:
+        item = _menu(client, ctx)["Americano"]
+        group = next(g for g in item["addon_groups"] if g["name"] == "Tambahan maks")
+        assert group["max_select"] == 2
+        ids = [o["id"] for o in group["options"]]
+        url = f"/api/v1/ops/outlets/{ctx['outlet']}/quotes"
+        line = {"product_id": item["product_id"], "quantity": 1}
+        res = client.post(
+            url, headers=ctx["staff"], json={"items": [{**line, "addon_option_ids": ids}]}
+        )
+        assert res.status_code == 422 and res.json()["error"]["code"] == "addon_invalid"
+        res = client.post(
+            url, headers=ctx["staff"], json={"items": [{**line, "addon_option_ids": ids[:2]}]}
+        )
+        assert res.status_code == 200, res.text
+    finally:
+        client.delete(f"/api/v1/owner/addon-groups/{group['id']}", headers=ctx["owner"])
+
+
 def test_quote_requires_addons_and_applies_pb1(client, ctx) -> None:
     menu = _menu(client, ctx)
     kopi = menu["Es Kopi Susu Senja"]
