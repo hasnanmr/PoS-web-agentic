@@ -42,6 +42,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, Huma
 from app import db
 from app.core import crypto, web_chat
 from app.core.actor import ActorContext
+from app.core.agent import tracing
 from app.core.agent.guard import AgentGuard, AgentLimitReached, TurnBudget
 from app.core.agent.prompt import PROMPT_VERSION, Context, system_prompt
 from app.core.agent.tools import TurnResult, bind_runner, build_tools
@@ -255,8 +256,19 @@ async def run_turn(
     text: str,
     context: Context,
     limit_seconds: float | None = None,
+    trace_id: str | None = None,
 ) -> AsyncIterator[AgentEvent]:
+    """`trace_id`: the Langfuse trace of this turn (the evaluation set passes its own to score
+    it); a new one when tracing is on and none is given."""
     message_id = uuid.uuid4()
+    trace_id = trace_id or tracing.new_trace_id()
+    trace_config = tracing.run_config(
+        trace_id=trace_id,
+        session=session,
+        outlet_id=str(scope.outlet_id),
+        context=context,
+        prompt_version=PROMPT_VERSION,
+    )
     correlation = message_id.hex
     ctx = ActorContext.for_agent(scope.tenant_id, correlation_id=correlation)
     async with db.transaction(pool, ctx) as conn:
@@ -278,7 +290,7 @@ async def run_turn(
             async for mode, chunk in agent.astream(
                 {"messages": messages},
                 stream_mode=["messages", "values"],
-                config={"recursion_limit": 40},
+                config={"recursion_limit": 40, **trace_config},
             ):
                 if mode == "messages":
                     message, meta = chunk

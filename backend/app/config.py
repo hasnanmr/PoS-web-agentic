@@ -95,6 +95,14 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     model_name: str | None = Field(default=None, max_length=200)
 
+    # Agent tracing with Langfuse (opt-in). Off unless both keys are set. Customer messages go
+    # to the Langfuse host with phone numbers and emails masked (app.core.agent.tracing), so
+    # point LANGFUSE_HOST at a self-hosted instance or a region the data-residency decision
+    # allows (NFR1, T-108). Default host: Langfuse Cloud EU.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_host: AnyHttpUrl | None = None
+
     default_timezone: str = "Asia/Jakarta"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5170"]
 
@@ -110,6 +118,9 @@ class Settings(BaseSettings):
         "openai_base_url",
         "openai_api_key",
         "model_name",
+        "langfuse_public_key",
+        "langfuse_secret_key",
+        "langfuse_host",
         mode="before",
     )
     @classmethod
@@ -209,6 +220,11 @@ class Settings(BaseSettings):
         """True when the web chat agent has a model to call: OPENAI_BASE_URL and MODEL_NAME
         (OPENAI_API_KEY too, unless the server needs none)."""
         return self.openai_base_url is not None and self.model_name is not None
+
+    @property
+    def langfuse_configured(self) -> bool:
+        """Agent traces go to Langfuse only with both keys set."""
+        return self.langfuse_public_key is not None and self.langfuse_secret_key is not None
 
     @property
     def agent_config_warning(self) -> str | None:

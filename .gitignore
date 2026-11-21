@@ -42,3 +42,6 @@ docs/business/
 # Local research notes and reports (payment gateway research etc.): not for the repo
 research_notes/
 reports/
+
+# Agent evaluation reports (scripts/agent-eval.sh)
+backend/eval-reports/
