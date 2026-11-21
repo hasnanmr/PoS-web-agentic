@@ -39,7 +39,7 @@ const CLOSE_MS = 160
 const HOURS_LABEL: Record<HoursFilter, string> = { all: 'Semua jam', busy: 'Jam ramai', quiet: 'Jam sepi' }
 const CHANNELS: { key: DashboardOrderRow['channel']; label: string }[] = [
   { key: 'web_online', label: 'Web chat (link outlet)' },
-  { key: 'web_table', label: 'Web meja (QR)' },
+  { key: 'web_table', label: 'Web chat (QR meja)' },
   { key: 'counter', label: 'Counter' },
   { key: 'whatsapp_online', label: 'WhatsApp online' },
   { key: 'whatsapp_table', label: 'WhatsApp meja (QR)' },
