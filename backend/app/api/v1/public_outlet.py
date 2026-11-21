@@ -107,10 +107,18 @@ async def place_order(
     request: Request,
     response: Response,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    order_key: str | None = Header(
+        default=None,
+        alias="X-Order-Key",
+        description="Access key made by the page (32-128 URL-safe characters); required",
+    ),
 ) -> WebOrderCreated:
-    """C4/C5 "Pesan & bayar": a pay-first `web_online` order, pickup or delivery."""
+    """C4/C5 "Pesan & bayar": a pay-first `web_online` order, pickup or delivery. The page
+    makes the access key and sends it as `X-Order-Key`; only its hash is stored."""
     scope = await current_scope(slug, request)
     ctx = scope.actor()
+    if not order_key:
+        raise ValidationFailedError("X-Order-Key is required", {"field": "access_key"})
     if not body.customer.name:
         raise ValidationFailedError("name is required", {"field": "name"})
     if body.fulfillment == "delivery" and not body.customer.address:
@@ -138,7 +146,9 @@ async def place_order(
             customer_id=customer_id,
         )
 
-    return await chat.create_order(request, response, scope, idempotency_key, body, build)
+    return await chat.create_order(
+        request, response, scope, idempotency_key, order_key, body, build
+    )
 
 
 # C10-C12 reservations (T-060, T-061) -------------------------------------------------------------
@@ -232,7 +242,12 @@ async def _idempotent(
     body: dict[str, Any],
     work: Any,
     model: type[BaseModel],
+    *,
+    secret: tuple[str, str] | None = None,
 ) -> Any:
+    """Idempotent write (FR6.4). `secret` = (field, value): an access key the caller already
+    holds and whose hash is part of `body`'s fingerprint; it is blanked in the cache and filled
+    in again on replay, so the cache never holds the key itself (FR2.15)."""
     key = idempotency.check_key(idempotency_key)
     if key is None:
         raise ApiError(422, "validation_failed", "Idempotency-Key is required")
@@ -245,9 +260,14 @@ async def _idempotent(
             if cached is not None:
                 response.status_code = status.HTTP_200_OK
                 response.headers["Idempotent-Replay"] = "true"
+                if secret:
+                    cached = {**cached, secret[0]: secret[1]}
                 return model(**cached)
             out = model(**await work(conn, ctx))
-            await idempotency.store(conn, ctx, name, key, fp, out.model_dump(mode="json"))
+            cache = out.model_dump(mode="json")
+            if secret:
+                cache[secret[0]] = ""
+            await idempotency.store(conn, ctx, name, key, fp, cache)
     except psycopg.errors.UniqueViolation as exc:
         if "idempotency_keys" in str(exc):
             raise ApiError(409, "conflict", "the same request is already being processed") from None
@@ -262,12 +282,21 @@ async def create_booking(
     request: Request,
     response: Response,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    booking_key: str | None = Header(
+        default=None,
+        alias="X-Booking-Key",
+        description="Access key made by the page (32-128 URL-safe characters); required",
+    ),
 ) -> BookingCreated:
-    """C10 "Konfirmasi booking": smallest free table, booking code, 2 upcoming per phone."""
+    """C10 "Konfirmasi booking": smallest free table, booking code, 2 upcoming per phone. The
+    page makes the access key and sends it as `X-Booking-Key`; only its hash is stored, also
+    not in the idempotency cache, and a replay must carry the same key."""
     scope = await _resolve(slug, request)
+    access_key = web_chat.check_client_key(booking_key)
+    if access_key is None:
+        raise ValidationFailedError("X-Booking-Key is required", {"field": "access_key"})
     name = web_booking.validate_name(body.customer.name or "")
     phone = web_chat.clean_phone(body.customer.phone)
-    access_key = web_chat.new_access_key()
 
     async def work(conn: Any, ctx: Any) -> dict[str, Any]:
         row = await web_booking.create(
@@ -289,9 +318,10 @@ async def create_booking(
         scope,
         "web_booking.create",
         idempotency_key,
-        body.model_dump(mode="json"),
+        {**body.model_dump(mode="json"), "key_hash": web_chat.hash_key(access_key)},
         work,
         BookingCreated,
+        secret=("access_key", access_key),
     )
 
 

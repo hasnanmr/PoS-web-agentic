@@ -22,6 +22,7 @@ Rules (PRD §5.2, §5.6, §5.12; docs/architecture/screen-endpoint-map.md → C1
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import secrets
 from dataclasses import dataclass
@@ -113,6 +114,32 @@ def new_access_key() -> str:
 
 def hash_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
+
+
+CLIENT_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
+
+
+def check_client_key(key: str | None) -> str | None:
+    """An access key the chat page created itself (sent as `X-Order-Key` / `X-Booking-Key` when
+    creating): random, URL-safe, at least 32 characters."""
+    if key is None or key == "":
+        return None
+    if not CLIENT_KEY_PATTERN.match(key):
+        raise ValidationFailedError(
+            "the access key must be 32-128 URL-safe characters", {"field": "access_key"}
+        )
+    return key
+
+
+async def replace_order_key(
+    conn: AsyncConnection, scope: ChatScope, order_id: UUID, key_hash: str
+) -> None:
+    """A replayed create without a page-made key gets a new key (the old one is not stored)."""
+    await conn.execute(
+        "update app.orders set access_key_hash = %s where id = %s and outlet_id = %s"
+        " and channel = %s",
+        (key_hash, order_id, scope.outlet_id, scope.channel),
+    )
 
 
 def short_name(name: str) -> str:
@@ -421,6 +448,15 @@ def check_session(session: str | None) -> str:
 
 
 _EMPTY_CART: dict[str, Any] = {"lines": []}
+# Serialized cart limit (JSON text). The column check (64 KB) leaves room, so a cart that
+# passes here never trips the database constraint.
+MAX_CART_BYTES = 16_000
+
+
+def check_cart_size(cart: dict[str, Any]) -> None:
+    size = len(json.dumps(cart, separators=(",", ":")).encode())
+    if size > MAX_CART_BYTES:
+        raise ValidationFailedError("the cart is too large", {"field": "cart"})
 
 
 async def get_session(
@@ -462,6 +498,19 @@ async def get_session(
     }
 
 
+async def purge_idle_sessions(conn: AsyncConnection, outlet_id: UUID, limit: int = 200) -> int:
+    """Delete this outlet's sessions idle for more than 2 hours: their cart would be emptied
+    and the step reset anyway, so nothing is lost. Runs when a session is saved (no poller
+    yet), a bounded batch at a time."""
+    cur = await conn.execute(
+        "delete from app.chat_sessions where id in ("
+        " select id from app.chat_sessions where outlet_id = %s and last_activity_at < %s"
+        " order by last_activity_at limit %s for update skip locked)",
+        (outlet_id, datetime.now(UTC) - CART_IDLE, limit),
+    )
+    return cur.rowcount
+
+
 async def put_session(
     conn: AsyncConnection,
     ctx: ActorContext,
@@ -474,6 +523,7 @@ async def put_session(
 ) -> dict[str, Any]:
     if scope.table_id is not None:
         fulfillment = None  # a table order is always dine-in
+    await purge_idle_sessions(conn, scope.outlet_id)
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
         """

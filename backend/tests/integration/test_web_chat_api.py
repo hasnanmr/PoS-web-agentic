@@ -117,6 +117,7 @@ def _order(
     *,
     fulfillment: str = "pickup",
     key: str | None = None,
+    order_key: str | None = None,
     customer: dict[str, Any] | None = None,
     **extra: Any,
 ) -> Any:
@@ -128,15 +129,24 @@ def _order(
         "privacy_notice_version": PRIVACY_NOTICE_VERSION,
         **extra,
     }
-    return client.post(
-        f"{_base(ctx)}/orders", headers={"Idempotency-Key": key or uuid4().hex}, json=body
-    )
+    headers = {"Idempotency-Key": key or uuid4().hex, "X-Order-Key": order_key or _new_key()}
+    return client.post(f"{_base(ctx)}/orders", headers=headers, json=body)
+
+
+def _new_key() -> str:
+    return "k-" + uuid4().hex + uuid4().hex
 
 
 def _placed(client: TestClient, ctx: dict[str, Any], **kw: Any) -> dict[str, Any]:
     res = _order(client, ctx, **kw)
     assert res.status_code == 201, res.text
     return res.json()
+
+
+def _board_card(client: TestClient, ctx: dict[str, Any], order_id: str) -> dict[str, Any]:
+    board = client.get(f"/api/v1/ops/outlets/{ctx['outlet']}/orders/board", headers=ctx["staff"])
+    assert board.status_code == 200, board.text
+    return next(c for col in board.json().values() for c in col if c["id"] == order_id)
 
 
 def _status(client: TestClient, ctx: dict[str, Any], order: dict[str, Any]) -> Any:
@@ -206,12 +216,23 @@ def test_quote_adds_the_delivery_fee_outside_pb1(client, ctx) -> None:
 
 def test_pickup_order_records_customer_and_privacy_notice(client, ctx) -> None:
     _upload_qris(client, ctx)
-    key = uuid4().hex
-    order = _placed(client, ctx, key=key)
+    key, order_key = uuid4().hex, _new_key()
+    order = _placed(client, ctx, key=key, order_key=order_key)
     assert order["status"] == "pending_payment" and order["delivery_fee"] == 0
-    # AC6.6: a double tap returns the same order.
-    again = _order(client, ctx, key=key)
+    assert order["access_key"] == order_key  # the page's own key, echoed
+    # AC6.6: a double tap returns the same order and the same key.
+    again = _order(client, ctx, key=key, order_key=order_key)
     assert again.status_code == 200 and again.json()["order_id"] == order["order_id"]
+    assert again.json()["access_key"] == order_key
+    # A replay with another key does not get the order (proof of holding the key).
+    other = _order(client, ctx, key=key, order_key=_new_key())
+    assert other.status_code == 409 and other.json()["error"]["code"] == "idempotency_key_reused"
+    # The key is never stored in plaintext, also not in the idempotency cache (FR2.15).
+    cached = admin_sql(
+        "select count(*) from app.idempotency_keys where response::text like %s",
+        (f"%{order_key}%",),
+    )
+    assert cached == [(0,)]
     row = admin_sql(
         "select o.channel::text, o.type::text, o.payment_mode::text, o.table_id, c.name, c.phone,"
         " a.notice_version from app.orders o join app.customers c on c.id = o.customer_id"
@@ -223,17 +244,10 @@ def test_pickup_order_records_customer_and_privacy_notice(client, ctx) -> None:
     ]
     status = _status(client, ctx, order).json()
     assert status["fulfillment"] == "pickup" and status["customer_name"] == "Bima"
-    card = next(
-        c
-        for col in client.get(
-            f"/api/v1/ops/outlets/{ctx['outlet']}/orders/board", headers=ctx["staff"]
-        )
-        .json()
-        .values()
-        for c in col
-        if c["id"] == order["order_id"]
-    )
+    card = _board_card(client, ctx, order["order_id"])
     assert card["channel"] == "web_online" and card["auto_cancel_at"] is not None
+    assert card["type"] == "pickup" and card["customer_phone"] == "081234567890"
+    assert card["delivery_address"] is None
 
 
 def test_details_are_checked(client, ctx) -> None:
@@ -246,6 +260,19 @@ def test_details_are_checked(client, ctx) -> None:
     assert res.json()["error"]["details"]["field"] == "privacy_notice_version"
     res = client.post(f"{_base(ctx)}/orders", json={})
     assert res.status_code == 422
+    no_key = client.post(
+        f"{_base(ctx)}/orders",
+        headers={"Idempotency-Key": uuid4().hex},
+        json={
+            "items": [{"product_id": str(uuid4()), "quantity": 1}],
+            "fulfillment": "pickup",
+            "customer": {"name": "Bima", "phone": "081234567890"},
+            "privacy_notice_version": PRIVACY_NOTICE_VERSION,
+        },
+    )
+    assert no_key.status_code == 422 and no_key.json()["error"]["details"]["field"] == "access_key"
+    short = _order(client, ctx, order_key="too-short")
+    assert short.status_code == 422 and short.json()["error"]["details"]["field"] == "access_key"
 
 
 def test_delivery_completed_is_anonymized(client, ctx) -> None:
@@ -272,6 +299,20 @@ def test_delivery_completed_is_anonymized(client, ctx) -> None:
         json={"merchant_account_checked": True},
     )
     assert res.status_code == 200, res.text
+    # S2 card: who to call and where to deliver (review finding on PR #63).
+    card = _board_card(client, ctx, order["order_id"])
+    assert card["type"] == "delivery" and card["customer_name"] == "Sari"
+    assert card["customer_phone"] == "+6281111111111"
+    assert card["delivery_address"] == "Jl. Dago 1"
+    queue = client.get(f"/api/v1/ops/payment-proofs/{proof}", headers=ctx["staff"]).json()
+    assert queue["customer_phone_masked"] == "+62 811-xxxx-111"
+    # O2: paid web_online orders count in the channel mix, and the shares cover every order.
+    summary = client.get(
+        "/api/v1/owner/dashboard", headers=ctx["owner"], params={"outlet_id": ctx["outlet"]}
+    ).json()
+    mix = {c["channel"]: c for c in summary["channel_mix"]}
+    assert mix["web_online"]["orders"] >= 1
+    assert sum(c["orders"] for c in summary["channel_mix"]) == summary["kpis"]["orders"]
     for step in ("preparing", "ready", "out_for_delivery", "completed"):
         res = client.post(
             f"/api/v1/ops/orders/{order['order_id']}/transitions",
@@ -422,3 +463,66 @@ def test_recommendation_cards_skip_sold_out_and_mark_picks(client, ctx) -> None:
     assert not sold_out & {c["product_id"] for c in cards}
     picks = [c for c in cards if c["badge"] == "owner_pick"]
     assert picks == cards[: len(picks)]  # owner's picks first
+
+
+def test_too_large_cart_is_a_validation_error(client, ctx) -> None:
+    line = {
+        "product_id": str(uuid4()),
+        "quantity": 1,
+        "addon_option_ids": [str(uuid4()) for _ in range(30)],
+        "note": "x" * 200,
+    }
+    res = client.put(
+        f"{_base(ctx)}/chat-session",
+        headers=SESSION,
+        json={"step": "cart", "cart": {"lines": [line] * 50}},
+    )
+    assert res.status_code == 422 and res.json()["error"]["details"]["field"] == "cart"
+
+
+def test_idle_sessions_are_removed(client, ctx) -> None:
+    other = {"X-Chat-Session": "s-" + "c" * 30}
+    assert (
+        client.put(f"{_base(ctx)}/chat-session", headers=other, json={"step": "menu"}).status_code
+        == 200
+    )
+    admin_sql(
+        "update app.chat_sessions set last_activity_at = now() - interval '3 hours'"
+        " where outlet_id = %s",
+        (ctx["outlet"],),
+    )
+    assert (
+        client.put(f"{_base(ctx)}/chat-session", headers=SESSION, json={"step": "menu"}).status_code
+        == 200
+    )
+    left = admin_sql(
+        "select count(*) from app.chat_sessions where outlet_id = %s", (ctx["outlet"],)
+    )
+    assert left == [(1,)]  # only the session just saved
+
+
+def test_default_slug_grows_its_suffix_on_a_collision(client, ctx) -> None:
+    rows = admin_sql(
+        "select app.default_outlet_slug('Senja Dago', id),"
+        " app.unique_outlet_slug('Senja Dago', id),"
+        " app.default_outlet_slug(repeat('panjang ', 20), id, 32)"
+        " from app.outlets where id = %s",
+        (ctx["outlet"],),
+    )
+    short, unique, longest = rows[0]
+    assert unique == short  # nobody else has it
+    assert len(longest) <= 40
+    admin_sql("update app.outlets set public_slug = %s where id = %s", (short, ctx["outlet"]))
+    try:
+        other = admin_sql("select app.unique_outlet_slug('Senja Dago', %s)", (ctx["outlet"],))
+        assert other == [(short,)]  # its own slug does not count as taken
+        twin = admin_sql(
+            "select app.unique_outlet_slug('Senja Dago', (left(%s::text, 8)"
+            " || '-0000-4000-8000-000000000000')::uuid)",
+            (ctx["outlet"],),
+        )[0][0]
+        assert twin != short and twin.startswith(short)  # longer suffix
+    finally:
+        admin_sql(
+            "update app.outlets set public_slug = %s where id = %s", (ctx["slug"], ctx["outlet"])
+        )

@@ -77,10 +77,12 @@ async def pending_queue(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str
 
 _PROOF_SQL = """
 select p.id, p.kind, p.order_id, p.outlet_id, p.status::text as status, p.storage_path,
-       p.received_at, p.reviewed_at, p.rejection_reason, u.display_name as reviewed_by, c.phone
+       p.received_at, p.reviewed_at, p.rejection_reason, u.display_name as reviewed_by,
+       coalesce(cu.phone, c.phone) as phone, o.customer_name
 from app.payment_proofs p
 join app.orders o on o.id = p.order_id
 left join app.whatsapp_contacts c on c.id = o.contact_id
+left join app.customers cu on cu.id = o.customer_id
 left join app.users u on u.id = p.reviewed_by
 where p.id = %s
 """

@@ -85,6 +85,7 @@ export default function OrderBoardPage() {
           <option value="counter">counter</option>
           <option value="whatsapp_online">whatsapp_online</option>
           <option value="whatsapp_table">whatsapp_table</option>
+          <option value="web_online">web (link outlet)</option>
           <option value="web_table">web (QR meja)</option>
         </Select>
         <Select aria-label="Tipe" className="h-8 w-auto" value={type} onChange={(e) => setType(e.target.value)}>
@@ -135,13 +136,17 @@ export default function OrderBoardPage() {
                       return (
                         <li key={o.id} className="rounded-md border border-border bg-surface p-2.5 text-[12px]">
                           <button type="button" className="w-full text-left" onClick={() => setOpenId(o.id)}>
-                            <div className="font-semibold">{o.order_no} · {o.channel === 'web_table' ? 'web' : o.channel}</div>
+                            <div className="font-semibold">{o.order_no} · {o.channel === 'web_table' || o.channel === 'web_online' ? 'web' : o.channel}</div>
                             <div>{where(o)}</div>
+                            {o.delivery_address && <div className="text-text-muted">{o.delivery_address}</div>}
                             <div className="truncate text-text-muted">{o.item_summary}</div>
                             {o.note && <div className="truncate text-text-muted">Catatan: {o.note}</div>}
                             <div>{formatRupiah(o.total)}{o.payment_status !== 'unpaid' || o.bill_id ? ` · ${paymentText(o)}` : ''}</div>
                             {o.auto_cancel_at && <div className="text-warning">⏱ Auto-cancel {formatTime(o.auto_cancel_at, outlet.timezone)}</div>}
                           </button>
+                          {o.customer_phone && (
+                            <a href={`tel:${o.customer_phone}`} className="mt-1 mr-1 inline-block text-[11px] font-semibold text-primary">📞 Hubungi</a>
+                          )}
                           {o.payment_status !== 'paid' && !o.bill_id && (
                             <span className="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">{o.payment_status}</span>
                           )}

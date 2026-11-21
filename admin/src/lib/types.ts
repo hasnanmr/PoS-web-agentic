@@ -250,7 +250,7 @@ export type PaymentStatus = 'unpaid' | 'proof_submitted' | 'paid' | 'refunded'
 export interface OrderCard {
   id: string
   order_no: string
-  channel: 'counter' | 'whatsapp_online' | 'whatsapp_table' | 'web_table'
+  channel: 'counter' | 'whatsapp_online' | 'whatsapp_table' | 'web_table' | 'web_online'
   type: 'dine_in' | 'takeaway' | 'delivery' | 'pickup'
   payment_mode: 'pay_first' | 'open_bill'
   status: OrderStatus
@@ -261,6 +261,10 @@ export interface OrderCard {
   qris_checked: boolean | null
   table: string | null
   customer_name: string | null
+  /** web_online: number to call; cleared once the order is finished. */
+  customer_phone?: string | null
+  /** web_online delivery: where to deliver; cleared once the order is finished. */
+  delivery_address?: string | null
   /** Web orders: "Catatan untuk dapur". */
   note: string | null
   /** Pending payment proof to review in S4. */
@@ -597,7 +601,7 @@ export interface DashboardSummary {
     display_unit: string | null
     status: 'low' | 'out'
   }[]
-  channel_mix: { channel: 'whatsapp_online' | 'whatsapp_table' | 'counter'; orders: number; share_pct: number }[]
+  channel_mix: { channel: 'web_online' | 'web_table' | 'counter' | 'whatsapp_online' | 'whatsapp_table'; orders: number; share_pct: number }[]
   payment_methods: { method: 'cash' | 'qris'; amount: number; transactions: number }[]
 }
 

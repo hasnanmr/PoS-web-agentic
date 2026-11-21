@@ -142,6 +142,12 @@ class OrderCard(BaseModel):
     )
     table: str | None
     customer_name: str | None
+    customer_phone: str | None = Field(
+        default=None, description="web_online: the number to call (cleared once finished)"
+    )
+    delivery_address: str | None = Field(
+        default=None, description="web_online delivery: where to deliver (cleared once finished)"
+    )
     note: str | None = Field(description='Web orders: "Catatan untuk dapur"')
     proof_id: UUID | None = Field(description="Pending payment proof to review in S4")
     payment_claimed_at: datetime | None = Field(

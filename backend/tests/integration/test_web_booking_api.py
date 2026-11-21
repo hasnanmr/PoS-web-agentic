@@ -115,10 +115,11 @@ def _book(
     phone: str = "0811-1111-1111",
     name: str = "Dewi",
     key: str | None = None,
+    booking_key: str | None = None,
 ) -> Any:
     return client.post(
         f"{_base(ctx)}/reservations",
-        headers={"Idempotency-Key": key or uuid4().hex},
+        headers={"Idempotency-Key": key or uuid4().hex, "X-Booking-Key": booking_key or _new_key()},
         json={
             "party_size": party,
             "start_at": start.isoformat(),
@@ -126,6 +127,10 @@ def _book(
             "privacy_notice_version": PRIVACY_NOTICE_VERSION,
         },
     )
+
+
+def _new_key() -> str:
+    return "b-" + uuid4().hex + uuid4().hex
 
 
 def _booked(client: TestClient, ctx: dict[str, Any], start: datetime, **kw: Any) -> dict[str, Any]:
@@ -167,13 +172,36 @@ def test_availability_respects_party_limit_and_local_time(client, enabled) -> No
 
 def test_booking_gets_smallest_table_code_and_staff_view(client, enabled) -> None:
     ctx = enabled
-    key = uuid4().hex
-    b = _booked(client, ctx, _tomorrow_at(12), key=key, phone="0812 2222 0001")
+    key, booking_key = uuid4().hex, _new_key()
+    b = _booked(
+        client, ctx, _tomorrow_at(12), key=key, booking_key=booking_key, phone="0812 2222 0001"
+    )
     assert re.fullmatch(r"[A-HJKMNP-Z2-9]{6}", b["booking_code"])
     assert b["label"] == "12:00" and b["party_size"] == 4 and b["can_change"] is True
-    assert len(b["access_key"]) >= 30
-    again = _book(client, ctx, _tomorrow_at(12), key=key, phone="0812 2222 0001")
+    assert b["access_key"] == booking_key  # the page's own key, echoed
+    again = _book(
+        client, ctx, _tomorrow_at(12), key=key, booking_key=booking_key, phone="0812 2222 0001"
+    )
     assert again.status_code == 200 and again.json()["reservation_id"] == b["reservation_id"]
+    assert again.json()["access_key"] == booking_key
+    other = _book(client, ctx, _tomorrow_at(12), key=key, phone="0812 2222 0001")
+    assert other.status_code == 409  # same Idempotency-Key, another booking key
+    stored = admin_sql(
+        "select count(*) from app.idempotency_keys where response::text like %s",
+        (f"%{booking_key}%",),
+    )
+    assert stored == [(0,)]  # never in plaintext
+    missing = client.post(
+        f"{_base(ctx)}/reservations",
+        headers={"Idempotency-Key": uuid4().hex},
+        json={
+            "party_size": 2,
+            "start_at": _tomorrow_at(11).isoformat(),
+            "customer": {"name": "Dewi", "phone": "081222220009"},
+            "privacy_notice_version": PRIVACY_NOTICE_VERSION,
+        },
+    )
+    assert missing.status_code == 422
     row = admin_sql(
         "select r.table_id::text, r.source::text, r.guest_phone, c.name, a.notice_version"
         " from app.reservations r join app.customers c on c.id = r.customer_id"
