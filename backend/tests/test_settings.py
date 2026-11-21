@@ -89,3 +89,31 @@ def test_invalid_values_fail_fast(
         load_settings()
     assert "Invalid configuration" in str(excinfo.value)
     assert expected in str(excinfo.value)
+
+
+def test_agent_is_off_without_its_variables() -> None:
+    settings = load_settings()
+    assert settings.agent_configured is False
+    assert settings.openai_base_url is None and settings.model_name is None
+
+
+def test_agent_variables_are_read_and_the_key_stays_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    monkeypatch.setenv("MODEL_NAME", "openai/gpt-4o-mini")
+    settings = load_settings()
+    assert settings.agent_configured is True
+    assert str(settings.openai_base_url) == "https://openrouter.ai/api/v1"
+    assert settings.model_name == "openai/gpt-4o-mini"
+    assert "sk-test-123" not in repr(settings)
+
+
+def test_deployed_env_refuses_a_partial_agent_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key, value in {**DEPLOYED_ENV, "APP_ENV": "demo"}.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    monkeypatch.setenv("MODEL_NAME", "")  # empty counts as unset
+    with pytest.raises(ConfigError, match="OPENAI_API_KEY, MODEL_NAME"):
+        load_settings()

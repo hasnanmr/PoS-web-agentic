@@ -80,6 +80,13 @@ class Settings(BaseSettings):
     db_pool_min_size: int = Field(default=1, ge=0, le=50)
     db_pool_max_size: int = Field(default=5, ge=1, le=100)
 
+    # Web chat agent (FR6.3, FR6.6; PRD §9): any OpenAI-compatible chat completions API with
+    # tool calling, so the provider changes without code changes. Optional in every
+    # environment: without all three the agent is off and the chat uses the buttons only.
+    openai_base_url: AnyHttpUrl | None = None
+    openai_api_key: SecretStr | None = None
+    model_name: str | None = Field(default=None, max_length=200)
+
     default_timezone: str = "Asia/Jakarta"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5170"]
 
@@ -91,6 +98,9 @@ class Settings(BaseSettings):
         "rabbitmq_url",
         "supabase_service_role_key",
         "admin_app_url",
+        "openai_base_url",
+        "openai_api_key",
+        "model_name",
         mode="before",
     )
     @classmethod
@@ -162,6 +172,17 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"APP_ENV={self.app_env} requires these variables: {', '.join(missing)}"
             )
+        agent_vars = {
+            "OPENAI_BASE_URL": self.openai_base_url,
+            "OPENAI_API_KEY": self.openai_api_key,
+            "MODEL_NAME": self.model_name,
+        }
+        partial = [k for k, v in agent_vars.items() if v is None]
+        if 0 < len(partial) < len(agent_vars):
+            raise ValueError(
+                "the web chat agent needs OPENAI_BASE_URL, OPENAI_API_KEY, and MODEL_NAME"
+                f" together (missing: {', '.join(partial)})"
+            )
         if "*" in self.cors_origins:
             raise ValueError(f"CORS_ORIGINS must not contain '*' when APP_ENV={self.app_env}")
         return self
@@ -173,6 +194,17 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.app_env == "local"
+
+    @property
+    def agent_configured(self) -> bool:
+        """True when the web chat agent has a model to call (OPENAI_BASE_URL, OPENAI_API_KEY,
+        and MODEL_NAME all set)."""
+        return (
+            self.openai_base_url is not None
+            and self.openai_api_key is not None
+            and bool(self.openai_api_key.get_secret_value())
+            and self.model_name is not None
+        )
 
 
 def _format_errors(exc: ValidationError) -> str:
