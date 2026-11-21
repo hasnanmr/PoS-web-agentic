@@ -166,9 +166,16 @@ async def update_outlet(
     before = await get_outlet(conn, outlet_id)
     if any(f in changes and changes[f] != before.get(f) for f in ("pb1_enabled", "pb1_rate_bps")):
         # A bill's PB1 is computed when it closes; changing the rate while a bill is open
-        # would make the bill disagree with the orders already taken on it.
+        # would make the bill disagree with the orders already taken on it. An open bill
+        # with no active order has nothing to disagree with, so it does not block.
         cur = await conn.execute(
-            "select exists (select 1 from app.bills where outlet_id = %s and status = 'open')",
+            """
+            select exists (
+              select 1 from app.bills b
+              where b.outlet_id = %s and b.status = 'open'
+                and exists (select 1 from app.orders o
+                            where o.bill_id = b.id and o.status <> 'cancelled'))
+            """,
             (outlet_id,),
         )
         if (await cur.fetchone())[0]:  # type: ignore[index]
