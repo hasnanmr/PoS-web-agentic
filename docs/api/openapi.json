@@ -7434,46 +7434,46 @@
         "title": "ProofQueueItem",
         "type": "object"
       },
-      "QrSettingsIn": {
+      "PublicLinkIn": {
         "properties": {
-          "target": {
-            "enum": [
-              "web_whatsapp",
-              "web",
-              "whatsapp"
-            ],
-            "title": "Target",
+          "slug": {
+            "description": "Lower-cased and trimmed",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Slug",
             "type": "string"
           }
         },
         "required": [
-          "target"
+          "slug"
         ],
-        "title": "QrSettingsIn",
+        "title": "PublicLinkIn",
         "type": "object"
       },
-      "QrSettingsOut": {
+      "PublicLinkOut": {
         "properties": {
-          "target": {
-            "enum": [
-              "web_whatsapp",
-              "web",
-              "whatsapp"
-            ],
-            "title": "Target",
+          "slug": {
+            "title": "Slug",
             "type": "string"
           },
-          "whatsapp_connected": {
-            "description": "Without WhatsApp the QR always leads to the web page (options disabled)",
-            "title": "Whatsapp Connected",
-            "type": "boolean"
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`{ADMIN_APP_URL}/o/{slug}`; null while it isn't set",
+            "title": "Url"
           }
         },
         "required": [
-          "target",
-          "whatsapp_connected"
+          "slug",
+          "url"
         ],
-        "title": "QrSettingsOut",
+        "title": "PublicLinkOut",
         "type": "object"
       },
       "QrTokenOut": {
@@ -9847,32 +9847,10 @@
           "table": {
             "$ref": "#/components/schemas/app__api__v1__public_table__TableOut"
           },
-          "target": {
-            "description": "Deprecated (Q1): web while WhatsApp isn't connected",
-            "enum": [
-              "web_whatsapp",
-              "web",
-              "whatsapp"
-            ],
-            "title": "Target",
-            "type": "string"
-          },
           "web_ordering": {
             "description": "False without a static QRIS: \"Pesan di kasir\"",
             "title": "Web Ordering",
             "type": "boolean"
-          },
-          "whatsapp_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Deprecated (Q1)",
-            "title": "Whatsapp Url"
           }
         },
         "required": [
@@ -9880,9 +9858,7 @@
           "table",
           "web_ordering",
           "agent_enabled",
-          "privacy_notice",
-          "target",
-          "whatsapp_url"
+          "privacy_notice"
         ],
         "title": "TablePage",
         "type": "object"
@@ -15792,6 +15768,185 @@
         ]
       }
     },
+    "/api/v1/owner/outlets/{outlet_id}/outlet-poster.pdf": {
+      "get": {
+        "description": "\"↓ Poster PDF\": one A5 page with the outlet QR, the outlet name, and the link.",
+        "operationId": "outlet_poster_pdf_api_v1_owner_outlets__outlet_id__outlet_poster_pdf_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outlet Poster Pdf",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/outlet-qr.png": {
+      "get": {
+        "description": "\"↓ Unduh PNG\": the QR of the outlet link.",
+        "operationId": "outlet_qr_png_api_v1_owner_outlets__outlet_id__outlet_qr_png_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outlet Qr Png",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
+    "/api/v1/owner/outlets/{outlet_id}/public-link": {
+      "get": {
+        "operationId": "get_public_link_api_v1_owner_outlets__outlet_id__public_link_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Public Link",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      },
+      "put": {
+        "description": "\"Simpan\": the old link and outlet QR stop working at once (C13).",
+        "operationId": "put_public_link_api_v1_owner_outlets__outlet_id__public_link_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "outlet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Outlet Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Public Link",
+        "tags": [
+          "owner: tables & reservation rules"
+        ]
+      }
+    },
     "/api/v1/owner/outlets/{outlet_id}/qris": {
       "get": {
         "description": "O3 \"qris-dago.png · diunggah 2 Nov 2026\" (null until one is uploaded). The image itself:\n`GET /ops/outlets/{id}/qris/image`.",
@@ -16170,100 +16325,6 @@
         "summary": "Export Movements",
         "tags": [
           "owner: stock"
-        ]
-      }
-    },
-    "/api/v1/owner/outlets/{outlet_id}/table-qr-settings": {
-      "get": {
-        "operationId": "get_qr_settings_api_v1_owner_outlets__outlet_id__table_qr_settings_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "outlet_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Outlet Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QrSettingsOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Qr Settings",
-        "tags": [
-          "owner: tables & reservation rules"
-        ]
-      },
-      "put": {
-        "operationId": "put_qr_settings_api_v1_owner_outlets__outlet_id__table_qr_settings_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "outlet_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Outlet Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QrSettingsIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QrSettingsOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Qr Settings",
-        "tags": [
-          "owner: tables & reservation rules"
         ]
       }
     },

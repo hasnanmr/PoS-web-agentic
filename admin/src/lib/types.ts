@@ -885,12 +885,11 @@ export interface MyAttendanceHistory {
   total_minutes: number
 }
 
-// O8 · QR meja (T-136) ----------------------------------------------------------------------------
-export type TableQrTarget = 'web_whatsapp' | 'web' | 'whatsapp'
-
-export interface TableQrSettings {
-  target: TableQrTarget
-  whatsapp_connected: boolean
+// O8 · Link outlet & QR (T-147) ---------------------------------------------------------------------
+export interface OutletPublicLink {
+  slug: string
+  /** `{ADMIN_APP_URL}/o/{slug}`; null while ADMIN_APP_URL isn't set. */
+  url: string | null
 }
 
 // O7 · Rekomendasi (T-073) -----------------------------------------------------------------------

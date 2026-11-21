@@ -22,13 +22,12 @@ const SETTINGS: ReservationSettings = {
 }
 
 describe('O8 Meja & Aturan Reservasi', () => {
-  it('replaces a table QR token after confirming and saves the QR target', async () => {
+  it('replaces a table QR token after confirming; no QR target choice any more', async () => {
     const api = fakeApi({
       'GET /owner/outlets/o-dago/tables': TABLES,
       'GET /owner/outlets/o-dago/reservation-settings': SETTINGS,
-      'GET /owner/outlets/o-dago/table-qr-settings': { target: 'web_whatsapp', whatsapp_connected: false },
+      'GET /owner/outlets/o-dago/public-link': { slug: 'kopisenja-dago', url: 'https://thinker.id/o/kopisenja-dago' },
       'POST /owner/tables/t1/qr-token': { qr_token: 'new', url: 'https://admin.test/t/new' },
-      'PUT /owner/outlets/o-dago/table-qr-settings': { target: 'web', whatsapp_connected: false },
     })
     render(<WithSession session={fakeSession('owner', { api })}><TablesPage /></WithSession>)
     expect(await screen.findByRole('button', { name: /Unduh semua QR \(PDF\)/ })).toBeInTheDocument()
@@ -37,11 +36,67 @@ describe('O8 Meja & Aturan Reservasi', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ya, ganti' }))
     await waitFor(() => expect(api.calls).toContainEqual(['POST', '/owner/tables/t1/qr-token', {}]))
     expect(await screen.findByText('QR baru dibuat. Unduh & cetak ulang.')).toBeInTheDocument()
+    expect(screen.queryByText('Tujuan QR meja')).not.toBeInTheDocument()
+    expect(api.calls.some(([, path]) => path.includes('table-qr-settings'))).toBe(false)
+  })
 
-    // Without WhatsApp the WhatsApp options are disabled; "Web saja" can be chosen.
-    expect(await screen.findByLabelText('WhatsApp saja')).toBeDisabled()
-    await userEvent.click(screen.getByLabelText('Web saja'))
-    await waitFor(() => expect(api.calls).toContainEqual(['PUT', '/owner/outlets/o-dago/table-qr-settings', { target: 'web' }]))
+  it('O8 link outlet: copy, change the slug after confirming, download the outlet QR and poster', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const api = fakeApi({
+      'GET /owner/outlets/o-dago/tables': TABLES,
+      'GET /owner/outlets/o-dago/reservation-settings': SETTINGS,
+      'GET /owner/outlets/o-dago/public-link': { slug: 'kopisenja-dago', url: 'https://thinker.id/o/kopisenja-dago' },
+      'PUT /owner/outlets/o-dago/public-link': { slug: 'kopi-senja', url: 'https://thinker.id/o/kopi-senja' },
+      'BLOB /owner/outlets/o-dago/outlet-qr.png': new Blob(['png']),
+      'BLOB /owner/outlets/o-dago/outlet-poster.pdf': new Blob(['pdf']),
+    })
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    URL.revokeObjectURL = vi.fn()
+    render(<WithSession session={fakeSession('owner', { api })}><TablesPage /></WithSession>)
+    const slug = await screen.findByLabelText('Slug outlet')
+    expect(slug).toHaveValue('kopisenja-dago')
+    expect(screen.getByText('thinker.id/o/')).toBeInTheDocument()
+    expect(screen.getByText('QR meja (3 meja) — dine-in')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Simpan link outlet' })).toBeDisabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Salin link outlet' }))
+    expect(writeText).toHaveBeenCalledWith('https://thinker.id/o/kopisenja-dago')
+
+    await userEvent.click(screen.getByRole('button', { name: '↓ Unduh PNG' }))
+    await userEvent.click(screen.getByRole('button', { name: '↓ Poster PDF' }))
+    expect(api.calls).toContainEqual(['BLOB', '/owner/outlets/o-dago/outlet-qr.png', 'image/png'])
+    expect(api.calls).toContainEqual(['BLOB', '/owner/outlets/o-dago/outlet-poster.pdf', 'application/pdf'])
+
+    await userEvent.clear(slug)
+    await userEvent.type(slug, 'Kopi-Senja')
+    // While the slug is edited the old link can't be copied or downloaded by mistake.
+    expect(screen.getByRole('button', { name: 'Salin link outlet' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '↓ Unduh PNG' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan link outlet' }))
+    const confirm = screen.getByRole('alertdialog', { name: 'Konfirmasi ganti link' })
+    expect(confirm).toHaveTextContent('Ganti link ke kopi-senja? Link & QR outlet lama langsung tidak berlaku.')
+    expect(api.calls.some(([m]) => m === 'PUT')).toBe(false)
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Ya, ganti' }))
+    await waitFor(() => expect(api.calls).toContainEqual(['PUT', '/owner/outlets/o-dago/public-link', { slug: 'kopi-senja' }]))
+    expect(await screen.findByText(/Link outlet disimpan/)).toBeInTheDocument()
+  })
+
+  it('O8 link outlet: a taken slug shows the error and keeps the old link', async () => {
+    const api = fakeApi({
+      'GET /owner/outlets/o-dago/tables': TABLES,
+      'GET /owner/outlets/o-dago/reservation-settings': SETTINGS,
+      'GET /owner/outlets/o-dago/public-link': { slug: 'kopisenja-dago', url: 'https://thinker.id/o/kopisenja-dago' },
+      'PUT /owner/outlets/o-dago/public-link': new ApiError(409, 'slug_taken', 'this link is already used by another outlet'),
+    })
+    render(<WithSession session={fakeSession('owner', { api })}><TablesPage /></WithSession>)
+    const slug = await screen.findByLabelText('Slug outlet')
+    await userEvent.clear(slug)
+    await userEvent.type(slug, 'kopi')
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan link outlet' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Ya, ganti' }))
+    expect(await screen.findByText('Link ini sudah dipakai outlet lain. Pilih slug lain.')).toBeInTheDocument()
+    expect(screen.getByText('thinker.id/o/')).toBeInTheDocument()
   })
 
   it('lists tables with their QR download and adds a table', async () => {

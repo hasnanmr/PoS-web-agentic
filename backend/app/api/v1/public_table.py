@@ -10,7 +10,7 @@ routes shared with the outlet link (menu, quote, chat session, status, payment) 
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, Header, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
@@ -57,12 +57,6 @@ class TablePage(BaseModel):
     web_ordering: bool = Field(description='False without a static QRIS: "Pesan di kasir"')
     agent_enabled: bool = Field(description="Free-text agent (C9/C14); off until T-086 ships")
     privacy_notice: PrivacyNotice
-    # Q1 fields, kept until the Q0-Q5 page is replaced by the web chat (T-145) and the O8 QR
-    # target setting is removed (T-147).
-    target: Literal["web_whatsapp", "web", "whatsapp"] = Field(
-        description="Deprecated (Q1): web while WhatsApp isn't connected"
-    )
-    whatsapp_url: str | None = Field(description="Deprecated (Q1)")
 
 
 @router.get("/{token}")
@@ -79,8 +73,6 @@ async def table_page(token: str, request: Request) -> TablePage:
         web_ordering=scope.web_ordering,
         agent_enabled=False,
         privacy_notice=chat.privacy_notice(),
-        target=ref.effective_target,
-        whatsapp_url=ref.whatsapp_url,
     )
 
 

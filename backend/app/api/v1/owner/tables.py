@@ -1,14 +1,16 @@
 """Owner tables and reservation rules — wireframe O8 "Meja & Aturan Reservasi" (T-057).
 
 Contract: docs/architecture/screen-endpoint-map.md → O8. Table QR (T-136, #44): each QR encodes
-the table web page `{ADMIN_APP_URL}/t/{qr_token}`; the owner downloads one (PNG) or all (PDF),
-replaces a table's token, and picks where the QR leads ("Tujuan QR meja").
+the web chat `{ADMIN_APP_URL}/t/{qr_token}`; the owner downloads one (PNG) or all (PDF) and
+replaces a table's token. Link outlet & QR (T-147, page 07): the owner sets the outlet slug of
+`{ADMIN_APP_URL}/o/{slug}` and downloads its QR (PNG) or poster (PDF). The QR always opens the
+web chat: the old "Tujuan QR meja" setting is gone.
 """
 
 from __future__ import annotations
 
 from datetime import time
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Request, Response, status
@@ -17,7 +19,7 @@ from pydantic import BaseModel, Field
 from app import db
 from app.api.errors import ApiError
 from app.auth.deps import OwnerOnly
-from app.core import outlets, table_qr
+from app.core import outlet_link, outlets, table_qr
 from app.core import tables as core
 
 router = APIRouter(prefix="/api/v1/owner", tags=["owner: tables & reservation rules"])
@@ -130,16 +132,6 @@ async def put_settings(
 # Table QR (T-136) -----------------------------------------------------------------------------
 
 
-class QrSettingsIn(BaseModel):
-    target: Literal["web_whatsapp", "web", "whatsapp"]
-
-
-class QrSettingsOut(QrSettingsIn):
-    whatsapp_connected: bool = Field(
-        description="Without WhatsApp the QR always leads to the web page (options disabled)"
-    )
-
-
 class QrTokenOut(BaseModel):
     qr_token: str
     url: str
@@ -207,20 +199,69 @@ async def replace_qr_token(table_id: UUID, request: Request, user: OwnerOnly) ->
     return QrTokenOut(qr_token=token, url=table_qr.table_url(app_url, token))
 
 
-@router.get("/outlets/{outlet_id}/table-qr-settings")
-async def get_qr_settings(outlet_id: UUID, request: Request, user: OwnerOnly) -> QrSettingsOut:
+# Link outlet & QR (T-147) ------------------------------------------------------------------------
+
+
+class PublicLinkIn(BaseModel):
+    slug: str = Field(min_length=1, max_length=60, description="Lower-cased and trimmed")
+
+
+class PublicLinkOut(BaseModel):
+    slug: str
+    url: str | None = Field(description="`{ADMIN_APP_URL}/o/{slug}`; null while it isn't set")
+
+
+def _link_out(request: Request, slug: str) -> PublicLinkOut:
+    app_url = request.app.state.settings.admin_app_url
+    return PublicLinkOut(
+        slug=slug, url=outlet_link.outlet_url(str(app_url), slug) if app_url else None
+    )
+
+
+@router.get("/outlets/{outlet_id}/public-link")
+async def get_public_link(outlet_id: UUID, request: Request, user: OwnerOnly) -> PublicLinkOut:
     async with db.transaction(_pool(request), user.actor()) as conn:
-        await outlets.require_outlet(conn, outlet_id)
-        row = await table_qr.qr_settings(conn, outlet_id)
-    return QrSettingsOut(**row)
+        row = await outlet_link.get_link(conn, outlet_id)
+    return _link_out(request, row["slug"])
 
 
-@router.put("/outlets/{outlet_id}/table-qr-settings")
-async def put_qr_settings(
-    outlet_id: UUID, body: QrSettingsIn, request: Request, user: OwnerOnly
-) -> QrSettingsOut:
+@router.put("/outlets/{outlet_id}/public-link")
+async def put_public_link(
+    outlet_id: UUID, body: PublicLinkIn, request: Request, user: OwnerOnly
+) -> PublicLinkOut:
+    """ "Simpan": the old link and outlet QR stop working at once (C13)."""
     ctx = user.actor()
     async with db.transaction(_pool(request), ctx) as conn:
-        await outlets.require_outlet(conn, outlet_id)
-        row = await table_qr.put_qr_settings(conn, ctx, outlet_id, body.target)
-    return QrSettingsOut(**row)
+        row = await outlet_link.set_slug(conn, ctx, outlet_id, body.slug)
+    return _link_out(request, row["slug"])
+
+
+@router.get("/outlets/{outlet_id}/outlet-qr.png")
+async def outlet_qr_png(outlet_id: UUID, request: Request, user: OwnerOnly) -> Response:
+    """ "↓ Unduh PNG": the QR of the outlet link."""
+    app_url = _app_url(request)
+    async with db.transaction(_pool(request), user.actor()) as conn:
+        row = await outlet_link.get_link(conn, outlet_id)
+    png = table_qr.qr_png(outlet_link.outlet_url(app_url, row["slug"]))
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Content-Disposition": f'attachment; filename="qr-{row["slug"]}.png"'},
+    )
+
+
+@router.get("/outlets/{outlet_id}/outlet-poster.pdf")
+async def outlet_poster_pdf(outlet_id: UUID, request: Request, user: OwnerOnly) -> Response:
+    """ "↓ Poster PDF": one A5 page with the outlet QR, the outlet name, and the link."""
+    app_url = _app_url(request)
+    async with db.transaction(_pool(request), user.actor()) as conn:
+        row = await outlet_link.get_link(conn, outlet_id)
+    url = outlet_link.outlet_url(app_url, row["slug"])
+    pdf = table_qr.qr_pdf(
+        [{"url": url, "title": row["outlet_name"], "subtitle": url.split("://", 1)[-1]}]
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="poster-{row["slug"]}.pdf"'},
+    )
