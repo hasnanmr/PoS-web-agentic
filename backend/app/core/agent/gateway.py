@@ -398,4 +398,6 @@ def _default_reply(turn: TurnResult) -> str:
         return "Ini beberapa pilihan yang cocok buat kamu."
     if turn.out_of_scope:
         return "Maaf, aku cuma bisa bantu pesan, rekomendasi menu, dan reservasi di outlet ini."
+    if turn.quick_replies:  # the model asked with buttons only and wrote no question
+        return "Siap! Pilih salah satu di bawah ya."
     return "Maaf, aku belum paham. Coba tulis lagi, atau pakai tombol di bawah ya."
