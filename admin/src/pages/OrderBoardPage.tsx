@@ -12,7 +12,7 @@
 // the table and name. Once the customer taps "Saya sudah bayar" the card shows "Pelanggan bilang
 // sudah bayar · 12:44" with "Cek & konfirmasi lunas →" and "Tolak · 📞 Hubungi" (Tolak opens S4).
 // Delivery orders get "Out for delivery →" before "Selesai" (from allowed_actions).
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { ROUTES } from '../app/nav'
 import { useRolePath, useSession } from '../app/session'
@@ -54,6 +54,9 @@ export default function OrderBoardPage() {
   const [openId, setOpenId] = useState<string>()
   const [checking, setChecking] = useState<OrderCard>()
   const [error, setError] = useState<string>()
+  // The order whose transition is in flight: its button stays disabled so a double tap sends it once.
+  const [actingId, setActingId] = useState<string>()
+  const acting = useRef(false) // guards taps that land before the disabled state renders
   const params = new URLSearchParams()
   if (channel) params.set('channel', channel)
   if (type) params.set('type', type)
@@ -67,6 +70,9 @@ export default function OrderBoardPage() {
   usePolling(board, POLL_MS)
 
   async function act(order: OrderCard, to: string) {
+    if (acting.current) return
+    acting.current = true
+    setActingId(order.id)
     setError(undefined)
     try {
       await api.post(`/ops/orders/${order.id}/transitions`, { to_status: to })
@@ -74,6 +80,9 @@ export default function OrderBoardPage() {
     } catch (e) {
       setError(errorMessage(e))
       await reload()
+    } finally {
+      acting.current = false
+      setActingId(undefined)
     }
   }
 
@@ -178,7 +187,7 @@ export default function OrderBoardPage() {
                             </div>
                           )}
                           {forward && (
-                            <Button className={`mt-2 h-8 w-full ${forward === 'completed' ? 'bg-success' : ''}`} onClick={() => void act(o, forward)}>
+                            <Button className={`mt-2 h-8 w-full ${forward === 'completed' ? 'bg-success' : ''}`} disabled={actingId === o.id} onClick={() => void act(o, forward)}>
                               {ACTION_LABEL[forward]}
                             </Button>
                           )}
