@@ -377,7 +377,7 @@ function DrawerCard({ outletId, grace, onGrace }: { outletId: string; grace: num
             ) : (
               <>
                 <span className="flex-1">
-                  Drawer {i + 1} · {d.name}{i === 0 ? ' (default)' : ''}
+                  Drawer {d.number} · {d.name}{i === 0 ? ' (default)' : ''}
                 </span>
                 <button type="button" aria-label={`Ubah ${d.name}`} className="text-text-muted hover:text-text"
                   onClick={() => setEditing({ id: d.id, name: d.name })}>✎</button>

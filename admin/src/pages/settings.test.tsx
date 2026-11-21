@@ -22,14 +22,16 @@ describe('O3 Bisnis & Outlet', () => {
     const api = fakeApi({
       'GET /owner/outlets/o-dago': DAGO,
       'GET /owner/outlets/o-dago/drawers': [
-        { id: 'd1', name: 'Kasir depan', has_open_shift: false },
-        { id: 'd2', name: 'Bar', has_open_shift: false },
+        // Drawer 2 was deleted: Bar keeps number 3, not its list position (#74).
+        { id: 'd1', name: 'Kasir depan', number: 1, has_open_shift: false },
+        { id: 'd3', name: 'Bar', number: 3, has_open_shift: false },
       ],
     })
     render(<WithSession session={fakeSession('owner', { api })}><BusinessPage /></WithSession>)
     expect(await screen.findByDisplayValue('Bandung – Dago')).toBeInTheDocument()
     expect(screen.getByText('Sen–Min 08:00 – 22:00')).toBeInTheDocument()
     expect(await screen.findByText('Drawer 1 · Kasir depan (default)')).toBeInTheDocument()
+    expect(screen.getByText('Drawer 3 · Bar')).toBeInTheDocument()
     expect(screen.getByText('● Terhubung')).toBeInTheDocument()
 
     const save = screen.getByRole('button', { name: 'Simpan perubahan' })

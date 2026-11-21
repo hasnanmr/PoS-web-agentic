@@ -22,6 +22,7 @@ from app.core.actor import ActorContext
 from app.core.audit import record_audit
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.localtime import local_date
+from app.core.outlets import DRAWER_NUMBER_SQL
 
 # S8 blind count: note counts per denomination, plus "Rp 1.000 & koin" entered as an amount.
 NOTES = (100_000, 50_000, 20_000, 10_000, 5_000, 2_000)
@@ -29,18 +30,16 @@ COINS_KEY = "coins"
 MAX_NOTES = 100_000
 MAX_COINS = 100_000_000
 
-_OPEN_SHIFTS = """
+_OPEN_SHIFTS = f"""
 select s.id, s.drawer_id, d.name as drawer_name, s.opened_at, s.starting_cash,
        s.opened_by, u.display_name as opened_by_name,
-       (select count(*) from app.cash_drawers d2
-        where d2.outlet_id = d.outlet_id and d2.created_at <= d.created_at)
-         as drawer_number
+       {DRAWER_NUMBER_SQL} as drawer_number
 from app.cashier_shifts s
 join app.cash_drawers d on d.id = s.drawer_id
 left join app.users u on u.id = s.opened_by
 where s.outlet_id = %s and s.status = 'open'
-order by d.created_at
-"""
+order by d.created_at, d.id
+"""  # noqa: S608 - DRAWER_NUMBER_SQL is a constant
 
 
 async def open_shifts(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str, Any]]:
@@ -53,8 +52,13 @@ async def drawers_with_shift(conn: AsyncConnection, outlet_id: UUID) -> list[dic
     """S8 drawer cards. No expected cash before the count (blind count)."""
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
-        "select id, name from app.cash_drawers where outlet_id = %s and is_active"
-        " order by created_at",
+        # number: the same as Kasir, Open Bills, O3 and the cash-count report.
+        f"""
+        select d.id, d.name, {DRAWER_NUMBER_SQL} as number
+        from app.cash_drawers d
+        where d.outlet_id = %s and d.is_active
+        order by d.created_at, d.id
+        """,  # noqa: S608 - DRAWER_NUMBER_SQL is a constant
         (outlet_id,),
     )
     drawers = await cur.fetchall()

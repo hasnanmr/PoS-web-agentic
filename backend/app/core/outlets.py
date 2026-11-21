@@ -237,19 +237,27 @@ async def set_opening_hours(
 
 # Cash drawers -------------------------------------------------------------------------
 
+# A drawer's number as every screen shows it ("Drawer 3 · Teras"): 1-based by creation order
+# among all of the outlet's drawers, deleted (inactive) ones included, so removing a drawer never
+# renumbers the others or past shifts. `id` breaks ties between drawers created in one
+# transaction (same `now()`). Expects the drawer aliased as `d`.
+DRAWER_NUMBER_SQL = """(select count(*) from app.cash_drawers d2
+        where d2.outlet_id = d.outlet_id
+          and (d2.created_at, d2.id) <= (d.created_at, d.id))"""
+
 
 async def list_drawers(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str, Any]]:
     await get_outlet(conn, outlet_id)
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
-        """
-        select d.id, d.name, d.created_at,
+        f"""
+        select d.id, d.name, d.created_at, {DRAWER_NUMBER_SQL} as number,
                exists (select 1 from app.cashier_shifts s
                        where s.drawer_id = d.id and s.closed_at is null) as has_open_shift
         from app.cash_drawers d
         where d.outlet_id = %s and d.is_active
-        order by d.created_at, d.name
-        """,
+        order by d.created_at, d.id
+        """,  # noqa: S608 - DRAWER_NUMBER_SQL is a constant
         (outlet_id,),
     )
     return await cur.fetchall()

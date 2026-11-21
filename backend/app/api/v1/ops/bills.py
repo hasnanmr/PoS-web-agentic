@@ -114,8 +114,12 @@ class DrawerOut(BaseModel):
     name: str | None
 
 
+class DrawerCardDrawer(DrawerOut):
+    number: int
+
+
 class DrawerCard(BaseModel):
-    drawer: DrawerOut
+    drawer: DrawerCardDrawer
     shift: DrawerShift | None
 
 

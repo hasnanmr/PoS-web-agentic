@@ -55,6 +55,8 @@ export interface OutletDetail {
 export interface Drawer {
   id: string
   name: string
+  /** Same "Drawer N" as S1, S8, Open Bills and the cash-count report (not the list position). */
+  number: number
   has_open_shift: boolean
 }
 
@@ -350,7 +352,7 @@ export interface ShiftRow {
 }
 
 export interface DrawerCard {
-  drawer: { id: string; name: string }
+  drawer: { id: string; name: string; number: number }
   shift: { id: string; opened_at: string; starting_cash: number; opened_by: string | null; cash_in: number;
     cash_in_count: number; cash_refunds: number } | null
 }

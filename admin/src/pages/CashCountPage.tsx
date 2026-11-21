@@ -71,7 +71,7 @@ export default function CashCountPage() {
           <Select aria-label="Drawer" className="h-8 w-auto" value={drawerId} disabled={!outletId}
             onChange={(e) => setDrawerId(e.target.value)}>
             <option value="">Drawer: Semua</option>
-            {(drawers.data ?? []).map((d, i) => <option key={d.id} value={d.id}>Drawer: {i + 1} · {d.name}</option>)}
+            {(drawers.data ?? []).map((d) => <option key={d.id} value={d.id}>Drawer: {d.number} · {d.name}</option>)}
           </Select>
           <RangePicker value={r ? { from: r.from, to: r.to } : range} onChange={setRange} />
           <Button variant="ghost" className="h-8 sm:ml-auto" onClick={() => void exportCsv()}>⭳ Ekspor CSV</Button>

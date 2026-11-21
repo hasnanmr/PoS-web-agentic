@@ -230,6 +230,19 @@ def test_drawers_create_rename_delete(client, tenant) -> None:
     )
     remaining = client.get(base, headers=owner(tenant)).json()
     assert [d["name"] for d in remaining] == ["Kasir depan"]
+    # S8 keeps each drawer's number after another drawer is deleted (#74).
+    again = client.post(base, headers=owner(tenant), json={"name": "Teras"}).json()["id"]
+    cards = client.get(
+        f"/api/v1/ops/outlets/{tenant['outlet_id']}/drawers", headers=owner(tenant)
+    ).json()
+    assert [(c["drawer"]["name"], c["drawer"]["number"]) for c in cards] == [
+        ("Kasir depan", 1),
+        ("Teras", 3),
+    ]
+    # O3 and the O10 drawer filter read the owner list: the same numbers.
+    listed = client.get(base, headers=owner(tenant)).json()
+    assert [(d["name"], d["number"]) for d in listed] == [("Kasir depan", 1), ("Teras", 3)]
+    client.delete(f"/api/v1/owner/drawers/{again}", headers=owner(tenant))
     last = client.delete(f"/api/v1/owner/drawers/{remaining[0]['id']}", headers=owner(tenant))
     assert last.json()["error"]["code"] == "last_drawer"
 

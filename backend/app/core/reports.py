@@ -25,6 +25,7 @@ from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
 from app.core.errors import ValidationFailedError
+from app.core.outlets import DRAWER_NUMBER_SQL
 
 Granularity = Literal["daily", "weekly", "monthly"]
 MAX_RANGE_DAYS = 366
@@ -217,12 +218,10 @@ async def cashflow(
 # O10 cash count ------------------------------------------------------------------------------
 
 
-_CASH_COUNT = """
+_CASH_COUNT = f"""
 select s.id as shift_id, s.opened_at, s.closed_at, s.outlet_id, o.name as outlet_name,
        o.timezone, s.drawer_id, d.name as drawer_name,
-       (select count(*) from app.cash_drawers d2
-        where d2.outlet_id = d.outlet_id and d2.created_at <= d.created_at)
-         as drawer_number,
+       {DRAWER_NUMBER_SQL} as drawer_number,
        s.starting_cash, s.expected_cash, s.counted_cash, s.difference,
        u.display_name as counted_by
 from app.cashier_shifts s
@@ -234,7 +233,7 @@ where s.status = 'closed'
   and (%(drawer)s::uuid is null or s.drawer_id = %(drawer)s)
   and (s.opened_at at time zone o.timezone)::date between %(from)s and %(to)s
 order by s.opened_at desc
-"""
+"""  # noqa: S608 - DRAWER_NUMBER_SQL is a constant
 
 
 def _kind(difference: int) -> str:

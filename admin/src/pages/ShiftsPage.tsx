@@ -35,8 +35,8 @@ export default function ShiftsPage() {
         {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
         {drawers.loading && !drawers.data ? <Loading /> : (
           <div className="grid gap-4 md:grid-cols-2">
-            {(drawers.data ?? []).map((d, i) => (
-              <Card key={d.drawer.id} title={`Drawer ${i + 1} · ${d.drawer.name}`}>
+            {(drawers.data ?? []).map((d) => (
+              <Card key={d.drawer.id} title={`Drawer ${d.drawer.number} · ${d.drawer.name}`}>
                 {d.shift ? (
                   <div className="space-y-1 text-[12px]">
                     <p className="text-success">● Shift aktif — {d.shift.opened_by ?? '—'}</p>
@@ -44,7 +44,7 @@ export default function ShiftsPage() {
                     <p>Cash masuk: {formatRupiah(d.shift.cash_in)} ({d.shift.cash_in_count} trx)</p>
                     <p>Refund cash: {formatRupiah(d.shift.cash_refunds)}</p>
                     <Button variant="action" className="mt-2" disabled={closing?.shiftId === d.shift.id}
-                      onClick={() => { setNotice(undefined); setClosing({ shiftId: d.shift!.id, label: `Drawer ${i + 1}` }) }}>
+                      onClick={() => { setNotice(undefined); setClosing({ shiftId: d.shift!.id, label: `Drawer ${d.drawer.number}` }) }}>
                       Tutup shift & hitung kas
                     </Button>
                   </div>

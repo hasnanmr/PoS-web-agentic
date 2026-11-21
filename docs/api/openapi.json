@@ -2386,11 +2386,16 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
           }
         },
         "required": [
           "id",
           "name",
+          "number",
           "has_open_shift"
         ],
         "title": "Drawer",
@@ -2399,7 +2404,7 @@
       "DrawerCard": {
         "properties": {
           "drawer": {
-            "$ref": "#/components/schemas/DrawerOut"
+            "$ref": "#/components/schemas/DrawerCardDrawer"
           },
           "shift": {
             "anyOf": [
@@ -2417,6 +2422,37 @@
           "shift"
         ],
         "title": "DrawerCard",
+        "type": "object"
+      },
+      "DrawerCardDrawer": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "number"
+        ],
+        "title": "DrawerCardDrawer",
         "type": "object"
       },
       "DrawerName": {

@@ -522,7 +522,7 @@ describe('S5 Open Bills', () => {
 
 describe('S8 Shift Kasir', () => {
   it('opens a shift with starting cash', async () => {
-    const api = fakeApi({ 'GET /ops/outlets/o-dago/drawers': [{ drawer: { id: 'd1', name: 'Kasir depan' }, shift: null }] })
+    const api = fakeApi({ 'GET /ops/outlets/o-dago/drawers': [{ drawer: { id: 'd1', name: 'Kasir depan', number: 1 }, shift: null }] })
     render(<WithSession session={fakeSession('staff', { api })}><ShiftsPage /></WithSession>)
     await userEvent.type(await screen.findByLabelText('Kas awal'), '500000')
     await userEvent.click(screen.getByRole('button', { name: 'Buka shift' }))
