@@ -31,8 +31,9 @@ import {
 import { MyOrders, PayCard, StatusCard } from './PayStatus'
 import { isActive, useObjectUrl } from './status'
 import {
-  bookingFragment, clearDetails, forgetOrder, loadBookings, loadDetails, loadOrders, orderFragment, randomKey,
-  readFragment, rememberBooking, rememberOrder, saveDetails, sessionId, type SavedBooking, type SavedOrder,
+  bookingFragment, clearDetails, clearTranscript, forgetOrder, loadBookings, loadDetails, loadOrders, loadTranscript,
+  orderFragment, randomKey, readFragment, rememberBooking, rememberOrder, saveDetails, saveTranscript, sessionId,
+  type SavedBooking, type SavedOrder,
 } from './storage'
 import type {
   Booking, CartLine, ChatMenuItem, ChatPage, ChatQuote, OrderOverview, OrderStatus, RecommendationCard, Scope,
@@ -58,6 +59,14 @@ type Step =
 type Msg =
   | { id: number; kind: 'me' | 'ok' | 'info' | 'warn' | 'expired'; text: string }
   | { id: number; kind: 'ai'; turn: AgentTurn }
+
+/** A transcript saved on this phone, as it should show after a refresh: a reply that was still
+ * streaming when the page closed can't continue, so it shows the friendly fallback instead. */
+function restoreTranscript(saved: Msg[]): Msg[] {
+  return saved.map((m) => (m.kind === 'ai' && m.turn.result === null
+    ? { ...m, turn: { ...m.turn, result: { kind: 'error', code: 'agent_unavailable', fallback: m.turn.context === 'recommend' ? 'cards' : 'buttons' } } }
+    : m))
+}
 
 export interface HashLocation {
   read: () => string
@@ -121,6 +130,13 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       setMenu(m)
       setCart(session.cart.lines)
       setFulfillment(session.fulfillment)
+      // The bubbles of this session come back from the phone (2 hours idle drops them, like the cart).
+      if (session.cart_expired) clearTranscript(key)
+      else {
+        const transcript = restoreTranscript(loadTranscript<Msg>(key, chat.session))
+        nextId.current = Math.max(0, ...transcript.map((m) => m.id)) + 1
+        setMsgs(transcript)
+      }
       const fragment = readFragment(location.read())
       if (fragment?.kind === 'order') {
         setOrders(rememberOrder(key, fragment.order))
@@ -164,6 +180,14 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
     }, 400)
     return () => window.clearTimeout(timer)
   }, [chat, cart, fulfillment, stepName, scope.kind])
+
+  // Keep the transcript on this phone so a refresh shows the same chat (debounced: a streaming
+  // reply changes it many times a second).
+  useEffect(() => {
+    if (!restored.current) return
+    const timer = window.setTimeout(() => saveTranscript(key, chat.session, msgs), 300)
+    return () => window.clearTimeout(timer)
+  }, [chat, key, msgs])
 
   // Pesanan Saya (C1 button, C7 list): the orders this phone kept keys for.
   const refreshOverview = useCallback(async () => {

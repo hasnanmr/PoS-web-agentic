@@ -2,7 +2,9 @@
 // - the chat session id (the server keeps step + cart under it);
 // - the orders and bookings placed from this phone, with their access keys (the server stores
 //   only hashes, so a key lost here can't be recovered; the saveable link carries it too);
-// - optionally the customer's own name, phone, and address ("Ingat data di HP ini").
+// - optionally the customer's own name, phone, and address ("Ingat data di HP ini");
+// - the chat transcript of the current session, so a refresh shows the same bubbles; it is
+//   dropped after 2 hours with no activity, like the cart (FR6.2).
 // Nothing here is sent anywhere except the matching API calls.
 
 export interface SavedOrder {
@@ -95,6 +97,38 @@ export function rememberBooking(slug: string, booking: SavedBooking): SavedBooki
     .slice(0, MAX_BOOKINGS)
   write(BOOKINGS, { ...all, [slug]: list })
   return list
+}
+
+// Chat transcript ------------------------------------------------------------------------------
+// Kept on this phone only (never on the server), per scope and chat session. Generic over the
+// message type so storage does not depend on the chat components.
+
+const TRANSCRIPT = 'thinker.chat.transcript.v1'
+export const TRANSCRIPT_IDLE_MS = 2 * 60 * 60 * 1000
+
+interface SavedTranscript<T> {
+  session: string
+  saved_at: string
+  messages: T[]
+}
+
+export function loadTranscript<T>(scopeKey: string, session: string, now = Date.now()): T[] {
+  const saved = read<Record<string, SavedTranscript<T>>>(TRANSCRIPT, {})[scopeKey]
+  if (!saved || saved.session !== session || !Array.isArray(saved.messages)) return []
+  if (now - new Date(saved.saved_at).getTime() >= TRANSCRIPT_IDLE_MS) return []
+  return saved.messages
+}
+
+export function saveTranscript<T>(scopeKey: string, session: string, messages: T[], now = Date.now()): void {
+  const all = read<Record<string, SavedTranscript<T>>>(TRANSCRIPT, {})
+  write(TRANSCRIPT, { ...all, [scopeKey]: { session, saved_at: new Date(now).toISOString(), messages } })
+}
+
+export function clearTranscript(scopeKey: string): void {
+  const all = read<Record<string, unknown>>(TRANSCRIPT, {})
+  if (!(scopeKey in all)) return
+  delete all[scopeKey]
+  write(TRANSCRIPT, all)
 }
 
 export function loadDetails(): SavedDetails | null {

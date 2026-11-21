@@ -64,9 +64,9 @@ function renderChat(routes: Record<string, unknown>, scope: 'o' | 't' = 'o', loc
     [`POST ${base}/orders/status`]: [],
     ...routes,
   })
-  render(<ChatScreens api={api} apiBaseUrl="https://api.test"
+  const view = render(<ChatScreens api={api} apiBaseUrl="https://api.test"
     scope={scope === 'o' ? { kind: 'o', slug: SLUG } : { kind: 't', token: TOKEN }} location={location} />)
-  return { api, location }
+  return { api, location, unmount: view.unmount }
 }
 
 beforeEach(() => {
@@ -524,5 +524,65 @@ describe('C9 AI / C14 / C15 agent', () => {
     expect(await screen.findByText('Oke, jam 18:30.')).toBeInTheDocument()
     expect(sent(fetchMock, 1).body.text).toBe('18:30')
     expect(screen.queryByText(/Masuk keranjang/)).not.toBeInTheDocument()
+  })
+
+  // FR6.2: a refresh keeps the chat. The transcript stays on this phone only.
+  const TRANSCRIPT = 'thinker.chat.transcript.v1'
+
+  it('a refresh shows the same chat, agent replies included', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['final', { ...FINAL, reply_text: 'Italian chicken 2 porsi, mau diambil atau diantar?', quick_replies: ['Pickup'] }]]))
+    const first = renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'mau italian chicken 2 porsi{Enter}')
+    await screen.findByText(/mau diambil atau diantar\?/)
+    await waitFor(() => expect(localStorage.getItem(TRANSCRIPT)).toContain('mau diambil atau diantar'))
+    first.unmount()
+
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    expect(await screen.findByText('mau italian chicken 2 porsi')).toBeInTheDocument()
+    expect(screen.getByText('Italian chicken 2 porsi, mau diambil atau diantar?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pickup' })).toBeInTheDocument()
+  })
+
+  it('a reply cut off by the refresh shows the friendly fallback, not a spinner', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))
+    const first = renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'halo{Enter}')
+    await waitFor(() => expect(localStorage.getItem(TRANSCRIPT)).toContain('halo'))
+    first.unmount()
+
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    expect(await screen.findByText('halo')).toBeInTheDocument()
+    expect(screen.getByText(/asistennya lagi belum bisa jawab/)).toBeInTheDocument()
+  })
+
+  it('after 2 idle hours the old chat is gone with the cart', async () => {
+    const user = userEvent.setup()
+    stubAgent()
+    const first = renderChat({})
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'pesan lama{Enter}')
+    await waitFor(() => expect(localStorage.getItem(TRANSCRIPT)).toContain('pesan lama'))
+    first.unmount()
+
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, cart_expired: true } })
+    expect(await screen.findByText('Keranjangmu sudah kosong lagi')).toBeInTheDocument()
+    expect(screen.queryByText('pesan lama')).not.toBeInTheDocument()
+    expect(localStorage.getItem(TRANSCRIPT) ?? '').not.toContain('pesan lama')
+  })
+})
+
+describe('chat transcript storage', () => {
+  it('is per session and dropped after 2 hours without activity', async () => {
+    const { loadTranscript, saveTranscript, TRANSCRIPT_IDLE_MS } = await import('./storage')
+    const now = Date.parse('2026-11-21T10:00:00Z')
+    saveTranscript('o:x', 'sess-1', [{ id: 1 }], now)
+    expect(loadTranscript('o:x', 'sess-1', now + TRANSCRIPT_IDLE_MS - 1)).toEqual([{ id: 1 }])
+    expect(loadTranscript('o:x', 'sess-1', now + TRANSCRIPT_IDLE_MS)).toEqual([])
+    expect(loadTranscript('o:x', 'sess-2', now)).toEqual([])
+    expect(loadTranscript('t:y', 'sess-1', now)).toEqual([])
   })
 })
