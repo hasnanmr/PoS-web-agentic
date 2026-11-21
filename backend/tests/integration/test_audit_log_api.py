@@ -115,8 +115,10 @@ def _event(ctx: dict[str, Any], outlet: str, order: str, event: str, at: str, **
 
 
 def _today_at(hour: int, minute: int, tz: str = "Asia/Jakarta", days: int = 0) -> str:
-    day = datetime.now(ZoneInfo(tz)).replace(hour=hour, minute=minute, second=0, microsecond=0)
-    return (day - timedelta(days=days)).isoformat()
+    # The calendar day is always Jakarta's (what the API's default range uses), so the
+    # result does not depend on which timezone is already past midnight when CI runs.
+    day = datetime.now(ZoneInfo("Asia/Jakarta")).date() - timedelta(days=days)
+    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=ZoneInfo(tz)).isoformat()
 
 
 @pytest.fixture(scope="module")

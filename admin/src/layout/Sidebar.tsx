@@ -18,26 +18,29 @@ export function Sidebar({ role, onNavigate }: SidebarProps) {
       className="flex h-full w-[220px] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-3 py-4"
     >
       <div className="px-2">
-        <Brand className="text-[15px]" />
-        {/* Outlet switcher: outlets from GET /me (owner: all, staff: assigned only). */}
-        <label className="mt-0.5 block text-[11px] text-text-muted">
-          <span>Outlet: {me.tenant?.name} – </span>
-          <select
-            aria-label="Ganti outlet"
-            className="max-w-full cursor-pointer appearance-none bg-transparent text-[11px] text-text-muted hover:text-text focus:outline-none"
-            value={outlet?.id ?? ""}
-            onChange={(event) => setOutletId(event.target.value)}
-          >
-            {me.outlets.length === 0 && (
-              <option value="">belum ada outlet</option>
-            )}
-            {me.outlets.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-          <span aria-hidden="true"> ▾</span>
+        <Brand size={36} className="text-[20px]" />
+        {/* Outlet switcher: outlets from GET /me (owner: all, staff: assigned only). Looks like a field so it reads as a choice. */}
+        <label className="mt-3 block">
+          <span className="text-[10px] font-medium tracking-wider text-text-muted uppercase">Outlet aktif</span>
+          <span className="relative mt-1 flex h-9 items-center rounded-md border border-border bg-page hover:border-primary focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-soft">
+            <select
+              aria-label="Ganti outlet"
+              className="h-full w-full cursor-pointer appearance-none truncate bg-transparent pr-8 pl-2.5 text-[13px] font-semibold text-text focus:outline-none"
+              value={outlet?.id ?? ''}
+              onChange={(event) => setOutletId(event.target.value)}
+            >
+              {me.outlets.length === 0 && <option value="">belum ada outlet</option>}
+              {me.outlets.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="pointer-events-none absolute right-2 h-4 w-4 text-primary" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 8l4-4 4 4M6 12l4 4 4-4" />
+            </svg>
+          </span>
+          {me.outlets.length > 1 && <span className="mt-1 block text-[11px] text-text-muted">{me.outlets.length} outlet · klik untuk ganti</span>}
         </label>
       </div>
 

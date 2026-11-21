@@ -142,6 +142,15 @@ describe('O9 Laporan Cashflow & Pengeluaran', () => {
     expect(screen.getByRole('button', { name: '1–17 Nov 2026 ▾' })).toBeInTheDocument()
     expect(screen.getByText(/^Nov 2026 · dari ledger/)).toBeInTheDocument()
     expect(screen.getAllByTestId('series-bar')).toHaveLength(CASHFLOW.series.length)
+    // Clicking a column opens its tooltip (hover/focus land first, so the click must not toggle it shut).
+    await userEvent.click(screen.getAllByTestId('series-bar')[0].querySelector('[tabindex]')!)
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    // O9 KPI cards expand in place; Kas bersih shows the shift cash difference it includes.
+    const net = screen.getByRole('button', { name: /Kas bersih/ })
+    expect(net).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(net)
+    expect(net).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Selisih kas shift (surplus − shortage)')).toBeInTheDocument()
     expect(await screen.findByText('17 Nov · Dago · oleh Olga')).toBeInTheDocument()
     expect(screen.getByText('Tidak bisa diedit/dihapus. Koreksi lewat reversal.')).toBeInTheDocument()
 

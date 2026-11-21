@@ -72,14 +72,26 @@ export default function CashflowPage() {
         {!r ? (report.loading ? <Loading /> : null) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Kpi label="Kas masuk" tile={r.totals.cash_in} previous={r.previous} />
-              <Kpi label="Kas keluar" tile={r.totals.cash_out} previous={r.previous} />
-              <Kpi label="Kas bersih" tile={r.totals.net} previous={r.previous} />
-              <div className="rounded-lg border border-border bg-surface p-4">
-                <p className="text-[12px] text-text-muted">PB1 terkumpul</p>
-                <p className="mt-1 text-[20px] font-bold">{formatRupiah(r.totals.pb1_collected.amount)}</p>
-                <p className="mt-1 text-[11px] text-text-muted">Titipan pajak, bukan pendapatan</p>
-              </div>
+              <Kpi label="Kas masuk" tile={r.totals.cash_in} previous={r.previous} details={[
+                ['Revenue (excl. PB1)', formatRupiah(r.breakdown.revenue_excl_pb1)],
+                ['PB1 (titipan pajak)', formatRupiah(r.breakdown.pb1)],
+                ['Delivery fee', formatRupiah(r.breakdown.delivery_fee)],
+                ['Cash', formatRupiah(r.breakdown.cash)],
+                ['QRIS', formatRupiah(r.breakdown.qris)],
+              ]} />
+              <Kpi label="Kas keluar" tile={r.totals.cash_out} previous={r.previous} details={[
+                ['Refund / reversal', formatRupiah(-r.breakdown.refunds)],
+                ['Pengeluaran', formatRupiah(-r.breakdown.expenses)],
+              ]} />
+              <Kpi label="Kas bersih" tile={r.totals.net} previous={r.previous} details={[
+                ['Kas masuk', formatRupiah(r.totals.cash_in.amount)],
+                ['Kas keluar', formatSignedRupiah(-r.totals.cash_out.amount)],
+                ['Selisih kas shift (surplus − shortage)', formatSignedRupiah(r.breakdown.cash_difference)],
+              ]} note="Kas bersih = kas masuk − kas keluar + selisih kas dari penutupan shift." />
+              <Kpi label="PB1 terkumpul" tile={r.totals.pb1_collected} caption="Titipan pajak, bukan pendapatan" details={[
+                ['PB1 dari penjualan', formatRupiah(r.breakdown.pb1)],
+                ['PB1 dikembalikan lewat refund', formatRupiah(r.breakdown.pb1 - r.totals.pb1_collected.amount)],
+              ]} />
             </div>
             <div className="grid gap-4 lg:grid-cols-3">
               <Card className="lg:col-span-2" title={SERIES_TITLE[r.granularity]}>
@@ -94,12 +106,17 @@ export default function CashflowPage() {
                 </p>
                 <ul className="space-y-2 text-[12px]">
                   {r.expenses_by_outlet.map((e) => (
-                    <li key={e.outlet_id}>
+                    <li key={e.outlet_id} tabIndex={0}
+                      title={`${e.outlet}: ${formatRupiah(e.amount)} · ${r.expenses_total ? Math.round((e.amount / r.expenses_total) * 100) : 0}% dari total · ${e.count} entri`}
+                      className="group cursor-default rounded-md px-1.5 py-1 -mx-1.5 hover:bg-primary-soft focus:bg-primary-soft focus:outline-none">
                       <div className="flex justify-between"><span>{e.outlet}</span><span>{formatRupiah(e.amount)}</span></div>
                       <div className="mt-1 h-1.5 rounded-full bg-page">
-                        <div className="h-1.5 rounded-full bg-accent-orange"
+                        <div className="h-1.5 rounded-full bg-accent-orange transition-opacity group-hover:opacity-80"
                           style={{ width: `${r.expenses_total ? Math.max(2, (e.amount / r.expenses_total) * 100) : 0}%` }} />
                       </div>
+                      <p className="mt-0.5 hidden text-[11px] text-text-muted group-hover:block group-focus:block">
+                        {r.expenses_total ? Math.round((e.amount / r.expenses_total) * 100) : 0}% dari total · {e.count} entri
+                      </p>
                     </li>
                   ))}
                   {r.expenses_by_outlet.length === 0 && <li className="text-text-muted">Belum ada pengeluaran di periode ini.</li>}
@@ -126,15 +143,35 @@ export default function CashflowPage() {
   )
 }
 
-function Kpi({ label, tile, previous }: { label: string; tile: Tile; previous: { from: string; to: string } }) {
+function Kpi({ label, tile, previous, caption, details, note }: {
+  label: string
+  tile: Tile
+  previous?: { from: string; to: string }
+  caption?: string
+  details: [string, string][]
+  note?: string
+}) {
+  const [open, setOpen] = useState(false)
   const pct = tile.change_pct
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <p className="text-[12px] text-text-muted">{label}</p>
-      <p className="mt-1 text-[20px] font-bold">{formatRupiah(tile.amount)}</p>
-      <p className={`mt-1 text-[11px] ${pct === null ? 'text-text-muted' : pct >= 0 ? 'text-success' : 'text-danger'}`}>
-        {pct === null ? '—' : `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}%`} vs {formatRange(previous.from, previous.to, false)}
-      </p>
+    <div className={`self-start rounded-lg border bg-surface transition-colors ${open ? 'border-primary' : 'border-border hover:border-primary'}`}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)}
+        title={open ? 'Sembunyikan rincian' : 'Lihat rincian'} className="block w-full cursor-pointer p-4 text-left">
+        <span className="flex items-center justify-between text-[12px] text-text-muted">
+          {label}
+          <span aria-hidden="true" className={`text-primary transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        </span>
+        <span className="mt-1 block text-[20px] font-bold">{formatRupiah(tile.amount)}</span>
+        <span className={`mt-1 block text-[11px] ${caption || pct === null ? 'text-text-muted' : pct >= 0 ? 'text-success' : 'text-danger'}`}>
+          {caption ?? `${pct === null ? '—' : `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}%`} vs ${previous ? formatRange(previous.from, previous.to, false) : ''}`}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-0.5 border-t border-border px-4 py-3 text-[12px]">
+          {details.map(([k, v]) => <div key={k} className="flex justify-between gap-3"><span className="text-text-muted">{k}</span><span>{v}</span></div>)}
+          {note && <p className="pt-1.5 text-[11px] text-text-muted">{note}</p>}
+        </div>
+      )}
     </div>
   )
 }
@@ -174,8 +211,14 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
   const every = Math.max(1, Math.ceil(series.length / 9))
   const label = (d: string) => granularity === 'daily' ? String(Number(d.slice(8))) : formatDay(d)
   const peakIn = series.reduce((best, p, i) => (p.cash_in > (series[best]?.cash_in ?? 0) ? i : best), 0)
+  // Hover / focus / tap a slot to see its figures; the slot is the whole column, so tiny bars are easy to hit.
+  const [active, setActive] = useState<number | null>(null)
+  const hit = active === null ? undefined : series[active]
+  const tipLeft = active === null ? 0 : (center(active) / W) * 100
+  const longDate = (d: string) => granularity === 'monthly' ? `${MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`
+    : granularity === 'weekly' ? `Minggu ${formatDay(d)}` : formatDay(d)
   return (
-    <div>
+    <div className="relative" onMouseLeave={() => setActive(null)}>
       <div className="mb-1 flex gap-4 text-[11px]">
         <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary" />Kas masuk</span>
         <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-accent-orange" />Kas keluar</span>
@@ -189,15 +232,20 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
         ))}
         {series.map((p, i) => (
           <g key={p.date} data-testid="series-bar">
+            {active === i && (
+              <rect x={pad.l + slot * i} y={pad.t} width={slot} height={H - pad.t - pad.b} fill="var(--pos-primary-soft)" />
+            )}
             <rect x={center(i) - bar} y={y(p.cash_in)} width={bar} height={y(0) - y(p.cash_in)} rx="2" fill="var(--pos-primary)">
-              <title>{`${label(p.date)} · Kas masuk ${formatRupiah(p.cash_in)}`}</title>
             </rect>
             <rect x={center(i)} y={y(p.cash_out)} width={bar} height={y(0) - y(p.cash_out)} rx="2" fill="var(--pos-accent-orange)">
-              <title>{`${label(p.date)} · Kas keluar ${formatRupiah(p.cash_out)}`}</title>
             </rect>
             {i % every === 0 && (
               <text x={center(i)} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--pos-text-muted)">{label(p.date)}</text>
             )}
+            <rect x={pad.l + slot * i} y={pad.t} width={slot} height={H - pad.t - pad.b} fill="transparent" tabIndex={0}
+              role="img" aria-label={`${longDate(p.date)}: kas masuk ${formatRupiah(p.cash_in)}, kas keluar ${formatRupiah(p.cash_out)}`}
+              onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)} onBlur={() => setActive(null)}
+              onClick={() => setActive(i)} style={{ cursor: 'pointer', outline: 'none' }} />
           </g>
         ))}
         {series[peakIn]?.cash_in > 0 && (
@@ -205,6 +253,16 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
             fontWeight="600" fill="var(--pos-text)">{juta(series[peakIn].cash_in)}</text>
         )}
       </svg>
+      {hit && (
+        <div role="tooltip" className="pointer-events-none absolute top-6 z-10 min-w-[150px] rounded-md bg-text px-2.5 py-1.5 text-[11px] text-white shadow-lg"
+          style={{ left: `${tipLeft}%`, transform: `translateX(${tipLeft > 60 ? '-105%' : '5%'})` }}>
+          <p className="font-semibold">{longDate(hit.date)}</p>
+          <p className="flex justify-between gap-3"><span>Kas masuk</span><span>{formatRupiah(hit.cash_in)}</span></p>
+          <p className="flex justify-between gap-3"><span>Kas keluar</span><span>{formatRupiah(hit.cash_out)}</span></p>
+          <p className="mt-0.5 flex justify-between gap-3 border-t border-white/30 pt-0.5 font-semibold">
+            <span>Selisih</span><span>{formatRupiah(hit.cash_in - hit.cash_out)}</span></p>
+        </div>
+      )}
     </div>
   )
 }
