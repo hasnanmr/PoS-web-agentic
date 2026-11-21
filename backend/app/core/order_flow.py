@@ -42,7 +42,7 @@ _NEXT: dict[Flow, dict[str, tuple[str, ...]]] = {
 
 
 def flow_of(order: Mapping[str, Any]) -> Flow:
-    if order["channel"] == "whatsapp_online":
+    if order["channel"] in ("whatsapp_online", "web_online"):
         return "online"
     if order["type"] == "takeaway":
         return "takeaway"

@@ -10,7 +10,8 @@ import { AuthGate } from './auth/AuthGate'
 import { parseEnv } from './env'
 import { EnvErrorScreen } from './EnvErrorScreen'
 import { TabletApp } from './tablet/TabletApp'
-import { TableApp } from './table/TableApp'
+import { ChatApp } from './chat/ChatApp'
+import { PrivacyPage } from './chat/PrivacyPage'
 
 const envResult = parseEnv(import.meta.env)
 const root = createRoot(document.getElementById('root')!)
@@ -25,12 +26,22 @@ if (!envResult.ok) {
       <TabletApp apiBaseUrl={envResult.env.VITE_API_BASE_URL} />
     </StrictMode>,
   )
-} else if (/^\/t\/[^/]+\/?$/.test(window.location.pathname)) {
-  // Q0–Q5: the customer table web page from the table QR, public (no sign-in, no sidebar).
-  const token = decodeURIComponent(window.location.pathname.split('/')[2])
+} else if (/^\/[ot]\/[^/]+\/?$/.test(window.location.pathname)) {
+  // C1–C13 (page 07): the customer web chat, public (no sign-in, no sidebar). The outlet link
+  // /o/<slug> and the table QR /t/<token> share one app.
+  const [, kind, value] = window.location.pathname.split('/')
+  const id = decodeURIComponent(value)
   root.render(
     <StrictMode>
-      <TableApp apiBaseUrl={envResult.env.VITE_API_BASE_URL} token={token} />
+      <ChatApp apiBaseUrl={envResult.env.VITE_API_BASE_URL}
+        scope={kind === 'o' ? { kind: 'o', slug: id } : { kind: 't', token: id }} />
+    </StrictMode>,
+  )
+} else if (window.location.pathname.replace(/\/+$/, '') === '/privasi') {
+  // "Kebijakan privasi lengkap ›" from the web chat (FR12.1).
+  root.render(
+    <StrictMode>
+      <PrivacyPage />
     </StrictMode>,
   )
 } else {

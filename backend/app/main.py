@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import db
 from app.api import health
 from app.api.errors import install_error_handlers
-from app.api.v1 import device, me, public_table
+from app.api.v1 import device, me, public_outlet, public_table
 from app.api.v1.ops import attendance as ops_attendance
 from app.api.v1.ops import bills as ops_bills
 from app.api.v1.ops import orders as ops_orders
@@ -42,6 +42,7 @@ from app.auth.principal import PgUserDirectory, UserDirectory
 from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
 from app.config import Settings, get_settings
+from app.core import crypto
 from app.logging import configure_logging
 from app.storage import ObjectStorage, SupabaseStorage
 
@@ -90,6 +91,9 @@ def create_app(
     """Build the app. Tests may inject a verifier and a user directory."""
     settings = settings or get_settings()
     configure_logging(settings.log_level, service="api", app_env=settings.app_env)
+    crypto.configure(
+        settings.data_encryption_key.get_secret_value() if settings.data_encryption_key else None
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -155,6 +159,7 @@ def create_app(
     app.include_router(attendance.router)
     app.include_router(device.router)
     app.include_router(public_table.router)
+    app.include_router(public_outlet.router)
     app.include_router(ops_attendance.router)
 
     logger.info(
@@ -163,6 +168,9 @@ def create_app(
             "timezone": settings.default_timezone,
             "db_configured": bool(settings.database_url),
             "auth_configured": app.state.token_verifier is not None,
+            "agent_configured": settings.agent_configured,
         },
     )
+    if settings.agent_config_warning:
+        logger.warning(settings.agent_config_warning)
     return app

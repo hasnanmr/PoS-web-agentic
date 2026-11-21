@@ -536,47 +536,6 @@
         "title": "AuditRow",
         "type": "object"
       },
-      "Availability": {
-        "properties": {
-          "limiting_stock_item": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limiting Stock Item"
-          },
-          "outlet_id": {
-            "format": "uuid",
-            "title": "Outlet Id",
-            "type": "string"
-          },
-          "outlet_name": {
-            "title": "Outlet Name",
-            "type": "string"
-          },
-          "portions_available": {
-            "title": "Portions Available",
-            "type": "integer"
-          },
-          "sold_out": {
-            "title": "Sold Out",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "outlet_id",
-          "outlet_name",
-          "portions_available",
-          "sold_out",
-          "limiting_stock_item"
-        ],
-        "title": "Availability",
-        "type": "object"
-      },
       "BestSellerItem": {
         "properties": {
           "name": {
@@ -1096,66 +1055,250 @@
         "title": "BoardTable",
         "type": "object"
       },
-      "BookingIn": {
+      "Booking": {
         "properties": {
-          "guest_name": {
-            "maxLength": 60,
-            "minLength": 1,
-            "title": "Guest Name",
+          "booking_code": {
+            "title": "Booking Code",
             "type": "string"
           },
-          "guest_phone": {
+          "can_change": {
+            "title": "Can Change",
+            "type": "boolean"
+          },
+          "change_until": {
+            "description": "Cancel/reschedule allowed until (cutoff)",
+            "format": "date-time",
+            "title": "Change Until",
+            "type": "string"
+          },
+          "guest_name": {
             "anyOf": [
               {
-                "pattern": "^\\+?[0-9 -]{8,20}$",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Guest Phone"
+            "description": "Cleared once the booking is finished",
+            "title": "Guest Name"
+          },
+          "hold_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Until"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
           },
           "party_size": {
-            "maximum": 100.0,
-            "minimum": 1.0,
             "title": "Party Size",
             "type": "integer"
           },
-          "source": {
-            "enum": [
-              "phone",
-              "in_person"
-            ],
-            "title": "Source",
-            "type": "string"
-          },
-          "starts_at": {
-            "format": "date-time",
-            "title": "Starts At",
-            "type": "string"
-          },
-          "table_id": {
+          "reminder_at": {
             "anyOf": [
               {
-                "format": "uuid",
+                "format": "date-time",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Omit to assign the smallest free fit",
-            "title": "Table Id"
+            "description": "C11 \"Pengingat di kalender HP\": the .ics alert time",
+            "title": "Reminder At"
+          },
+          "reservation_id": {
+            "format": "uuid",
+            "title": "Reservation Id",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
           }
         },
         "required": [
-          "guest_name",
+          "reservation_id",
+          "booking_code",
+          "start_at",
+          "label",
+          "timezone",
           "party_size",
-          "starts_at",
-          "source"
+          "status",
+          "guest_name",
+          "hold_until",
+          "change_until",
+          "can_change",
+          "outlet_name"
         ],
-        "title": "BookingIn",
+        "title": "Booking",
+        "type": "object"
+      },
+      "BookingCreated": {
+        "properties": {
+          "access_key": {
+            "description": "Keep on the phone; send as `X-Booking-Key`",
+            "title": "Access Key",
+            "type": "string"
+          },
+          "booking_code": {
+            "title": "Booking Code",
+            "type": "string"
+          },
+          "can_change": {
+            "title": "Can Change",
+            "type": "boolean"
+          },
+          "change_until": {
+            "description": "Cancel/reschedule allowed until (cutoff)",
+            "format": "date-time",
+            "title": "Change Until",
+            "type": "string"
+          },
+          "guest_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cleared once the booking is finished",
+            "title": "Guest Name"
+          },
+          "hold_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Until"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
+          },
+          "party_size": {
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "reminder_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "C11 \"Pengingat di kalender HP\": the .ics alert time",
+            "title": "Reminder At"
+          },
+          "reservation_id": {
+            "format": "uuid",
+            "title": "Reservation Id",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id",
+          "booking_code",
+          "start_at",
+          "label",
+          "timezone",
+          "party_size",
+          "status",
+          "guest_name",
+          "hold_until",
+          "change_until",
+          "can_change",
+          "outlet_name",
+          "access_key"
+        ],
+        "title": "BookingCreated",
+        "type": "object"
+      },
+      "BookingRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key"
+        ],
+        "title": "BookingRef",
+        "type": "object"
+      },
+      "BookingsStatusIn": {
+        "properties": {
+          "reservations": {
+            "items": {
+              "$ref": "#/components/schemas/BookingRef"
+            },
+            "maxItems": 10,
+            "title": "Reservations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reservations"
+        ],
+        "title": "BookingsStatusIn",
         "type": "object"
       },
       "Breakdown": {
@@ -1250,6 +1393,62 @@
           "avg_orders"
         ],
         "title": "BusynessCell",
+        "type": "object"
+      },
+      "Cart": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/CartLine"
+            },
+            "maxItems": 50,
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "title": "Cart",
+        "type": "object"
+      },
+      "CartLine": {
+        "properties": {
+          "addon_option_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Addon Option Ids",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id",
+          "quantity"
+        ],
+        "title": "CartLine",
         "type": "object"
       },
       "CashCount": {
@@ -1492,6 +1691,8 @@
             "enum": [
               "whatsapp_online",
               "whatsapp_table",
+              "web_table",
+              "web_online",
               "counter"
             ],
             "title": "Channel",
@@ -1512,6 +1713,221 @@
           "share_pct"
         ],
         "title": "ChannelShare",
+        "type": "object"
+      },
+      "ChatOutlet": {
+        "properties": {
+          "is_open_now": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None when no opening hours are set",
+            "title": "Is Open Now"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "opening_hours": {
+            "items": {
+              "$ref": "#/components/schemas/OpeningHours"
+            },
+            "title": "Opening Hours",
+            "type": "array"
+          },
+          "short_name": {
+            "description": "Initials for the chat avatar (C1)",
+            "title": "Short Name",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "short_name",
+          "timezone",
+          "opening_hours",
+          "is_open_now"
+        ],
+        "title": "ChatOutlet",
+        "type": "object"
+      },
+      "ChatQuote": {
+        "properties": {
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/QuoteLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "pb1_amount": {
+            "title": "Pb1 Amount",
+            "type": "integer"
+          },
+          "pb1_rate_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb1 Rate Bps"
+          },
+          "subtotal": {
+            "title": "Subtotal",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lines",
+          "subtotal",
+          "pb1_rate_bps",
+          "pb1_amount",
+          "delivery_fee",
+          "total"
+        ],
+        "title": "ChatQuote",
+        "type": "object"
+      },
+      "ChatQuoteIn": {
+        "properties": {
+          "fulfillment": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pickup",
+                  "delivery"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Outlet link only; a table order is always dine-in",
+            "title": "Fulfillment"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ChatQuoteIn",
+        "type": "object"
+      },
+      "ChatSessionIn": {
+        "properties": {
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          },
+          "fulfillment": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pickup",
+                  "delivery"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fulfillment"
+          },
+          "step": {
+            "examples": [
+              "menu",
+              "addons:<product_id>"
+            ],
+            "pattern": "^[a-z0-9_.:-]{1,60}$",
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "ChatSessionIn",
+        "type": "object"
+      },
+      "ChatSessionOut": {
+        "properties": {
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          },
+          "cart_expired": {
+            "description": "True once after a 2-hour idle cart was emptied (C13)",
+            "title": "Cart Expired",
+            "type": "boolean"
+          },
+          "fulfillment": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pickup",
+                  "delivery"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fulfillment"
+          },
+          "last_activity_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity At"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "cart",
+          "fulfillment",
+          "last_activity_at",
+          "cart_expired"
+        ],
+        "title": "ChatSessionOut",
         "type": "object"
       },
       "CloseIn": {
@@ -1637,6 +2053,40 @@
           "level"
         ],
         "title": "Crowd",
+        "type": "object"
+      },
+      "CustomerIn": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "minLength": 8,
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ],
+        "title": "CustomerIn",
         "type": "object"
       },
       "Dashboard": {
@@ -2096,6 +2546,7 @@
               "whatsapp_online",
               "whatsapp_table",
               "web_table",
+              "web_online",
               "counter"
             ],
             "title": "Channel",
@@ -2885,6 +3336,47 @@
         "title": "LineIn",
         "type": "object"
       },
+      "LookupIn": {
+        "properties": {
+          "booking_code": {
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Booking Code",
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "minLength": 8,
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "booking_code",
+          "phone"
+        ],
+        "title": "LookupIn",
+        "type": "object"
+      },
+      "LookupOut": {
+        "properties": {
+          "access_key": {
+            "title": "Access Key",
+            "type": "string"
+          },
+          "reservation_id": {
+            "format": "uuid",
+            "title": "Reservation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id",
+          "access_key"
+        ],
+        "title": "LookupOut",
+        "type": "object"
+      },
       "LowStock": {
         "properties": {
           "display_unit": {
@@ -3155,6 +3647,18 @@
               }
             ],
             "title": "Category"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "C2 menu card (web chat)",
+            "title": "Description"
           },
           "is_owner_pick": {
             "title": "Is Owner Pick",
@@ -3567,6 +4071,69 @@
         "title": "OnboardingResponse",
         "type": "object"
       },
+      "OnlineOrderIn": {
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerIn"
+          },
+          "expected_total": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total the page showed; `price_changed` if it differs",
+            "title": "Expected Total"
+          },
+          "fulfillment": {
+            "enum": [
+              "pickup",
+              "delivery"
+            ],
+            "title": "Fulfillment",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "privacy_notice_version": {
+            "description": "The notice the chat showed before the details were sent",
+            "maxLength": 40,
+            "title": "Privacy Notice Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "fulfillment",
+          "customer",
+          "privacy_notice_version"
+        ],
+        "title": "OnlineOrderIn",
+        "type": "object"
+      },
       "OpenBillRef": {
         "properties": {
           "id": {
@@ -3584,6 +4151,30 @@
           "total"
         ],
         "title": "OpenBillRef",
+        "type": "object"
+      },
+      "OpeningHours": {
+        "properties": {
+          "closes_at": {
+            "title": "Closes At",
+            "type": "string"
+          },
+          "opens_at": {
+            "title": "Opens At",
+            "type": "string"
+          },
+          "weekday": {
+            "description": "ISO weekday, 1 = Monday",
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday",
+          "opens_at",
+          "closes_at"
+        ],
+        "title": "OpeningHours",
         "type": "object"
       },
       "OpeningHoursItem": {
@@ -3686,6 +4277,30 @@
               }
             ],
             "title": "Customer Name"
+          },
+          "customer_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online: the number to call (cleared once finished)",
+            "title": "Customer Phone"
+          },
+          "delivery_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online delivery: where to deliver (cleared once finished)",
+            "title": "Delivery Address"
           },
           "id": {
             "format": "uuid",
@@ -3995,6 +4610,30 @@
               }
             ],
             "title": "Customer Name"
+          },
+          "customer_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online: the number to call (cleared once finished)",
+            "title": "Customer Phone"
+          },
+          "delivery_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "web_online delivery: where to deliver (cleared once finished)",
+            "title": "Delivery Address"
           },
           "delivery_fee": {
             "title": "Delivery Fee",
@@ -4352,6 +4991,94 @@
         "title": "OrderItemOut",
         "type": "object"
       },
+      "OrderOverview": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "fulfillment": {
+            "enum": [
+              "dine_in",
+              "pickup",
+              "delivery"
+            ],
+            "title": "Fulfillment",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "payment_status": {
+            "title": "Payment Status",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "order_id",
+          "order_no",
+          "fulfillment",
+          "status",
+          "payment_status",
+          "total",
+          "created_at"
+        ],
+        "title": "OrderOverview",
+        "type": "object"
+      },
+      "OrderRef": {
+        "properties": {
+          "key": {
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Key",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "key"
+        ],
+        "title": "OrderRef",
+        "type": "object"
+      },
+      "OrdersStatusIn": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OrderRef"
+            },
+            "maxItems": 20,
+            "title": "Orders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "orders"
+        ],
+        "title": "OrdersStatusIn",
+        "type": "object"
+      },
       "OutletCounts": {
         "properties": {
           "active": {
@@ -4617,22 +5344,44 @@
         "title": "OutletInfo",
         "type": "object"
       },
-      "OutletOut": {
+      "OutletPage": {
         "properties": {
-          "name": {
-            "title": "Name",
-            "type": "string"
+          "agent_enabled": {
+            "description": "Free-text agent (C9/C14/C15); off until T-086 ships",
+            "title": "Agent Enabled",
+            "type": "boolean"
           },
-          "timezone": {
-            "title": "Timezone",
-            "type": "string"
+          "delivery_fee": {
+            "description": "Flat fee for delivery orders, outside the PB1 base",
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
+          "outlet": {
+            "$ref": "#/components/schemas/ChatOutlet"
+          },
+          "privacy_notice": {
+            "$ref": "#/components/schemas/PrivacyNotice"
+          },
+          "reservations_enabled": {
+            "description": "Shows Reservasi and Reservasi Saya (FR2.0)",
+            "title": "Reservations Enabled",
+            "type": "boolean"
+          },
+          "web_ordering": {
+            "description": "False without a static QRIS: \"Pesan di kasir\"",
+            "title": "Web Ordering",
+            "type": "boolean"
           }
         },
         "required": [
-          "name",
-          "timezone"
+          "outlet",
+          "reservations_enabled",
+          "web_ordering",
+          "delivery_fee",
+          "agent_enabled",
+          "privacy_notice"
         ],
-        "title": "OutletOut",
+        "title": "OutletPage",
         "type": "object"
       },
       "OutletPatch": {
@@ -6104,6 +6853,25 @@
         "title": "PreviewItem",
         "type": "object"
       },
+      "PrivacyNotice": {
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "version": {
+            "description": "Send back as `privacy_notice_version` with personal data",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "url"
+        ],
+        "title": "PrivacyNotice",
+        "type": "object"
+      },
       "ProductCreate": {
         "properties": {
           "category": {
@@ -7023,6 +7791,63 @@
         "title": "RecipeLineRow",
         "type": "object"
       },
+      "RecommendationCard": {
+        "properties": {
+          "badge": {
+            "enum": [
+              "owner_pick",
+              "best_seller"
+            ],
+            "title": "Badge",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "price": {
+            "title": "Price",
+            "type": "integer"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "description",
+          "price",
+          "photo_url",
+          "badge"
+        ],
+        "title": "RecommendationCard",
+        "type": "object"
+      },
       "RecommendationPreview": {
         "properties": {
           "best_sellers": {
@@ -7289,6 +8114,20 @@
         "title": "RejectIn",
         "type": "object"
       },
+      "RescheduleIn": {
+        "properties": {
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_at"
+        ],
+        "title": "RescheduleIn",
+        "type": "object"
+      },
       "ReservationDetail": {
         "properties": {
           "allowed_actions": {
@@ -7379,7 +8218,8 @@
               "whatsapp",
               "phone",
               "in_person",
-              "walk_in"
+              "walk_in",
+              "web_chat"
             ],
             "title": "Source",
             "type": "string"
@@ -7622,7 +8462,8 @@
               "whatsapp",
               "phone",
               "in_person",
-              "walk_in"
+              "walk_in",
+              "web_chat"
             ],
             "title": "Source",
             "type": "string"
@@ -8922,16 +9763,92 @@
         "title": "TableCreate",
         "type": "object"
       },
+      "TableOrderIn": {
+        "properties": {
+          "customer_name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "expected_total": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total the page showed; `price_changed` if it differs",
+            "title": "Expected Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LineIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "privacy_notice_version": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The notice the chat showed before the name was sent (FR12.1)",
+            "title": "Privacy Notice Version"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TableOrderIn",
+        "type": "object"
+      },
       "TablePage": {
         "properties": {
+          "agent_enabled": {
+            "description": "Free-text agent (C9/C14); off until T-086 ships",
+            "title": "Agent Enabled",
+            "type": "boolean"
+          },
           "outlet": {
-            "$ref": "#/components/schemas/OutletOut"
+            "$ref": "#/components/schemas/ChatOutlet"
+          },
+          "privacy_notice": {
+            "$ref": "#/components/schemas/PrivacyNotice"
           },
           "table": {
             "$ref": "#/components/schemas/app__api__v1__public_table__TableOut"
           },
           "target": {
-            "description": "Effective: web while WhatsApp isn't connected",
+            "description": "Deprecated (Q1): web while WhatsApp isn't connected",
             "enum": [
               "web_whatsapp",
               "web",
@@ -8941,7 +9858,7 @@
             "type": "string"
           },
           "web_ordering": {
-            "description": "False without a static QRIS: menu only",
+            "description": "False without a static QRIS: \"Pesan di kasir\"",
             "title": "Web Ordering",
             "type": "boolean"
           },
@@ -8954,14 +9871,17 @@
                 "type": "null"
               }
             ],
+            "description": "Deprecated (Q1)",
             "title": "Whatsapp Url"
           }
         },
         "required": [
           "outlet",
           "table",
-          "target",
           "web_ordering",
+          "agent_enabled",
+          "privacy_notice",
+          "target",
           "whatsapp_url"
         ],
         "title": "TablePage",
@@ -9130,6 +10050,26 @@
           "change_pct"
         ],
         "title": "Tile",
+        "type": "object"
+      },
+      "TimeSlot": {
+        "properties": {
+          "label": {
+            "description": "Outlet-local \"19:00\"",
+            "title": "Label",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_at",
+          "label"
+        ],
+        "title": "TimeSlot",
         "type": "object"
       },
       "Times": {
@@ -9374,6 +10314,11 @@
             "title": "Access Key",
             "type": "string"
           },
+          "delivery_fee": {
+            "default": 0,
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
           "order_id": {
             "format": "uuid",
             "title": "Order Id",
@@ -9423,61 +10368,6 @@
         "title": "WebOrderCreated",
         "type": "object"
       },
-      "WebOrderIn": {
-        "properties": {
-          "customer_name": {
-            "anyOf": [
-              {
-                "maxLength": 40,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Customer Name"
-          },
-          "expected_total": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Total the page showed; `price_changed` if it differs",
-            "title": "Expected Total"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/LineIn"
-            },
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Items",
-            "type": "array"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "WebOrderIn",
-        "type": "object"
-      },
       "WebOrderStatus": {
         "properties": {
           "cancel_reason": {
@@ -9519,12 +10409,37 @@
             ],
             "title": "Customer Name"
           },
+          "delivery_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cleared once the order is finished",
+            "title": "Delivery Address"
+          },
+          "delivery_fee": {
+            "title": "Delivery Fee",
+            "type": "integer"
+          },
           "events": {
             "items": {
               "$ref": "#/components/schemas/StatusEvent"
             },
             "title": "Events",
             "type": "array"
+          },
+          "fulfillment": {
+            "enum": [
+              "dine_in",
+              "pickup",
+              "delivery"
+            ],
+            "title": "Fulfillment",
+            "type": "string"
           },
           "id": {
             "format": "uuid",
@@ -9598,7 +10513,9 @@
           "id",
           "order_no",
           "created_at",
+          "fulfillment",
           "customer_name",
+          "delivery_address",
           "note",
           "status",
           "payment_status",
@@ -9607,6 +10524,7 @@
           "items",
           "subtotal",
           "pb1_amount",
+          "delivery_fee",
           "total",
           "reject_reason",
           "cancel_reason",
@@ -9614,24 +10532,6 @@
           "timezone"
         ],
         "title": "WebOrderStatus",
-        "type": "object"
-      },
-      "WebQuoteIn": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/LineIn"
-            },
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Items",
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "WebQuoteIn",
         "type": "object"
       },
       "app__api__v1__ops__attendance__OutletRef": {
@@ -9814,6 +10714,109 @@
         "title": "Board",
         "type": "object"
       },
+      "app__api__v1__ops__reservations__BookingIn": {
+        "properties": {
+          "guest_name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Guest Name",
+            "type": "string"
+          },
+          "guest_phone": {
+            "anyOf": [
+              {
+                "pattern": "^\\+?[0-9 -]{8,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Phone"
+          },
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "phone",
+              "in_person"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to assign the smallest free fit",
+            "title": "Table Id"
+          }
+        },
+        "required": [
+          "guest_name",
+          "party_size",
+          "starts_at",
+          "source"
+        ],
+        "title": "BookingIn",
+        "type": "object"
+      },
+      "app__api__v1__owner__catalog__Availability": {
+        "properties": {
+          "limiting_stock_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limiting Stock Item"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
+          },
+          "portions_available": {
+            "title": "Portions Available",
+            "type": "integer"
+          },
+          "sold_out": {
+            "title": "Sold Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "outlet_name",
+          "portions_available",
+          "sold_out",
+          "limiting_stock_item"
+        ],
+        "title": "Availability",
+        "type": "object"
+      },
       "app__api__v1__owner__catalog__Created": {
         "properties": {
           "catalog_sync": {
@@ -9963,6 +10966,85 @@
           "is_bookable"
         ],
         "title": "TableOut",
+        "type": "object"
+      },
+      "app__api__v1__public_outlet__Availability": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "last_date": {
+            "description": "Last date inside the booking window",
+            "format": "date",
+            "title": "Last Date",
+            "type": "string"
+          },
+          "max_party_size": {
+            "title": "Max Party Size",
+            "type": "integer"
+          },
+          "times": {
+            "items": {
+              "$ref": "#/components/schemas/TimeSlot"
+            },
+            "title": "Times",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "timezone",
+          "max_party_size",
+          "last_date",
+          "times"
+        ],
+        "title": "Availability",
+        "type": "object"
+      },
+      "app__api__v1__public_outlet__BookingIn": {
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerIn"
+          },
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "privacy_notice_version": {
+            "maxLength": 40,
+            "title": "Privacy Notice Version",
+            "type": "string"
+          },
+          "source": {
+            "default": "buttons",
+            "enum": [
+              "buttons",
+              "agent"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "party_size",
+          "start_at",
+          "customer",
+          "privacy_notice_version"
+        ],
+        "title": "BookingIn",
         "type": "object"
       },
       "app__api__v1__public_table__TableOut": {
@@ -11096,7 +12178,8 @@
                     "counter",
                     "whatsapp_online",
                     "whatsapp_table",
-                    "web_table"
+                    "web_table",
+                    "web_online"
                   ],
                   "type": "string"
                 },
@@ -11571,7 +12654,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BookingIn"
+                "$ref": "#/components/schemas/app__api__v1__ops__reservations__BookingIn"
               }
             }
           },
@@ -13627,7 +14710,8 @@
                     "counter",
                     "whatsapp_online",
                     "whatsapp_table",
-                    "web_table"
+                    "web_table",
+                    "web_online"
                   ],
                   "type": "string"
                 },
@@ -15786,7 +16870,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Availability"
+                    "$ref": "#/components/schemas/app__api__v1__owner__catalog__Availability"
                   },
                   "title": "Response Product Availability Api V1 Owner Products  Product Id  Availability Get",
                   "type": "array"
@@ -17392,9 +18476,1316 @@
         ]
       }
     },
+    "/api/v1/public/o/{slug}": {
+      "get": {
+        "description": "C1: greeting and what the main menu offers at this outlet.",
+        "operationId": "outlet_page_api_v1_public_o__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutletPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outlet Page",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/availability": {
+      "get": {
+        "description": "C10: free start times for the party on an outlet-local date (AC9.1, AC9.3).",
+        "operationId": "availability_api_v1_public_o__slug__availability_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "party_size",
+            "required": true,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Party Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__v1__public_outlet__Availability"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Availability",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/chat-session": {
+      "get": {
+        "description": "C1/C8 resume: step and cart of this phone's chat; empty after 2 idle hours.",
+        "operationId": "get_chat_session_api_v1_public_o__slug__chat_session_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Session",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      },
+      "put": {
+        "description": "Save step + cart (no personal data: name, phone, and address stay on the phone).",
+        "operationId": "put_chat_session_api_v1_public_o__slug__chat_session_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Chat Session",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/menu": {
+      "get": {
+        "description": "C2/C3: the outlet's active menu with prices, add-ons, and sold-out state.",
+        "operationId": "menu_api_v1_public_o__slug__menu_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MenuItem"
+                  },
+                  "title": "Response Menu Api V1 Public O  Slug  Menu Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Menu",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders": {
+      "post": {
+        "description": "C4/C5 \"Pesan & bayar\": a pay-first `web_online` order, pickup or delivery. The page\nmakes the access key and sends it as `X-Order-Key`; only its hash is stored.",
+        "operationId": "place_order_api_v1_public_o__slug__orders_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "description": "Access key made by the page (32-128 URL-safe characters); required",
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Access key made by the page (32-128 URL-safe characters); required",
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnlineOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Place Order",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/status": {
+      "post": {
+        "description": "C1 \"Pesanan Saya\": the orders whose keys this phone kept, while still readable.",
+        "operationId": "orders_status_api_v1_public_o__slug__orders_status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrderOverview"
+                  },
+                  "title": "Response Orders Status Api V1 Public O  Slug  Orders Status Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Orders Status",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}": {
+      "get": {
+        "description": "C7 (and C6 on reload): only with the order's access key; polled every 5 seconds.",
+        "operationId": "order_status_api_v1_public_o__slug__orders__order_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Status",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}/cancel": {
+      "post": {
+        "description": "C6 \"Batalkan pesanan\": only before \"Saya sudah bayar\"; stock returns.",
+        "operationId": "cancel_api_v1_public_o__slug__orders__order_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}/payment-claim": {
+      "post": {
+        "description": "C6 \"Saya sudah bayar\": staff check the merchant account and confirm in S2/S4.\nRepeating it returns the same result (FR6.4).",
+        "operationId": "payment_claim_api_v1_public_o__slug__orders__order_id__payment_claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebOrderStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payment Claim",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/orders/{order_id}/qris": {
+      "get": {
+        "description": "C6: the outlet's static QRIS image (same as O3 / the S1 popup).",
+        "operationId": "order_qris_api_v1_public_o__slug__orders__order_id__qris_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Order-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Qris",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/quote": {
+      "post": {
+        "description": "C4 totals (subtotal, PB1, delivery fee, total), priced by the server.",
+        "operationId": "chat_quote_api_v1_public_o__slug__quote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatQuoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatQuote"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat Quote",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/recommendations": {
+      "get": {
+        "description": "C9 cards: owner's picks first, then 30-day best sellers; no sold-out items, ≤ 30.",
+        "operationId": "recommendation_cards_api_v1_public_o__slug__recommendations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecommendationCard"
+                  },
+                  "title": "Response Recommendation Cards Api V1 Public O  Slug  Recommendations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recommendation Cards",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations": {
+      "post": {
+        "description": "C10 \"Konfirmasi booking\": smallest free table, booking code, 2 upcoming per phone. The\npage makes the access key and sends it as `X-Booking-Key`; only its hash is stored, also\nnot in the idempotency cache, and a replay must carry the same key.",
+        "operationId": "create_booking_api_v1_public_o__slug__reservations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "description": "Access key made by the page (32-128 URL-safe characters); required",
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Access key made by the page (32-128 URL-safe characters); required",
+              "title": "X-Booking-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__public_outlet__BookingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/lookup": {
+      "post": {
+        "description": "C12 \"Cari dengan kode + HP\": same answer for a wrong code or a wrong phone (AC9.12).",
+        "operationId": "lookup_booking_api_v1_public_o__slug__reservations_lookup_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lookup Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/status": {
+      "post": {
+        "description": "C12 \"Reservasi Saya\": upcoming bookings whose keys this phone kept.",
+        "operationId": "bookings_status_api_v1_public_o__slug__reservations_status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingsStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Booking"
+                  },
+                  "title": "Response Bookings Status Api V1 Public O  Slug  Reservations Status Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bookings Status",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}": {
+      "get": {
+        "description": "C11/C12: the booking, only with a key this phone holds.",
+        "operationId": "read_booking_api_v1_public_o__slug__reservations__reservation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Booking-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}/calendar.ics": {
+      "get": {
+        "description": "C11 \"Tambah ke kalender\": the key is in the query so the phone can open it as a link.",
+        "operationId": "booking_calendar_api_v1_public_o__slug__reservations__reservation_id__calendar_ics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "minLength": 8,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Booking Calendar",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}/cancel": {
+      "post": {
+        "description": "C12 \"Batalkan\": until the cutoff; frees the table. Repeating it returns the same\ncancelled booking, with or without the same Idempotency-Key.",
+        "operationId": "cancel_booking_api_v1_public_o__slug__reservations__reservation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Booking-Key"
+            }
+          },
+          {
+            "description": "Accepted like every write (FR6.4); cancel is idempotent by itself",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Accepted like every write (FR6.4); cancel is idempotent by itself",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}/reschedule": {
+      "post": {
+        "description": "C12 \"Jadwal ulang\": a free time, until the cutoff (AC9.6).",
+        "operationId": "reschedule_booking_api_v1_public_o__slug__reservations__reservation_id__reschedule_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Booking-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reschedule Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
     "/api/v1/public/t/{token}": {
       "get": {
-        "description": "Q1: the outlet and table, where the QR leads, and the WhatsApp link when allowed.",
+        "description": "C8: the outlet and table, and whether ordering is possible here.",
         "operationId": "table_page_api_v1_public_t__token__get",
         "parameters": [
           {
@@ -17431,13 +19822,139 @@
         },
         "summary": "Table Page",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/chat-session": {
+      "get": {
+        "description": "C1/C8 resume: step and cart of this phone's chat; empty after 2 idle hours.",
+        "operationId": "get_chat_session_api_v1_public_t__token__chat_session_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Session",
+        "tags": [
+          "public: web chat from a table QR (C8)"
+        ]
+      },
+      "put": {
+        "description": "Save step + cart (no personal data: name, phone, and address stay on the phone).",
+        "operationId": "put_chat_session_api_v1_public_t__token__chat_session_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Chat Session",
+        "tags": [
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/menu": {
       "get": {
-        "description": "Q2/Q2a: the outlet's active menu with prices, add-ons and sold-out state.",
+        "description": "C2/C3: the outlet's active menu with prices, add-ons, and sold-out state.",
         "operationId": "menu_api_v1_public_t__token__menu_get",
         "parameters": [
           {
@@ -17478,13 +19995,13 @@
         },
         "summary": "Menu",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders": {
       "post": {
-        "description": "Q3 \"Pesan & bayar\": a pay-first dine-in order for this table (stock deducted).",
+        "description": "C8 \"Pesan & bayar\": a pay-first dine-in order for this table (stock deducted).",
         "operationId": "place_order_api_v1_public_t__token__orders_post",
         "parameters": [
           {
@@ -17511,13 +20028,31 @@
               ],
               "title": "Idempotency-Key"
             }
+          },
+          {
+            "description": "Access key made by the page (32-128 URL-safe characters); recommended",
+            "in": "header",
+            "name": "X-Order-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Access key made by the page (32-128 URL-safe characters); recommended",
+              "title": "X-Order-Key"
+            }
           }
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WebOrderIn"
+                "$ref": "#/components/schemas/TableOrderIn"
               }
             }
           },
@@ -17547,13 +20082,70 @@
         },
         "summary": "Place Order",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/orders/status": {
+      "post": {
+        "description": "C1 \"Pesanan Saya\": the orders whose keys this phone kept, while still readable.",
+        "operationId": "orders_status_api_v1_public_t__token__orders_status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrderOverview"
+                  },
+                  "title": "Response Orders Status Api V1 Public T  Token  Orders Status Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Orders Status",
+        "tags": [
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}": {
       "get": {
-        "description": "Q5 (and Q4 on reload): only with the order's access key.",
+        "description": "C7 (and C6 on reload): only with the order's access key; polled every 5 seconds.",
         "operationId": "order_status_api_v1_public_t__token__orders__order_id__get",
         "parameters": [
           {
@@ -17616,13 +20208,13 @@
         },
         "summary": "Order Status",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}/cancel": {
       "post": {
-        "description": "Q4 \"Batalkan pesanan\": only before \"Saya sudah bayar\"; stock returns.",
+        "description": "C6 \"Batalkan pesanan\": only before \"Saya sudah bayar\"; stock returns.",
         "operationId": "cancel_api_v1_public_t__token__orders__order_id__cancel_post",
         "parameters": [
           {
@@ -17685,13 +20277,13 @@
         },
         "summary": "Cancel",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}/payment-claim": {
       "post": {
-        "description": "Q4 \"Saya sudah bayar\": staff check the merchant account and confirm in S2/S4.",
+        "description": "C6 \"Saya sudah bayar\": staff check the merchant account and confirm in S2/S4.\nRepeating it returns the same result (FR6.4).",
         "operationId": "payment_claim_api_v1_public_t__token__orders__order_id__payment_claim_post",
         "parameters": [
           {
@@ -17754,13 +20346,13 @@
         },
         "summary": "Payment Claim",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/orders/{order_id}/qris": {
       "get": {
-        "description": "Q4: the outlet's static QRIS image (same as O3 / the S1 popup).",
+        "description": "C6: the outlet's static QRIS image (same as O3 / the S1 popup).",
         "operationId": "order_qris_api_v1_public_t__token__orders__order_id__qris_get",
         "parameters": [
           {
@@ -17821,14 +20413,14 @@
         },
         "summary": "Order Qris",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
         ]
       }
     },
     "/api/v1/public/t/{token}/quote": {
       "post": {
-        "description": "Q3 totals before ordering (subtotal, PB1, total), priced by the server like S1.",
-        "operationId": "web_quote_api_v1_public_t__token__quote_post",
+        "description": "C4 totals (subtotal, PB1, delivery fee, total), priced by the server.",
+        "operationId": "chat_quote_api_v1_public_t__token__quote_post",
         "parameters": [
           {
             "in": "path",
@@ -17844,7 +20436,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WebQuoteIn"
+                "$ref": "#/components/schemas/ChatQuoteIn"
               }
             }
           },
@@ -17855,7 +20447,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QuoteResponse"
+                  "$ref": "#/components/schemas/ChatQuote"
                 }
               }
             },
@@ -17872,9 +20464,56 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Web Quote",
+        "summary": "Chat Quote",
         "tags": [
-          "public: table web page (Q0-Q5)"
+          "public: web chat from a table QR (C8)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/recommendations": {
+      "get": {
+        "description": "C9 cards: owner's picks first, then 30-day best sellers; no sold-out items, ≤ 30.",
+        "operationId": "recommendation_cards_api_v1_public_t__token__recommendations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecommendationCard"
+                  },
+                  "title": "Response Recommendation Cards Api V1 Public T  Token  Recommendations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recommendation Cards",
+        "tags": [
+          "public: web chat from a table QR (C8)"
         ]
       }
     },

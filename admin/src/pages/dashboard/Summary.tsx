@@ -13,13 +13,19 @@ import { periodWord, revenueChange } from './period'
 
 // Wireframe colours: map scale light → peak, the channel/method bars, and the crowd badges.
 const MAP_SCALE = ['bg-[#E8EFFB]', 'bg-[#B9CDF0]', 'bg-[#5F86CF]', 'bg-primary', 'bg-accent-orange']
-const SERIES = ['bg-primary', 'bg-[#8FB0E8]', 'bg-[#CBD5E6]']
+const SERIES = ['bg-primary', 'bg-[#8FB0E8]', 'bg-[#CBD5E6]', 'bg-accent-orange', 'bg-[#0F766E]']
 const CROWD: Record<CrowdLevel, { label: string; badge: string; bar: string }> = {
   ramai: { label: 'Ramai', badge: 'bg-[#FFF1E6] text-[#9A3412]', bar: 'bg-accent-orange' },
   normal: { label: 'Normal', badge: 'bg-primary-soft text-primary', bar: 'bg-primary' },
   sepi: { label: 'Sepi', badge: 'bg-[#F1F3F5] text-text-muted', bar: 'bg-[#8FB0E8]' },
 }
-const CHANNELS = { whatsapp_online: 'WhatsApp online', whatsapp_table: 'WhatsApp meja (QR)', counter: 'Counter' }
+const CHANNELS: Record<DashboardSummary['channel_mix'][number]['channel'], string> = {
+  web_online: 'Web chat (link outlet)',
+  web_table: 'Web chat (QR meja)',
+  counter: 'Counter',
+  whatsapp_online: 'WhatsApp online',
+  whatsapp_table: 'WhatsApp meja (QR)',
+}
 const METHODS = { cash: 'Cash', qris: 'QRIS' }
 
 const pad = (h: number) => String(h % 24).padStart(2, '0')

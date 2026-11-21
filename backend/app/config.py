@@ -33,6 +33,7 @@ REQUIRED_OUTSIDE_LOCAL: tuple[str, ...] = (
     "supabase_url",
     "supabase_jwks_url",
     "supabase_jwt_issuer",
+    "data_encryption_key",
 )
 
 
@@ -73,12 +74,26 @@ class Settings(BaseSettings):
     # and every URL handed out stays valid for that long.
     signed_url_seconds: int = Field(default=3600, ge=300, le=86400)
     signed_url_min_left_seconds: int = Field(default=1200, ge=60, le=3600)
+    # Field encryption (app.core.crypto): 32 random bytes, base64 (`openssl rand -base64 32`).
+    # Encrypts customer personal data and stored credentials (AES-256-GCM) and keys the blind
+    # indexes (HMAC-SHA256). Required outside local; losing it makes that data unreadable.
+    data_encryption_key: SecretStr | None = None
     # Admin app URL: where invitation emails send people to set their password.
     admin_app_url: AnyHttpUrl | None = None
 
     # Connection pool (transaction pooler, port 6543 on Supabase; Appendix A.1/B.4).
     db_pool_min_size: int = Field(default=1, ge=0, le=50)
     db_pool_max_size: int = Field(default=5, ge=1, le=100)
+
+    # Web chat agent (FR6.3, FR6.6; PRD §9): any OpenAI-compatible chat completions API with
+    # tool calling, so the provider changes without code changes. Optional in every
+    # environment: the agent is on only with OPENAI_BASE_URL and MODEL_NAME (OPENAI_API_KEY is
+    # optional, for keyless self-hosted servers); otherwise the chat uses the buttons only.
+    # A partial set never blocks the boot (a shared OPENAI_API_KEY meant for another tool must
+    # not take the API down): the agent stays off and `agent_config_warning` says why.
+    openai_base_url: AnyHttpUrl | None = None
+    openai_api_key: SecretStr | None = None
+    model_name: str | None = Field(default=None, max_length=200)
 
     default_timezone: str = "Asia/Jakarta"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5170"]
@@ -91,12 +106,27 @@ class Settings(BaseSettings):
         "rabbitmq_url",
         "supabase_service_role_key",
         "admin_app_url",
+        "data_encryption_key",
+        "openai_base_url",
+        "openai_api_key",
+        "model_name",
         mode="before",
     )
     @classmethod
     def _empty_to_none(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip():
-            return None
+        if isinstance(value, str):
+            # Pasted secrets often end with a newline or space; never send those along.
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator("data_encryption_key")
+    @classmethod
+    def _valid_encryption_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None:
+            from app.core.crypto import parse_key
+
+            parse_key(value.get_secret_value())
         return value
 
     @field_validator("app_env", mode="before")
@@ -173,6 +203,29 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.app_env == "local"
+
+    @property
+    def agent_configured(self) -> bool:
+        """True when the web chat agent has a model to call: OPENAI_BASE_URL and MODEL_NAME
+        (OPENAI_API_KEY too, unless the server needs none)."""
+        return self.openai_base_url is not None and self.model_name is not None
+
+    @property
+    def agent_config_warning(self) -> str | None:
+        """Why the agent is off although some of its variables are set (logged at startup)."""
+        if self.agent_configured:
+            return None
+        missing = [
+            name
+            for name, value in (
+                ("OPENAI_BASE_URL", self.openai_base_url),
+                ("MODEL_NAME", self.model_name),
+            )
+            if value is None
+        ]
+        if self.openai_api_key is None and len(missing) == 2:
+            return None  # nothing set: the agent is simply off
+        return f"web chat agent is off: {', '.join(missing)} not set (buttons only)"
 
 
 def _format_errors(exc: ValidationError) -> str:

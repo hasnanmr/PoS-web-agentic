@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
+from app.core import idempotency
 from app.core import orders as orders_core
 from app.main import create_app
 
@@ -289,14 +290,20 @@ def test_idempotency_key_is_bound_to_the_request_and_the_user(client, ctx) -> No
     assert res.status_code == 409 and res.json()["error"]["code"] == "idempotency_key_reused"
     res = _post_order(client, ctx, body, who="staff2", key="review-key-0001")
     assert res.status_code == 409 and res.json()["error"]["code"] == "idempotency_key_reused"
+    # The key is stored as its SHA-256, never as sent.
+    stored = idempotency.stored_key("review-key-0001")
+    assert admin_sql("select count(*) from app.idempotency_keys where key = 'review-key-0001'") == [
+        (0,)
+    ]
     # Old keys are purged (24 hours).
     admin_sql(
-        "update app.idempotency_keys set created_at = now() - interval '2 days'"
-        " where key = 'review-key-0001'"
+        "update app.idempotency_keys set created_at = now() - interval '2 days' where key = %s",
+        (stored,),
     )
     assert admin_sql(
         "delete from app.idempotency_keys where created_at < now() - interval '24 hours'"
-        " and key = 'review-key-0001' returning 1"
+        " and key = %s returning 1",
+        (stored,),
     ) == [(1,)]
 
 

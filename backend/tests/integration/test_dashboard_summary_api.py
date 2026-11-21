@@ -195,10 +195,10 @@ def test_kpis_and_methods_from_real_counter_orders(client, ctx) -> None:
         {"method": "qris", "amount": totals[1], "transactions": 1},
     ]
     assert body["channel_mix"] == [
-        {"channel": "whatsapp_online", "orders": 0, "share_pct": 0},
-        {"channel": "whatsapp_table", "orders": 0, "share_pct": 0},
+        {"channel": "web_online", "orders": 0, "share_pct": 0},
+        {"channel": "web_table", "orders": 0, "share_pct": 0},
         {"channel": "counter", "orders": 2, "share_pct": 100},
-    ]
+    ]  # the Phase 3 WhatsApp channels appear only when they have orders
     # Week and month include today.
     for period in ("week", "month"):
         assert _get(client, ctx, outlet_id=ctx["dago"], period=period)["kpis"]["orders"] == 2

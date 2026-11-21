@@ -90,7 +90,7 @@ class LowStock(BaseModel):
 
 
 class ChannelShare(BaseModel):
-    channel: Literal["whatsapp_online", "whatsapp_table", "counter"]
+    channel: dashboard.OrderChannel
     orders: int
     share_pct: int
 

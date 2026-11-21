@@ -28,7 +28,7 @@ Decisions recorded from the product owner on 2026-11-17:
 | Pergerakan stok | `stock_movement` | Append-only change to stock: sale, sale reversal, restock, waste, adjustment. Stock level = sum of movements. |
 | Sold out / habis | derived | A product is unavailable at an outlet when any ingredient is below one portion. |
 | Order | `order` | One order from a channel. Has an order status and a separate payment status. |
-| Kanal | `order_channel` | `whatsapp_online`, `whatsapp_table`, `web_table`, `counter`. |
+| Kanal | `order_channel` | `web_online`, `web_table`, `counter` (MVP); `whatsapp_online`, `whatsapp_table` reserved for Phase 3. |
 | Tipe order | `order_type` | `delivery`, `pickup` (online); `dine_in`, `takeaway` (counter, table). |
 | Open bill | `bill` | A running bill for a table or guest name at open-bill outlets; paid in full once. |
 | Mode pembayaran dine-in | `payment_mode` | Outlet setting: `pay_first` or `open_bill`. Online orders are always pay first. |
@@ -84,7 +84,7 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `tenant_type` | `restaurant`, `cafe` | `dropshipper` added in Phase 3 (T-097). |
 | `user_role` | `owner`, `staff` | Stored role. The `app_role` JWT claim (T-113) is `owner`, `staff`, or `owner_pending` (invited owner, no tenant yet). |
 | `payment_mode` | `pay_first`, `open_bill` | Dine-in only. Online orders always pay first. |
-| `order_channel` | `whatsapp_online`, `whatsapp_table`, `web_table`, `counter` | FR2.8. `web_table` = order from the table QR web page (issue #44, planned): always paid first with the outlet's static QRIS, never on an open bill. |
+| `order_channel` | `web_online`, `web_table`, `counter`, `whatsapp_online`, `whatsapp_table` | FR2.8. `web_online` = web chat order from the outlet link `/o/<slug>` (pickup or delivery, name + phone); `web_table` = web chat order from a table QR `/t/<token>` (dine-in). Both are always paid first with the outlet's static QRIS, never on an open bill, and carry a per-order access key. The WhatsApp values are reserved for Phase 3; no MVP flow creates them. |
 | `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in. Counter: dine_in/takeaway. |
 | `order_status` | `pending_payment`, `confirmed`, `preparing`, `ready`, `out_for_delivery`, `served`, `completed`, `cancelled` | Flows in §5. |
 | `payment_status` | `unpaid`, `proof_submitted`, `paid`, `refunded` | `refunded` only through a reversal. |
@@ -116,7 +116,7 @@ Allowed status transitions. Anything not listed is refused (AC10.1). `→ cancel
 
 | Flow | When | Statuses |
 |---|---|---|
-| Online (pay first) | channel `whatsapp_online` | `pending_payment` → `confirmed` → `preparing` → `ready` → (`out_for_delivery` if delivery) → `completed` |
+| Online (pay first) | channel `web_online` (and Phase 3 `whatsapp_online`) | `pending_payment` → `confirmed` → `preparing` → `ready` → (`out_for_delivery` if delivery) → `completed` |
 | Dine-in, pay first | outlet `pay_first`, type `dine_in` | `pending_payment` → `confirmed` → `preparing` → `ready` → `completed` |
 | Dine-in, open bill | outlet `open_bill`, type `dine_in` | `confirmed` → `preparing` → `ready` → `served` → `completed` (when the bill is paid) |
 | Takeaway, counter | type `takeaway` | `confirmed` → `preparing` → `ready` → `completed` (only once paid) |
@@ -176,9 +176,18 @@ Permission matrix as in PRD FR1.5. Key points:
 
 ## 10. Customer data
 
-- Personal data lives only in customer tables (`whatsapp_contacts`, addresses, messages); never copied into ledger or stock tables (FR12.4).
-- Consent is per tenant, asked once on first contact with any outlet of that tenant.
-- Withdrawn or declined consent → anonymize the contact; orders and ledger stay intact.
+PRD v0.20 §5.12 (web chat); no accounts and no membership in the MVP.
+
+- Personal data (name, phone number) lives only in `customers`, one row per web chat order or booking; the delivery address lives on `orders.delivery_address`. It is never copied into ledger or stock tables (FR12.4), and chat sessions hold only the step and cart (FR6.2).
+- Before a name, phone number, or address is sent, the chat shows the privacy notice; the order stores the notice version in `privacy_notice_acknowledgements` (FR12.1). The API refuses any other version than the current one. Exception until the web chat page (T-145) replaces the Q3 table page: a table order may carry a name without `privacy_notice_version`; that name stays only on `orders.customer_name` (no `customers` row) and is cleared the same way when the order is finished. T-145 always sends the version, after which it becomes required.
+- Anonymized as soon as the order is completed or cancelled, or the booking is completed, cancelled, or no-show (FR12.2): the customer row loses name and phone, and the order loses `customer_name` and `delivery_address`; items, totals, and ledger entries stay.
+- The server never links visits into a profile (FR12.3); the phone may remember the customer's own details in local storage.
+- **Hashing (SHA-256), never readable back:** order and booking access keys, chat session ids, idempotency keys, attendance tablet tokens and pairing codes, and the table QR token's lookup value. The web chat page creates its access keys itself and sends them with the create request; the idempotency cache never holds a key.
+- **Encryption (AES-256-GCM, `app.core.crypto`):** customer name and phone (`customers`), `orders.customer_name`, `orders.delivery_address`, `reservations.guest_name`, `reservations.guest_phone` (web chat and S6 phone bookings), the booking code, and the table QR token (O8 re-download). Stored as `enc:v1:…`, each value bound to its column; the API decrypts for the screens that show it. The key is `DATA_ENCRYPTION_KEY` (required outside local; if it is lost the data cannot be read).
+- **Lookups on encrypted values** use keyed HMAC-SHA256 blind indexes: phone number (2-booking limit, C12 lookup) and booking code. Values written before encryption stay readable until `python -m app.tools.encrypt_existing` re-writes them.
+- Not encrypted: staff emails (needed by Supabase Auth), supplier contacts (business data), open-bill guest labels (`bills.guest_name`), and the Phase 3 WhatsApp tables (unused in the MVP).
+- Phone numbers are stored as digits (optional leading `+`), 8–15 digits, without verification.
+- The WhatsApp tables (`whatsapp_contacts`, `customer_consents`, conversations, messages) are kept for the Phase 3 channel and unused in the MVP.
 
 ## 11. Open items
 

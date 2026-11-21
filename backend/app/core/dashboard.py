@@ -36,12 +36,18 @@ from zoneinfo import ZoneInfo
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
+from app.core import crypto
 from app.core.errors import NotFoundError, ValidationFailedError
 from app.core.orders import _items as order_items
 from app.core.orders import _summary as item_summary
 from app.core.orders import order_label
 from app.core.reports import change_pct, previous_period
 from app.core.stock import stock_status
+
+# O2 "Komposisi per kanal": the MVP channels always, plus the Phase 3 WhatsApp channels only
+# when an order has one, so the shares always add up to 100% of `kpis.orders`.
+MIX_CHANNELS = ("web_online", "web_table", "counter")
+PHASE3_CHANNELS = ("whatsapp_online", "whatsapp_table")
 
 TopItemsPeriod = Literal["day", "month", "year"]
 TOP_ITEMS_LIMIT = 5
@@ -399,7 +405,7 @@ async def _figures(
                 "orders": channels[c],
                 "share_pct": round(channels[c] * 100 / total) if total else 0,
             }
-            for c in ("whatsapp_online", "whatsapp_table", "counter")
+            for c in (*MIX_CHANNELS, *(c for c in PHASE3_CHANNELS if channels[c]))
         ],
         "payment_methods": [
             {"method": m, "amount": method_amount[m], "transactions": transactions.get(m, 0)}
@@ -632,10 +638,7 @@ def _empty_summary(period: str, hours: str, now: datetime) -> dict[str, Any]:
         "busy_summary": none,
         "quiet_summary": dict(none),
         "low_stock": [],
-        "channel_mix": [
-            {"channel": c, "orders": 0, "share_pct": 0}
-            for c in ("whatsapp_online", "whatsapp_table", "counter")
-        ],
+        "channel_mix": [{"channel": c, "orders": 0, "share_pct": 0} for c in MIX_CHANNELS],
         "payment_methods": [
             {"method": m, "amount": 0, "transactions": 0} for m in ("cash", "qris")
         ],
@@ -644,8 +647,7 @@ def _empty_summary(period: str, hours: str, now: datetime) -> dict[str, Any]:
 
 # --- O2b drawer detail Revenue / Order: GET /owner/dashboard/orders -------------------------
 
-# web_table: the table QR web page (#44); channel_mix on O2 does not split it out yet.
-OrderChannel = Literal["whatsapp_online", "whatsapp_table", "web_table", "counter"]
+OrderChannel = Literal["whatsapp_online", "whatsapp_table", "web_table", "web_online", "counter"]
 PaymentMethod = Literal["cash", "qris"]
 ORDERS_LIMIT_DEFAULT = 30
 ORDERS_LIMIT_MAX = 100
@@ -830,7 +832,8 @@ async def drill_orders(
                 "channel": r["channel"],
                 "type": r["type"],
                 "table": r["table_name"],
-                "customer_name": r["customer_name"] or r["guest_name"],
+                "customer_name": crypto.decrypt(r["customer_name"], "orders.customer_name")
+                or r["guest_name"],
                 "payment_method": r["method"],
                 "item_summary": item_summary(lines.get(r["id"], [])),
                 "revenue_excl_pb1": int(r["subtotal"]),

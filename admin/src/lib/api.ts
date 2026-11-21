@@ -21,7 +21,7 @@ export type TokenSource = () => Promise<string | null>
 export interface Api {
   get<T>(path: string, headers?: Record<string, string>): Promise<T>
   post<T>(path: string, body?: unknown, headers?: Record<string, string>): Promise<T>
-  put<T>(path: string, body: unknown): Promise<T>
+  put<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T>
   patch<T>(path: string, body: unknown): Promise<T>
   del<T = void>(path: string): Promise<T>
   /** Raw file download (e.g. O10 "Ekspor CSV", the outlet's QRIS image). */
@@ -64,7 +64,7 @@ export function createApi(baseUrl: string, token: TokenSource): Api {
   return {
     get: (path, headers) => request('GET', path, undefined, headers),
     post: (path, body, headers) => request('POST', path, body ?? {}, headers),
-    put: (path, body) => request('PUT', path, body),
+    put: (path, body, headers) => request('PUT', path, body, headers),
     patch: (path, body) => request('PATCH', path, body),
     del: (path) => request('DELETE', path),
     blob: (path, accept = 'text/csv', headers) =>

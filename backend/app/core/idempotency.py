@@ -9,6 +9,7 @@ Usage inside one transaction:
     ... do the work ...
     await idempotency.store(conn, ctx, scope, key, fp, response)
 
+Keys are stored as their SHA-256 (`stored_key`), never as sent.
 A key is bound to the request that first used it (a hash of the body plus the user).
 Reusing it with another body or by another user is `idempotency_key_reused` (409), never a
 silent replay of an unrelated response. A concurrent duplicate waits on the primary key
@@ -41,6 +42,11 @@ def check_key(key: str | None) -> str | None:
     return key
 
 
+def stored_key(key: str) -> str:
+    """The key as stored: its SHA-256, never the key the client sent (glossary §10)."""
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
 def fingerprint(*parts: Any) -> str:
     """Stable hash of the request: JSON-serializable parts (ids, body) in a fixed order."""
     text = json.dumps(parts, sort_keys=True, default=str, separators=(",", ":"))
@@ -55,7 +61,7 @@ async def lookup(
     cur = await conn.execute(
         "select response, request_hash, actor_id from app.idempotency_keys"
         " where tenant_id = %s and scope = %s and key = %s",
-        (ctx.tenant_id, scope, key),
+        (ctx.tenant_id, scope, stored_key(key)),
     )
     row = await cur.fetchone()
     if row is None:
@@ -84,7 +90,7 @@ async def store(
     await conn.execute(
         "insert into app.idempotency_keys (tenant_id, scope, key, response, request_hash,"
         " actor_id) values (%s, %s, %s, %s, %s, %s)",
-        (ctx.tenant_id, scope, key, Jsonb(response), request_hash, ctx.actor_id),
+        (ctx.tenant_id, scope, stored_key(key), Jsonb(response), request_hash, ctx.actor_id),
     )
 
 

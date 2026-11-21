@@ -27,6 +27,7 @@ from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from app.core import crypto
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.localtime import local_day_bounds
@@ -210,6 +211,15 @@ async def _finish_job(conn: AsyncConnection, res_id: UUID, status: str) -> None:
 
 
 # Writes ----------------------------------------------------------------------------------
+def phone_index(phone: str) -> str:
+    """Blind index of the guest phone, digits only (same index as `customers.phone_index`)."""
+    return crypto.blind_index("".join(c for c in phone if c.isdigit() or c == "+"), "phone")
+
+
+def booking_code_index(code: str) -> str:
+    return crypto.blind_index(code.strip().upper(), "booking_code")
+
+
 async def _event(
     conn: AsyncConnection,
     ctx: ActorContext,
@@ -273,16 +283,19 @@ async def _insert(
             await conn.execute(
                 "insert into app.reservations (id, tenant_id, outlet_id, table_id, contact_id,"
                 " guest_name, guest_phone, party_size, starts_at, ends_at, source, status,"
-                " created_by_actor, created_by_id)"
-                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                " created_by_actor, created_by_id, customer_id, booking_code, access_key_hash,"
+                " guest_phone_index, booking_code_index)"
+                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,"
+                " %s, %s)",
                 (
                     res_id,
                     ctx.tenant_id,
                     outlet_id,
                     table_id,
                     values.get("contact_id"),
-                    values.get("guest_name"),
-                    values.get("guest_phone"),
+                    # Personal data is stored encrypted (app.core.crypto, glossary §10).
+                    crypto.encrypt(values.get("guest_name"), "reservations.guest_name"),
+                    crypto.encrypt(values.get("guest_phone"), "reservations.guest_phone"),
                     values["party_size"],
                     values["starts_at"],
                     values["ends_at"],
@@ -290,6 +303,13 @@ async def _insert(
                     values["status"],
                     ctx.actor_type.value,
                     ctx.actor_id,
+                    values.get("customer_id"),
+                    crypto.encrypt(values.get("booking_code"), "reservations.booking_code"),
+                    values.get("access_key_hash"),
+                    phone_index(values["guest_phone"]) if values.get("guest_phone") else None,
+                    booking_code_index(values["booking_code"])
+                    if values.get("booking_code")
+                    else None,
                 ),
             )
     except errors.ExclusionViolation:
@@ -310,8 +330,10 @@ async def create_booking(
     contact_id: UUID | None = None,
     table_id: UUID | None = None,
     now: datetime | None = None,
+    web: dict[str, Any] | None = None,
 ) -> UUID:
-    """S6 "+ Booking telepon / langsung" (and later the WhatsApp flow).
+    """S6 "+ Booking telepon / langsung" and the web chat (C10, source `web_chat`; `web`
+    carries `customer_id`, `booking_code`, and `access_key_hash`).
 
     Without `table_id` the smallest free bookable table that fits is assigned. Errors:
     `conflict` (the chosen table is taken), `no_table_available`, `validation_failed`
@@ -334,6 +356,7 @@ async def create_booking(
         "ends_at": ends_at,
         "source": source,
         "status": "booked",
+        **(web or {}),
     }
     res_id: UUID | None = None
     if table_id is not None:
@@ -427,12 +450,25 @@ def _require_action(row: dict[str, Any], action: str, now: datetime) -> None:
 
 
 async def _set_status(
-    conn: AsyncConnection, ctx: ActorContext, res_id: UUID, action: str, to_status: str
+    conn: AsyncConnection,
+    ctx: ActorContext,
+    res_id: UUID,
+    action: str,
+    to_status: str,
+    reason: str | None = None,
 ) -> None:
     row = await _lock(conn, res_id)
     _require_action(row, action, datetime.now(UTC))
     await conn.execute("update app.reservations set status = %s where id = %s", (to_status, res_id))
-    await _event(conn, ctx, row, "status_changed", from_status=row["status"], to_status=to_status)
+    await _event(
+        conn,
+        ctx,
+        row,
+        "status_changed",
+        from_status=row["status"],
+        to_status=to_status,
+        data={"reason": reason} if reason else None,
+    )
     if row["status"] == "booked":
         await _finish_job(conn, res_id, "cancelled")
 
@@ -441,8 +477,11 @@ async def seat(conn: AsyncConnection, ctx: ActorContext, res_id: UUID) -> None:
     await _set_status(conn, ctx, res_id, "seat", "seated")
 
 
-async def cancel(conn: AsyncConnection, ctx: ActorContext, res_id: UUID) -> None:
-    await _set_status(conn, ctx, res_id, "cancel", "cancelled")
+async def cancel(
+    conn: AsyncConnection, ctx: ActorContext, res_id: UUID, reason: str | None = None
+) -> None:
+    """`reason` shows in the S6 history (e.g. the customer cancelled in the web chat)."""
+    await _set_status(conn, ctx, res_id, "cancel", "cancelled", reason)
 
 
 async def mark_no_show(conn: AsyncConnection, ctx: ActorContext, res_id: UUID) -> None:
@@ -483,10 +522,80 @@ async def move(conn: AsyncConnection, ctx: ActorContext, res_id: UUID, table_id:
     )
 
 
+async def reschedule(
+    conn: AsyncConnection,
+    ctx: ActorContext,
+    res_id: UUID,
+    starts_at: datetime,
+    *,
+    now: datetime | None = None,
+) -> None:
+    """C12 "Jadwal ulang": a new time for a `booked` booking, same party. The current table is
+    kept when it is still free, otherwise the smallest free table that fits is taken; the
+    exclusion constraint still guards every move (FR9.3). The caller checks the cutoff."""
+    now = now or datetime.now(UTC)
+    if starts_at.tzinfo is None:
+        raise ValidationFailedError("starts_at needs a time zone offset", {"field": "starts_at"})
+    row = await _lock(conn, res_id)
+    if row["status"] != "booked":
+        raise ConflictError("invalid_transition", f"cannot reschedule a {row['status']} booking")
+    settings = await get_settings(conn, row["outlet_id"])
+    tz = await _outlet_tz(conn, row["outlet_id"])
+    check_booking_time(starts_at, settings, tz, now)
+    if starts_at == row["starts_at"]:
+        return
+    ends_at = starts_at + timedelta(minutes=settings["default_duration_minutes"])
+    # The current table first, but only while the outlet still offers it for this party
+    # (active, bookable, big enough), like `move` and `_candidate_tables` (PR #64 review).
+    candidates: list[UUID] = []
+    cur = await conn.execute(
+        "select 1 from app.tables where id = %s and outlet_id = %s and is_active"
+        " and is_bookable and capacity >= %s",
+        (row["table_id"], row["outlet_id"], row["party_size"]),
+    )
+    if await cur.fetchone() is not None:
+        candidates.append(row["table_id"])
+    for t in await _candidate_tables(conn, row["outlet_id"], row["party_size"], starts_at, ends_at):
+        if t not in candidates:
+            candidates.append(t)
+    moved_to: UUID | None = None
+    for table_id in candidates:
+        try:
+            async with conn.transaction():
+                await conn.execute(
+                    "update app.reservations set table_id = %s, starts_at = %s, ends_at = %s"
+                    " where id = %s",
+                    (table_id, starts_at, ends_at, res_id),
+                )
+        except errors.ExclusionViolation:
+            continue
+        moved_to = table_id
+        break
+    if moved_to is None:
+        raise ConflictError("no_table_available", "no free table fits this party at that time")
+    await _event(
+        conn,
+        ctx,
+        row,
+        "rescheduled",
+        data={
+            "from_starts_at": row["starts_at"].isoformat(),
+            "to_starts_at": starts_at.isoformat(),
+            "from_table_id": str(row["table_id"]),
+            "to_table_id": str(moved_to),
+        },
+    )
+    await conn.execute(
+        "update app.scheduled_jobs set run_at = %s where job_key = %s"
+        " and status in ('pending', 'enqueued')",
+        (starts_at + HOLD, f"no_show_release:{res_id}"),
+    )
+
+
 # Reads -----------------------------------------------------------------------------------
 _ROW_SQL = """
 select r.id, r.outlet_id, r.table_id, t.name as table_name,
-       coalesce(r.guest_name, c.display_name) as guest_name, r.guest_phone,
+       r.guest_name as guest_name_enc, c.display_name as contact_name, r.guest_phone,
        c.phone as contact_phone,
        r.party_size, r.starts_at, r.ends_at, r.status::text as status, r.source::text as source,
        (select e.created_at from app.reservation_events e
@@ -496,6 +605,15 @@ from app.reservations r
 join app.tables t on t.id = r.table_id
 left join app.whatsapp_contacts c on c.id = r.contact_id
 """
+
+
+def _decrypt_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Guest name and phone are stored encrypted; WhatsApp contacts (Phase 3) are not."""
+    name = crypto.decrypt(row.pop("guest_name_enc"), "reservations.guest_name")
+    contact = row.pop("contact_name")
+    row["guest_name"] = name or contact
+    row["guest_phone"] = crypto.decrypt(row["guest_phone"], "reservations.guest_phone")
+    return row
 
 
 def _public(row: dict[str, Any], now: datetime) -> dict[str, Any]:
@@ -520,7 +638,7 @@ async def board(conn: AsyncConnection, outlet_id: UUID, day: date | None) -> dic
         " order by r.starts_at, t.name",
         (outlet_id, start, end),
     )
-    rows = await cur.fetchall()
+    rows = [_decrypt_row(r) for r in await cur.fetchall()]
     used = {r["table_id"] for r in rows}
     await cur.execute(
         "select id, name, capacity, area, is_bookable, is_active from app.tables"
@@ -562,6 +680,7 @@ async def detail(conn: AsyncConnection, res_id: UUID) -> dict[str, Any]:
     row = await cur.fetchone()
     if row is None:
         raise NotFoundError("reservation")
+    row = _decrypt_row(row)
     await cur.execute(
         """
         select e.event, e.from_status::text as from_status, e.to_status::text as to_status,

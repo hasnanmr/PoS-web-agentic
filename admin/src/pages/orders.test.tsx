@@ -355,6 +355,22 @@ describe('S2 web order from the table QR (#44)', () => {
   })
 })
 
+describe('S2 web order from the outlet link (page 07)', () => {
+  it('shows delivery, name, phone, address, and a call link', async () => {
+    const web: OrderCard = { ...CARD, id: 'o10', order_no: '#A-1052', channel: 'web_online', type: 'delivery',
+      status: 'pending_payment', payment_status: 'unpaid', payment_method: null, table: null,
+      customer_name: 'Rina', customer_phone: '081234567221', delivery_address: 'Jl. Dipatiukur No. 35',
+      allowed_actions: ['cancel'] }
+    const api = fakeApi({ 'GET /ops/outlets/o-dago/orders/board': { ...EMPTY, awaiting_payment: [web] } })
+    render(<MemoryRouter><WithSession session={fakeSession('staff', { api })}><OrderBoardPage /></WithSession></MemoryRouter>)
+    const column = await screen.findByRole('region', { name: 'MENUNGGU BAYAR' })
+    expect(within(column).getByText('#A-1052 · web')).toBeInTheDocument()
+    expect(within(column).getByText('🛵 Delivery · Rina · 081234567221')).toBeInTheDocument()
+    expect(within(column).getByText('Jl. Dipatiukur No. 35')).toBeInTheDocument()
+    expect(within(column).getByRole('link', { name: '📞 Hubungi' })).toHaveAttribute('href', 'tel:081234567221')
+  })
+})
+
 describe('S2 QRIS cross-check (PoC)', () => {
   it('shows "QRIS belum dicek" and confirms only after the merchant-account checkbox', async () => {
     const qris: OrderCard = { ...CARD, payment_method: 'qris', payment_id: 'pay1', qris_checked: false,
