@@ -802,7 +802,7 @@ export interface ReservationRow {
   starts_at: string
   ends_at: string
   status: ReservationStatus
-  source: 'whatsapp' | 'phone' | 'in_person' | 'walk_in'
+  source: 'whatsapp' | 'phone' | 'in_person' | 'walk_in' | 'web_chat'
   hold_until: string | null
   no_show_at: string | null
   allowed_actions: ReservationAction[]
