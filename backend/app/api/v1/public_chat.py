@@ -11,7 +11,7 @@ access key (`X-Order-Key`). Error codes are for the page only; it shows friendly
 from __future__ import annotations
 
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Literal
@@ -49,7 +49,8 @@ _WINDOW_SECONDS = 60
 _LIMIT_PER_SESSION = 120
 _LIMIT_PER_CLIENT = 1200
 _LIMIT_PER_SCOPE = 300
-_hits: dict[str, deque[float]] = {}
+_MAX_KEYS = 10_000  # hard cap: the least recently used key is dropped first
+_hits: OrderedDict[str, deque[float]] = OrderedDict()
 
 
 def client_address(request: Request) -> str:
@@ -61,15 +62,18 @@ def client_address(request: Request) -> str:
 
 def rate_limit(key: str, limit: int) -> None:
     now = time.monotonic()
-    hits = _hits.setdefault(key, deque())
+    hits = _hits.get(key)
+    if hits is None:
+        hits = _hits[key] = deque()
+        while len(_hits) > _MAX_KEYS:  # O(1) per dropped key, never a scan of every key
+            _hits.popitem(last=False)
+    else:
+        _hits.move_to_end(key)
     while hits and hits[0] < now - _WINDOW_SECONDS:
         hits.popleft()
     if len(hits) >= limit:
         raise ApiError(429, "too_many_requests", "too many requests; wait a moment")
     hits.append(now)
-    if len(_hits) > 10_000:  # keep memory bounded
-        for k in [k for k, v in _hits.items() if not v or v[-1] < now - _WINDOW_SECONDS]:
-            del _hits[k]
 
 
 def limit_scope(request: Request, scope_key: str) -> None:

@@ -12,6 +12,7 @@ import { ROUTES } from '../app/nav'
 import { useRolePath, useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
 import { formatRupiah, formatTime } from '../lib/format'
+import { newKey } from '../lib/newKey'
 import type { MenuItem, OrderCreated, Quote, ShiftRow, TableRow } from '../lib/types'
 import { useLoad } from '../lib/useLoad'
 import { usePhotoRefresh } from '../lib/usePhotoRefresh'
@@ -29,12 +30,6 @@ interface CartLine {
 
 type Method = 'open_bill' | 'cash' | 'qris'
 
-function newKey(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `k-${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
 function addonText(line: CartLine): string {
   const names = line.item.addon_groups.flatMap((g) => g.options)
     .filter((o) => line.optionIds.includes(o.id))
@@ -43,6 +38,13 @@ function addonText(line: CartLine): string {
 }
 
 export default function CounterPage() {
+  const { outlet } = useSession()
+  // A fresh screen per outlet: the cart, table, drawer, method and idempotency key of one outlet
+  // must never reach another (its products and tables differ).
+  return <CounterScreen key={outlet?.id ?? ''} />
+}
+
+function CounterScreen() {
   const { api, me, outlet } = useSession()
   const pathFor = useRolePath()
   const outletId = outlet?.id ?? ''

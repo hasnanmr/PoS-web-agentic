@@ -2,6 +2,7 @@
 // (O16, staff S12) and the staff screens S10/S11. Labels are the wireframe's Bahasa Indonesia copy.
 import { useRef } from 'react'
 import { MONTHS, formatDay, formatRupiah, plainQuantity } from '../../lib/format'
+import { newKey } from '../../lib/newKey'
 import type { PaymentTerm, PoChip, PoDetail, PoRow } from '../../lib/types'
 
 export const TERM_LABEL: Record<PaymentTerm, string> = {
@@ -19,11 +20,7 @@ export const CHIPS: { key: PoChip | null; label: string; danger?: boolean }[] = 
   { key: 'closed', label: 'Ditutup' },
 ]
 
-export function newKey(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `k-${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
+export { newKey }
 
 /** Idempotency-Key for one write. Until it succeeds, retrying the same body reuses the key (safe
  * after a network error: the server answers with the stored result) and a corrected body gets a

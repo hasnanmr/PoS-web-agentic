@@ -223,6 +223,58 @@ describe('S5 empty bill', () => {
   })
 })
 
+describe('S1 Counter: outlet switch (#69)', () => {
+  it('starts with an empty cart for the new outlet', async () => {
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/menu': [{ ...KOPI, addon_groups: [] }],
+      'GET /ops/outlets/o-riau/menu': [{ ...KOPI, addon_groups: [] }],
+      'GET /ops/outlets/o-dago/tables': [], 'GET /ops/outlets/o-riau/tables': [],
+      'GET /ops/outlets/o-dago/shifts/current': [], 'GET /ops/outlets/o-riau/shifts/current': [],
+    })
+    const at = (outlet: typeof PAY_FIRST) => (
+      <MemoryRouter><WithSession session={fakeSession('owner', { api, outlet })}><CounterPage /></WithSession></MemoryRouter>)
+    const { rerender } = render(at(PAY_FIRST))
+    await userEvent.click(await screen.findByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    expect(screen.queryByText(/Keranjang kosong/)).not.toBeInTheDocument()
+
+    rerender(at({ ...OUTLETS[1], payment_mode: 'pay_first' as const }))
+    expect(await screen.findByText(/Keranjang kosong/)).toBeInTheDocument()
+    await waitFor(() => expect(api.calls).toContainEqual(['GET', '/ops/outlets/o-riau/menu', undefined]))
+    // Nothing of the old cart was priced for the new outlet.
+    expect(api.calls.filter(([m, p]) => m === 'POST' && p === '/ops/outlets/o-riau/quotes')).toHaveLength(0)
+  })
+})
+
+describe('S5 Open Bills: double click (#70)', () => {
+  it('opens one bill when "Buka bill" is clicked twice', async () => {
+    let release: (v: unknown) => void = () => {}
+    const api = fakeApi({
+      'GET /ops/outlets/o-dago/bills': { payment_mode: 'open_bill', bills: [] },
+      'GET /ops/outlets/o-dago/tables': [],
+      'GET /ops/outlets/o-dago/shifts/current': [],
+      'GET /ops/bills/b9': { id: 'b9', table_name: null, table_area: null, guest_name: 'Pak Joko', status: 'open',
+        opened_at: new Date().toISOString(), orders: [], subtotal: 0, pb1_rate_bps: null, pb1_amount: 0, total: 0 },
+    })
+    const base = api.post
+    api.post = vi.fn(async (path: string, body?: unknown) => {
+      if (path === '/ops/outlets/o-dago/bills') {
+        api.calls.push(['POST', path, body])
+        return new Promise((resolve) => { release = resolve })
+      }
+      return base(path, body)
+    }) as typeof api.post
+    render(<WithSession session={fakeSession('staff', { api })}><OpenBillsPage /></WithSession>)
+    await userEvent.click(await screen.findByRole('button', { name: '+ Buka bill (meja / nama tamu)' }))
+    await userEvent.click(screen.getByLabelText('Nama tamu', { selector: 'input[type=radio]' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Nama tamu' }), 'Pak Joko')
+    const open = screen.getByRole('button', { name: 'Buka bill' })
+    await userEvent.dblClick(open)
+    expect(api.calls.filter(([m, p]) => m === 'POST' && p === '/ops/outlets/o-dago/bills')).toHaveLength(1)
+    expect(open).toBeDisabled()
+    await act(async () => { release({ id: 'b9' }) })
+  })
+})
+
 describe('usePolling', () => {
   it('reloads on a timer and skips a tick while a request is still running', () => {
     vi.useFakeTimers()

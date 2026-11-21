@@ -651,6 +651,7 @@ OrderChannel = Literal["whatsapp_online", "whatsapp_table", "web_table", "web_on
 PaymentMethod = Literal["cash", "qris"]
 ORDERS_LIMIT_DEFAULT = 30
 ORDERS_LIMIT_MAX = 100
+_MAX_ORDER_NO = 2**31 - 1  # order_no is a Postgres integer
 _ORDER_NO = re.compile(r"#?\s*(?:([A-Za-z]+)\s*-?\s*)?(\d+)")
 
 # The paid orders behind an O2 figure: same basis as the KPI tiles (outlet-local creation
@@ -693,7 +694,10 @@ def parse_order_no(q: str) -> tuple[str | None, int] | None:
     m = _ORDER_NO.fullmatch(q.strip())
     if not m:
         return None
-    return (m.group(1).upper() if m.group(1) else None), int(m.group(2))
+    no = int(m.group(2))
+    if no > _MAX_ORDER_NO:  # e.g. a pasted phone number: no such order, not a DB error
+        return None
+    return (m.group(1).upper() if m.group(1) else None), no
 
 
 async def drill_orders(
