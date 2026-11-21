@@ -2386,11 +2386,16 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
           }
         },
         "required": [
           "id",
           "name",
+          "number",
           "has_open_shift"
         ],
         "title": "Drawer",

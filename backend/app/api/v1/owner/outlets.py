@@ -83,6 +83,7 @@ class OutletPatch(BaseModel):
 class Drawer(BaseModel):
     id: UUID
     name: str
+    number: int  # the same "Drawer N" as S1, S8, Open Bills and the cash-count report
     has_open_shift: bool
 
 

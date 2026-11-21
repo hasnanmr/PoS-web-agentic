@@ -55,6 +55,8 @@ export interface OutletDetail {
 export interface Drawer {
   id: string
   name: string
+  /** Same "Drawer N" as S1, S8, Open Bills and the cash-count report (not the list position). */
+  number: number
   has_open_shift: boolean
 }
 
