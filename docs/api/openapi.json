@@ -1094,6 +1094,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "occupancy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TableOccupancy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only for today's board, while the table is in use"
           }
         },
         "required": [
@@ -8212,6 +8223,24 @@
         "title": "RejectIn",
         "type": "object"
       },
+      "ReleaseIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "ReleaseIn",
+        "type": "object"
+      },
       "RescheduleIn": {
         "properties": {
           "start_at": {
@@ -8346,6 +8375,12 @@
           "table_name": {
             "title": "Table Name",
             "type": "string"
+          },
+          "table_occupied": {
+            "default": false,
+            "description": "A booked reservation starting today whose table is in use now (FR9.11)",
+            "title": "Table Occupied",
+            "type": "boolean"
           },
           "timezone": {
             "title": "Timezone",
@@ -8590,6 +8625,12 @@
           "table_name": {
             "title": "Table Name",
             "type": "string"
+          },
+          "table_occupied": {
+            "default": false,
+            "description": "A booked reservation starting today whose table is in use now (FR9.11)",
+            "title": "Table Occupied",
+            "type": "boolean"
           }
         },
         "required": [
@@ -9859,6 +9900,48 @@
           "capacity"
         ],
         "title": "TableCreate",
+        "type": "object"
+      },
+      "TableOccupancy": {
+        "description": "The table is in use now (FR9.11): an open dine-in order or an open bill.",
+        "properties": {
+          "allowed_actions": {
+            "items": {
+              "const": "release",
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "bill_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill Id"
+          },
+          "open_orders": {
+            "title": "Open Orders",
+            "type": "integer"
+          },
+          "since": {
+            "format": "date-time",
+            "title": "Since",
+            "type": "string"
+          }
+        },
+        "required": [
+          "since",
+          "bill_id",
+          "open_orders",
+          "allowed_actions"
+        ],
+        "title": "TableOccupancy",
         "type": "object"
       },
       "TableOrderIn": {
@@ -13815,6 +13898,60 @@
         "summary": "Supplier Options",
         "tags": [
           "ops: purchase orders"
+        ]
+      }
+    },
+    "/api/v1/ops/tables/{table_id}/release-occupancy": {
+      "post": {
+        "description": "\"Kosongkan meja\" (FR9.11): the table is free for bookings again until a new order or\nbill uses it; orders and bills are unchanged. `not_occupied` when it is not in use.",
+        "operationId": "release_occupancy_api_v1_ops_tables__table_id__release_occupancy_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReleaseIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Occupancy",
+        "tags": [
+          "ops: reservations"
         ]
       }
     },

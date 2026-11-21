@@ -38,6 +38,7 @@ from psycopg.rows import dict_row
 
 from app.core import crypto
 from app.core.errors import NotFoundError, ValidationFailedError
+from app.core.occupancy import OCCUPIED_SQL
 from app.core.orders import _items as order_items
 from app.core.orders import _summary as item_summary
 from app.core.orders import order_label
@@ -102,8 +103,9 @@ QUIET_PCT = 60  # and quiet at <= 60%
 CROWD_RAMAI_PCT = 75  # current crowd: tables occupied >= 75% → Ramai
 CROWD_SEPI_PCT = 30  # <= 30% → Sepi; in between → Normal
 MAP_WEEKS = 4  # busyness map: average over the last 4 complete weeks
-# Orders still in progress, seated guests, and open bills make an outlet crowded now. Ones older
-# than 12 hours are left out, so a table nobody closed does not keep an outlet "Ramai" for days.
+# Seated guests and tables in use (open dine-in orders or open bills, `app.core.occupancy`, the
+# same rule as booking availability, FR9.11) make an outlet crowded now. Ones older than 12 hours
+# are left out, so a table nobody closed does not keep an outlet "Ramai" for days.
 ACTIVE_STATUSES = ("confirmed", "preparing", "ready", "out_for_delivery")
 ACTIVE_WINDOW = timedelta(hours=12)
 MAX_RANGE_DAYS = 92  # "Rentang": at most about three months, so the queries stay bounded
@@ -448,7 +450,7 @@ async def _current_crowd(
 ) -> list[dict[str, Any]]:
     cur = conn.cursor(row_factory=dict_row)
     await cur.execute(
-        """
+        f"""
         select ol.id as outlet_id,
           (select count(*) from app.tables t where t.outlet_id = ol.id and t.is_active)::int
             as total_tables,
@@ -457,16 +459,12 @@ async def _current_crowd(
              exists (select 1 from app.reservations rs
                      where rs.table_id = t.id and rs.status = 'seated'
                        and rs.starts_at > %(since)s)
-             or exists (select 1 from app.bills b where b.table_id = t.id and b.status = 'open'
-                        and b.opened_at > %(since)s)
-             or exists (select 1 from app.orders o where o.table_id = t.id
-                        and o.status = any(%(active)s::app.order_status[])
-                        and o.created_at > %(since)s)))::int as occupied_tables,
+             or {OCCUPIED_SQL}))::int as occupied_tables,
           (select count(*) from app.orders o where o.outlet_id = ol.id
              and o.status = any(%(active)s::app.order_status[])
              and o.created_at > %(since)s)::int as active_orders
         from app.outlets ol where ol.id = any(%(ids)s)
-        """,
+        """,  # noqa: S608 - constant SQL fragments only
         {
             "ids": [o["id"] for o in outlets],
             "active": list(ACTIVE_STATUSES),

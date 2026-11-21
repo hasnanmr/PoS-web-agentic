@@ -15,7 +15,7 @@ from uuid import UUID
 from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
 
-from app.core import crypto
+from app.core import crypto, occupancy
 from app.core.actor import ActorContext
 from app.core.audit import record_audit
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
@@ -198,6 +198,8 @@ async def delete_table(conn: AsyncConnection, ctx: ActorContext, table_id: UUID)
     has_bill, has_booking = await cur.fetchone()  # type: ignore[misc]
     if has_bill:
         raise ConflictError("table_in_use", "this table has an open bill")
+    if await occupancy.is_occupied(conn, table_id):
+        raise ConflictError("table_in_use", "this table is in use (an open order)")
     if has_booking:
         raise ConflictError("table_in_use", "this table has an upcoming reservation")
     await conn.execute("update app.tables set is_active = false where id = %s", (table_id,))
