@@ -219,6 +219,37 @@ def test_stock_race_names_the_short_item_and_deducts_nothing(client, ctx, monkey
 # F5, F7 ------------------------------------------------------------------------------------
 
 
+def test_an_empty_open_bill_does_not_lock_pb1(client, ctx) -> None:
+    staff, owner, outlet = ctx["staff"], ctx["owner"], ctx["outlet"]
+    url = f"/api/v1/owner/outlets/{outlet}"
+    before = client.get(url, headers=owner).json()["pb1_rate_bps"]
+    res = client.post(
+        f"/api/v1/ops/outlets/{outlet}/bills", headers=staff, json={"guest_name": "rama"}
+    )
+    assert res.status_code == 201, res.text
+    empty_bill = res.json()["id"]
+
+    # A guest bill with no order has no total to disagree with the new rate.
+    res = client.patch(url, headers=owner, json={"pb1_rate_bps": 500})
+    assert res.status_code == 200, res.text
+
+    # Once a bill has an order, PB1 is locked again.
+    roti = _menu(client, ctx)["Roti Bakar Cokelat"]["product_id"]
+    order = _bill_order(client, ctx, _table(client, ctx, "M03"), roti)
+    res = client.patch(url, headers=owner, json={"pb1_rate_bps": before})
+    assert res.status_code == 409 and res.json()["error"]["code"] == "bills_open"
+
+    # Leave the module's outlet as it was: no open bill, the original rate.
+    assert client.post(f"/api/v1/ops/bills/{empty_bill}/void", headers=staff).status_code == 204
+    res = client.post(
+        f"/api/v1/ops/bills/{order['bill_id']}/close",
+        headers=staff,
+        json={"method": "qris"},
+    )
+    assert res.status_code == 200, res.text
+    assert client.patch(url, headers=owner, json={"pb1_rate_bps": before}).status_code == 200
+
+
 def test_closed_bill_keeps_its_snapshot_and_pb1_is_locked_while_bills_are_open(client, ctx) -> None:
     staff, owner, outlet = ctx["staff"], ctx["owner"], ctx["outlet"]
     m01 = _table(client, ctx, "M01")
