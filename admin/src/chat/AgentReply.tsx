@@ -5,6 +5,8 @@
 // server quote), the booking draft continues to name + phone + privacy and "Cek lagi" (C10);
 // out of scope → a short refusal and the main menu buttons; failure or > 30 s → the buttons
 // (or the owner's pick + best seller cards in Rekomendasi).
+// Only the latest reply's buttons work (`active`); older ones stay visible but greyed out, so an
+// old quick reply or draft can't be tapped by mistake. "+ Tambah" on cards always works.
 import { formatRupiah } from '../lib/format'
 import { Photo } from '../ui/Photo'
 import type { AgentBookingDraft, AgentContext, AgentOrderDraft, AgentResult } from './agent'
@@ -24,8 +26,9 @@ const WAITING: Record<AgentContext, string> = {
   auto: 'Sebentar ya…',
 }
 
-export function AgentReply({ turn, byId, webOrdering, canBook, onAdd, onQuick, onOrder, onBook, onPick }: {
+export function AgentReply({ turn, active = true, byId, webOrdering, canBook, onAdd, onQuick, onOrder, onBook, onPick }: {
   turn: AgentTurn
+  active?: boolean
   byId: Map<string, ChatMenuItem>
   webOrdering: boolean
   canBook: boolean
@@ -56,7 +59,7 @@ export function AgentReply({ turn, byId, webOrdering, canBook, onAdd, onQuick, o
               ? 'Maaf, asistennya lagi belum bisa jawab. Ini pilihan owner & terlaris di outlet ini ya.'
               : 'Maaf, asistennya lagi belum bisa jawab. Pakai tombol di bawah dulu ya, tetap bisa pesan seperti biasa.'}
         </Bubble>
-        {(result.fallback === 'buttons' || result.code === 'too_many_requests') && <MenuButtons canBook={canBook} onPick={onPick} />}
+        {(result.fallback === 'buttons' || result.code === 'too_many_requests') && <MenuButtons canBook={canBook} disabled={!active} onPick={onPick} />}
       </div>
     )
   }
@@ -68,11 +71,11 @@ export function AgentReply({ turn, byId, webOrdering, canBook, onAdd, onQuick, o
     <div className="max-w-[92%] space-y-2">
       <Bubble label={label}>
         {final.reply_text && <p className="whitespace-pre-line">{final.reply_text}</p>}
-        {final.order_draft && <OrderDraft draft={final.order_draft} webOrdering={webOrdering} onOrder={onOrder} />}
+        {final.order_draft && <OrderDraft draft={final.order_draft} webOrdering={webOrdering} disabled={!active} onOrder={onOrder} />}
         {final.booking_draft && (
           <div className="mt-2 rounded-lg bg-page px-2 py-1.5 text-[12px]">
             <p className="font-semibold">{final.booking_draft.party_size} orang · {final.booking_draft.label}</p>
-            <Action className="mt-2" onClick={() => onBook(final.booking_draft!)}>Lanjut isi nama &amp; no HP</Action>
+            <Action className="mt-2" disabled={!active} onClick={() => onBook(final.booking_draft!)}>Lanjut isi nama &amp; no HP</Action>
           </div>
         )}
       </Bubble>
@@ -98,16 +101,16 @@ export function AgentReply({ turn, byId, webOrdering, canBook, onAdd, onQuick, o
       )}
       {final.quick_replies.length > 0 && (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Pilihan cepat">
-          {final.quick_replies.map((q) => <Chip key={q} onClick={() => onQuick(q)}>{q}</Chip>)}
+          {final.quick_replies.map((q) => <Chip key={q} disabled={!active} onClick={() => onQuick(q)}>{q}</Chip>)}
         </div>
       )}
-      {final.out_of_scope && <MenuButtons canBook={canBook} onPick={onPick} />}
+      {final.out_of_scope && <MenuButtons canBook={canBook} disabled={!active} onPick={onPick} />}
     </div>
   )
 }
 
-function OrderDraft({ draft, webOrdering, onOrder }: {
-  draft: AgentOrderDraft; webOrdering: boolean; onOrder: (draft: AgentOrderDraft, edit: boolean) => void
+function OrderDraft({ draft, webOrdering, disabled, onOrder }: {
+  draft: AgentOrderDraft; webOrdering: boolean; disabled: boolean; onOrder: (draft: AgentOrderDraft, edit: boolean) => void
 }) {
   return (
     <div className="mt-2 space-y-1 text-[12px]">
@@ -126,19 +129,21 @@ function OrderDraft({ draft, webOrdering, onOrder }: {
         {' · '}Total {formatRupiah(draft.total)}
       </p>
       <div className="grid grid-cols-2 gap-2 pt-1">
-        <Action tone="ghost" onClick={() => onOrder(draft, true)}>Ubah</Action>
-        <Action tone="action" disabled={!webOrdering} onClick={() => onOrder(draft, false)}>Pesan &amp; bayar</Action>
+        <Action tone="ghost" disabled={disabled} onClick={() => onOrder(draft, true)}>Ubah</Action>
+        <Action tone="action" disabled={disabled || !webOrdering} onClick={() => onOrder(draft, false)}>Pesan &amp; bayar</Action>
       </div>
     </div>
   )
 }
 
-function MenuButtons({ canBook, onPick }: { canBook: boolean; onPick: (target: 'menu' | 'recs' | 'book') => void }) {
+function MenuButtons({ canBook, disabled, onPick }: {
+  canBook: boolean; disabled: boolean; onPick: (target: 'menu' | 'recs' | 'book') => void
+}) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      <Chip onClick={() => onPick('menu')}>Pesan</Chip>
-      <Chip onClick={() => onPick('recs')}>Rekomendasi</Chip>
-      {canBook && <Chip onClick={() => onPick('book')}>Reservasi</Chip>}
+      <Chip disabled={disabled} onClick={() => onPick('menu')}>Pesan</Chip>
+      <Chip disabled={disabled} onClick={() => onPick('recs')}>Rekomendasi</Chip>
+      {canBook && <Chip disabled={disabled} onClick={() => onPick('book')}>Reservasi</Chip>}
     </div>
   )
 }

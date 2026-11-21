@@ -508,15 +508,16 @@ describe('C9 AI / C14 / C15 agent', () => {
   it('a quick reply tapped on the note step goes to the agent, not into the kitchen note', async () => {
     const user = userEvent.setup()
     const fetchMock = stubAgent(
-      sse([['final', { ...FINAL, reply_text: 'Mau jam berapa?', quick_replies: ['18:30'] }]]),
+      sse([['final', { ...FINAL, reply_text: 'Mau jam berapa?', quick_replies: ['18:30'],
+        cards: [{ product_id: 'p-kopi', name: 'Es Kopi Susu Senja', description: null, price: 25000, photo_url: null, badge: null }] }]]),
       sse([['final', { ...FINAL, reply_text: 'Oke, jam 18:30.' }]]),
     )
     renderChat({ [`GET ${O}`]: AGENT_O })
     await user.click(await screen.findByRole('button', { name: /Pesan/ }))
     await user.type(screen.getByPlaceholderText('Tulis pesananmu…'), 'reservasi{Enter}')
     await screen.findByText('Mau jam berapa?')
-    const menu = screen.getByRole('list', { name: 'Menu' })
-    await user.click(within(menu).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    const cards = screen.getByRole('list', { name: 'Rekomendasi asisten' })
+    await user.click(within(cards).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
     await user.click(screen.getByRole('radio', { name: /Oat milk/ }))
     await user.click(screen.getByRole('button', { name: 'Lanjut' }))
     expect(await screen.findByText(/Catatan untuk dapur\?/)).toBeInTheDocument()
@@ -586,6 +587,46 @@ describe('resume after a refresh (FR6.2)', () => {
     renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'recs' }, [`GET ${O}/recommendations`]: [] })
     await waitFor(() => expect(screen.queryByRole('button', { name: /Reservasi meja/ })).not.toBeInTheDocument())
     expect(screen.queryByText(/Selamat datang/)).not.toBeInTheDocument()
+  })
+
+  it('a refresh after talking to the agent shows the divider and keeps the menu out of the way', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      `event: final\ndata: ${JSON.stringify({ reply_text: 'Mau berapa porsi?', cards: [], quick_replies: ['1', '2'], order_draft: null, booking_draft: null, out_of_scope: false, prompt_version: 'v' })}\n\n`,
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } })))
+    const page = { [`GET ${O}`]: { ...PAGE_O, agent_enabled: true } }
+    const first = renderChat(page)
+    await user.click(await screen.findByRole('button', { name: /Pesan/ }))
+    expect(screen.getByRole('list', { name: 'Menu' })).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Tulis pesananmu…'), 'italian chicken{Enter}')
+    await screen.findByText('Mau berapa porsi?')
+    // The menu is not drawn again under the reply.
+    expect(screen.queryByRole('list', { name: 'Menu' })).not.toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('thinker.chat.transcript.v1')).toContain('Mau berapa porsi?'))
+    first.unmount()
+
+    renderChat({ ...page, [`GET ${O}/chat-session`]: { ...SESSION, step: 'menu' } })
+    expect(await screen.findByText('Mau berapa porsi?')).toBeInTheDocument()
+    expect(screen.getByRole('separator')).toHaveTextContent('Lanjut dari chat sebelumnya')
+    expect(screen.queryByRole('list', { name: 'Menu' })).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('only the latest agent reply keeps its buttons active', async () => {
+    const user = userEvent.setup()
+    const reply = (text: string, quick: string[]) => new Response(
+      `event: final\ndata: ${JSON.stringify({ reply_text: text, cards: [], quick_replies: quick, order_draft: null, booking_draft: null, out_of_scope: false, prompt_version: 'v' })}\n\n`,
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+    const replies = [reply('Diambil atau diantar?', ['Pickup']), reply('Berapa porsi?', ['2 porsi'])]
+    vi.stubGlobal('fetch', vi.fn(async () => replies.shift()!))
+    renderChat({ [`GET ${O}`]: { ...PAGE_O, agent_enabled: true } })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'italian chicken{Enter}')
+    expect(await screen.findByRole('button', { name: 'Pickup' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Pickup' }))
+    expect(await screen.findByRole('button', { name: '2 porsi' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Pickup' })).toBeDisabled()
+    vi.unstubAllGlobals()
   })
 
   it('checkout steps with an empty cart start from the main menu', async () => {
