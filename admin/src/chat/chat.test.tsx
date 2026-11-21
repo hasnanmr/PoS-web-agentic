@@ -467,4 +467,62 @@ describe('C9 AI / C14 / C15 agent', () => {
     await waitFor(() => expect(screen.getAllByText(/asistennya lagi belum bisa jawab/)).toHaveLength(2))
     expect(screen.queryByText(/agent_timeout|Failed to fetch/)).not.toBeInTheDocument()
   })
+
+  it('reads a stream framed with CRLF line endings', async () => {
+    const user = userEvent.setup()
+    const body = `event: final\r\ndata: ${JSON.stringify({ ...FINAL, reply_text: 'Halo, mau pesan apa?' })}\r\n\r\n`
+    stubAgent(new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'halo{Enter}')
+    expect(await screen.findByText('Halo, mau pesan apa?')).toBeInTheDocument()
+  })
+
+  it('a message sent while the agent is still answering gets a wait hint, not silence', async () => {
+    const user = userEvent.setup()
+    let release: (r: Response) => void = () => {}
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { release = resolve }))
+    vi.stubGlobal('fetch', fetchMock)
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    await screen.findByRole('button', { name: /Pesan/ })
+    await user.type(screen.getByRole('textbox'), 'halo{Enter}')
+    await user.type(screen.getByRole('textbox'), 'masih di sana?{Enter}')
+    expect(await screen.findByText('masih di sana?')).toBeInTheDocument()
+    expect(screen.getByText(/Tunggu sebentar ya, asistennya masih menjawab/)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    release(sse([['final', { ...FINAL, reply_text: 'Hai!' }]]))
+    expect(await screen.findByText('Hai!')).toBeInTheDocument()
+  })
+
+  it('rate limited in Rekomendasi: the buttons the copy points at are shown', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['error', { code: 'too_many_requests', fallback: 'cards' }]]))
+    renderChat({ [`GET ${O}`]: AGENT_O, [`GET ${O}/recommendations`]: [] })
+    await user.click(await screen.findByRole('button', { name: /Rekomendasi/ }))
+    await user.type(screen.getByPlaceholderText('Ceritakan seleramu…'), 'yang manis{Enter}')
+    expect(await screen.findByText(/Tunggu sebentar ya, atau pakai tombol di bawah/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reservasi' }))
+    expect(await screen.findByText(/Untuk berapa orang/)).toBeInTheDocument()
+  })
+
+  it('a quick reply tapped on the note step goes to the agent, not into the kitchen note', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubAgent(
+      sse([['final', { ...FINAL, reply_text: 'Mau jam berapa?', quick_replies: ['18:30'] }]]),
+      sse([['final', { ...FINAL, reply_text: 'Oke, jam 18:30.' }]]),
+    )
+    renderChat({ [`GET ${O}`]: AGENT_O })
+    await user.click(await screen.findByRole('button', { name: /Pesan/ }))
+    await user.type(screen.getByPlaceholderText('Tulis pesananmu…'), 'reservasi{Enter}')
+    await screen.findByText('Mau jam berapa?')
+    const menu = screen.getByRole('list', { name: 'Menu' })
+    await user.click(within(menu).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
+    await user.click(screen.getByRole('radio', { name: /Oat milk/ }))
+    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
+    expect(await screen.findByText(/Catatan untuk dapur\?/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '18:30' }))
+    expect(await screen.findByText('Oke, jam 18:30.')).toBeInTheDocument()
+    expect(sent(fetchMock, 1).body.text).toBe('18:30')
+    expect(screen.queryByText(/Masuk keranjang/)).not.toBeInTheDocument()
+  })
 })

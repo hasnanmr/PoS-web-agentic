@@ -235,7 +235,12 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
     setMsgs((all) => all.map((m) => (m.id === id && m.kind === 'ai' ? { ...m, turn: change(m.turn) } : m)))
   }
   async function askAgent(text: string) {
-    if (!text || agentBusy.current) return
+    if (!text) return
+    if (agentBusy.current) {
+      say('me', text)
+      say('info', 'Tunggu sebentar ya, asistennya masih menjawab pesan sebelumnya.')
+      return
+    }
     agentBusy.current = true
     const context: AgentContext = step.name === 'recs' ? 'recommend' : step.name === 'book' ? 'book'
       : ['menu', 'addons', 'cart', 'details', 'summary'].includes(step.name) ? 'order' : 'auto'
@@ -325,7 +330,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         m.kind === 'ai' ? (
           <AgentReply key={m.id} turn={m.turn} byId={byId} webOrdering={page.web_ordering}
             canBook={scope.kind === 'o' && page.reservations_enabled}
-            onAdd={startAdd} onQuick={onText} onOrder={applyOrderDraft} onBook={applyBookingDraft}
+            onAdd={startAdd} onQuick={(q) => void askAgent(q)} onOrder={applyOrderDraft} onBook={applyBookingDraft}
             onPick={(target) => go(target === 'menu' ? 'Pesan' : target === 'recs' ? 'Rekomendasi' : 'Reservasi meja', { name: target })} />
         )
           : m.kind === 'me' ? <Mine key={m.id}>{m.text}</Mine>

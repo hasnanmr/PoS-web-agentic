@@ -85,6 +85,9 @@ export async function sendToAgent({ apiBaseUrl, base, session, text, context, on
     for (;;) {
       const { done, value } = await reader.read()
       if (value) buffer += decoder.decode(value, { stream: true })
+      // SSE allows CRLF or CR line endings as well as LF; normalise before splitting on blank lines
+      // (a trailing CR waits for the next chunk, which may start with its LF).
+      buffer = buffer.replace(/\r\n|\r(?!$)/g, '\n')
       let cut = buffer.indexOf('\n\n')
       while (cut >= 0) {
         const block = buffer.slice(0, cut)

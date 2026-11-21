@@ -56,7 +56,7 @@ export function AgentReply({ turn, byId, webOrdering, canBook, onAdd, onQuick, o
               ? 'Maaf, asistennya lagi belum bisa jawab. Ini pilihan owner & terlaris di outlet ini ya.'
               : 'Maaf, asistennya lagi belum bisa jawab. Pakai tombol di bawah dulu ya, tetap bisa pesan seperti biasa.'}
         </Bubble>
-        {result.fallback === 'buttons' && <MenuButtons canBook={canBook} onPick={onPick} />}
+        {(result.fallback === 'buttons' || result.code === 'too_many_requests') && <MenuButtons canBook={canBook} onPick={onPick} />}
       </div>
     )
   }
