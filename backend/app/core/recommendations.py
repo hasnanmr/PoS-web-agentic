@@ -102,16 +102,21 @@ async def list_tags(conn: AsyncConnection) -> list[str]:
     return [r[0] for r in await cur.fetchall()]
 
 
-async def recommendation_list(conn: AsyncConnection, outlet_id: UUID) -> dict[str, Any]:
+async def recommendation_list(
+    conn: AsyncConnection, outlet_id: UUID, menu_rows: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """What the Rekomendasi menu of this outlet shows, and what was left out and why.
 
     Each entry is `{product_id, name, position, skipped_reason}`; `position` is the place in
     the customer's list (1-based, picks and best sellers continue the same count) and is
-    None for a skipped entry. Items the outlet does not offer at all (inactive, no price
+    None for a skipped entry. `menu_rows` is the outlet's `counter_menu`, when the caller has
+    already loaded it. Items the outlet does not offer at all (inactive, no price
     here) are not shown, except a pick, which the owner chose on purpose: it is listed as
     skipped `unavailable`.
     """
-    menu = {m["product_id"]: m for m in await catalog.counter_menu(conn, outlet_id)}
+    if menu_rows is None:
+        menu_rows = await catalog.counter_menu(conn, outlet_id)
+    menu = {m["product_id"]: m for m in menu_rows}
     picks = await list_picks(conn)
 
     listed: set[UUID] = set()
