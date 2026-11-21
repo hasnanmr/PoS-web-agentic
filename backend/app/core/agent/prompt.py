@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from app.core import web_chat
 
-PROMPT_VERSION = "2026-11-21.2"
+PROMPT_VERSION = "2026-11-21.3"
 
 Context = Literal["recommend", "order", "book", "auto"]
 
@@ -67,7 +67,7 @@ Lingkup (wajib):
 
 Cara kerja:
 - Rekomendasi: cari item yang cocok (lihat_menu dengan kata kunci/tag, atau terlaris), lalu tampilkan_kartu 1–4 item yang tidak habis, pilihan owner duluan. Jelaskan singkat kenapa cocok.
-- Pesanan: cocokkan tiap item dan add-on dengan menu. Item yang tidak ada di menu: jangan dimasukkan, dan bilang jelas dengan menyebut namanya, contoh: "Maaf, nasi goreng tidak tersedia di resto kami." Item yang habis: sebutkan bahwa sedang habis, jangan dimasukkan. Lanjutkan dengan item lain yang tersedia. Grup add-on wajib yang belum jelas: tanya dengan menyebut opsinya; jawaban biasa seperti "keju" memilih opsi Keju di grup itu. Catatan seperti "less sugar" masuk ke catatan item. Kalau sudah lengkap, panggil usulkan_pesanan (sertakan cara_ambil kalau pelanggan sudah menyebut pickup/ambil sendiri atau delivery/antar).
+- Pesanan: cocokkan tiap item dan add-on dengan menu. Item yang tidak ada di menu: jangan dimasukkan, dan bilang jelas dengan menyebut namanya, contoh: "Maaf, nasi goreng tidak tersedia di resto kami." Item yang habis: sebutkan bahwa sedang habis, jangan dimasukkan. Lanjutkan dengan item lain yang tersedia. Grup add-on wajib yang belum jelas: tanya dengan menyebut opsinya; jawaban biasa seperti "keju" memilih opsi Keju di grup itu. Permintaan yang ada sebagai opsi add-on item itu (mis. "less sugar" kalau ada opsi Less sugar) wajib dipilih sebagai opsi; hanya permintaan yang tidak ada opsinya yang masuk ke catatan item. Kalau sudah lengkap, panggil usulkan_pesanan (sertakan cara_ambil kalau pelanggan sudah menyebut pickup/ambil sendiri atau delivery/antar).
 - Reservasi: butuh jumlah orang, tanggal, dan jam. Tanggal relatif ("besok", "malam minggu") dihitung dari waktu sekarang di atas; "jam 7 malam" = 19:00. Cek dengan cek_meja. Kalau jam yang diminta penuh, tawarkan jam terdekat yang ada lewat pilihan_cepat (maks 3 jam + "Pilih jam lain"). Kalau jam sudah dipilih dan tersedia, panggil usulkan_booking.
 - Kalau ada yang kurang jelas, tanya satu hal saja per balasan, boleh dengan pilihan_cepat.
 """
