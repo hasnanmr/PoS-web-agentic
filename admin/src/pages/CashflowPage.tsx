@@ -245,7 +245,7 @@ function SeriesChart({ series, granularity }: { series: Cashflow['series']; gran
             <rect x={pad.l + slot * i} y={pad.t} width={slot} height={H - pad.t - pad.b} fill="transparent" tabIndex={0}
               role="img" aria-label={`${longDate(p.date)}: kas masuk ${formatRupiah(p.cash_in)}, kas keluar ${formatRupiah(p.cash_out)}`}
               onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)} onBlur={() => setActive(null)}
-              onClick={() => setActive(active === i ? null : i)} style={{ cursor: 'pointer', outline: 'none' }} />
+              onClick={() => setActive(i)} style={{ cursor: 'pointer', outline: 'none' }} />
           </g>
         ))}
         {series[peakIn]?.cash_in > 0 && (
