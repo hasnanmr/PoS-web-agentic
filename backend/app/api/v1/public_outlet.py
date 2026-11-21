@@ -56,7 +56,9 @@ class OutletPage(BaseModel):
     reservations_enabled: bool = Field(description="Shows Reservasi and Reservasi Saya (FR2.0)")
     web_ordering: bool = Field(description='False without a static QRIS: "Pesan di kasir"')
     delivery_fee: int = Field(description="Flat fee for delivery orders, outside the PB1 base")
-    agent_enabled: bool = Field(description="Free-text agent (C9/C14/C15); off until T-086 ships")
+    agent_enabled: bool = Field(
+        description="Free-text agent (C9/C14/C15) is set up (OPENAI_BASE_URL + MODEL_NAME)"
+    )
     privacy_notice: PrivacyNotice
 
 
@@ -72,7 +74,7 @@ async def outlet_page(slug: str, request: Request) -> OutletPage:
         reservations_enabled=scope.reservations_enabled,
         web_ordering=scope.web_ordering,
         delivery_fee=scope.delivery_fee,
-        agent_enabled=False,
+        agent_enabled=chat.agent_enabled(request),
         privacy_notice=chat.privacy_notice(),
     )
 

@@ -43,6 +43,7 @@ from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
 from app.config import Settings, get_settings
 from app.core import crypto
+from app.core.agent.gateway import ModelFactory, openai_model_factory
 from app.logging import configure_logging
 from app.storage import ObjectStorage, SupabaseStorage
 
@@ -87,8 +88,9 @@ def create_app(
     user_directory: UserDirectory | None = None,
     auth_admin: AuthAdmin | None = None,
     storage: ObjectStorage | None = None,
+    agent_model: ModelFactory | None = None,
 ) -> FastAPI:
-    """Build the app. Tests may inject a verifier and a user directory."""
+    """Build the app. Tests may inject a verifier, a user directory, and the agent model."""
     settings = settings or get_settings()
     configure_logging(settings.log_level, service="api", app_env=settings.app_env)
     crypto.configure(
@@ -127,6 +129,7 @@ def create_app(
     app.state.user_directory = user_directory
     app.state.auth_admin = auth_admin or build_auth_admin(settings)
     app.state.storage = storage or build_storage(settings)
+    app.state.agent_model = agent_model or openai_model_factory(settings)
 
     app.add_middleware(
         CORSMiddleware,

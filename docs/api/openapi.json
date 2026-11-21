@@ -232,6 +232,33 @@
         "title": "AffectedProduct",
         "type": "object"
       },
+      "AgentMessageIn": {
+        "properties": {
+          "context": {
+            "default": "auto",
+            "description": "Where the customer typed: C9, C14, C15, or the main menu",
+            "enum": [
+              "recommend",
+              "order",
+              "book",
+              "auto"
+            ],
+            "title": "Context",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "AgentMessageIn",
+        "type": "object"
+      },
       "AmountCount": {
         "properties": {
           "amount": {
@@ -5347,7 +5374,7 @@
       "OutletPage": {
         "properties": {
           "agent_enabled": {
-            "description": "Free-text agent (C9/C14/C15); off until T-086 ships",
+            "description": "Free-text agent (C9/C14/C15) is set up (OPENAI_BASE_URL + MODEL_NAME)",
             "title": "Agent Enabled",
             "type": "boolean"
           },
@@ -9834,7 +9861,7 @@
       "TablePage": {
         "properties": {
           "agent_enabled": {
-            "description": "Free-text agent (C9/C14); off until T-086 ships",
+            "description": "Free-text agent (C9/C14) is set up (OPENAI_BASE_URL + MODEL_NAME)",
             "title": "Agent Enabled",
             "type": "boolean"
           },
@@ -12151,11 +12178,11 @@
               "anyOf": [
                 {
                   "enum": [
-                    "counter",
                     "whatsapp_online",
                     "whatsapp_table",
                     "web_table",
-                    "web_online"
+                    "web_online",
+                    "counter"
                   ],
                   "type": "string"
                 },
@@ -14683,11 +14710,11 @@
               "anyOf": [
                 {
                   "enum": [
-                    "counter",
                     "whatsapp_online",
                     "whatsapp_table",
                     "web_table",
-                    "web_online"
+                    "web_online",
+                    "counter"
                   ],
                   "type": "string"
                 },
@@ -18580,6 +18607,71 @@
         ]
       }
     },
+    "/api/v1/public/o/{slug}/agent/messages": {
+      "post": {
+        "description": "C9 AI / C14 / C15: one free-text message to the agent, answered as server-sent\nevents — `delta` ({text}) while the reply is written, then one `final` ({reply_text,\ncards, quick_replies, order_draft, booking_draft, out_of_scope}) or one `error`\n({code, fallback: buttons|cards}). Read-only, outlet-scoped tools, ≤ 4 data-tool calls\nand 30 s (FR6.6). Drafts create nothing: Pesan & bayar / Konfirmasi booking go through\nthe button-flow endpoints.",
+        "operationId": "agent_message_api_v1_public_o__slug__agent_messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Message",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
     "/api/v1/public/o/{slug}/availability": {
       "get": {
         "description": "C10: free start times for the party on an outlet-local date (AC9.1, AC9.3).",
@@ -19882,6 +19974,71 @@
           }
         },
         "summary": "Table Page",
+        "tags": [
+          "public: web chat from a table QR (C8)"
+        ]
+      }
+    },
+    "/api/v1/public/t/{token}/agent/messages": {
+      "post": {
+        "description": "C9 AI / C14 / C15: one free-text message to the agent, answered as server-sent\nevents — `delta` ({text}) while the reply is written, then one `final` ({reply_text,\ncards, quick_replies, order_draft, booking_draft, out_of_scope}) or one `error`\n({code, fallback: buttons|cards}). Read-only, outlet-scoped tools, ≤ 4 data-tool calls\nand 30 s (FR6.6). Drafts create nothing: Pesan & bayar / Konfirmasi booking go through\nthe button-flow endpoints.",
+        "operationId": "agent_message_api_v1_public_t__token__agent_messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Chat-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chat-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Message",
         "tags": [
           "public: web chat from a table QR (C8)"
         ]

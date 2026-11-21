@@ -55,7 +55,9 @@ class TablePage(BaseModel):
     outlet: ChatOutlet
     table: TableOut
     web_ordering: bool = Field(description='False without a static QRIS: "Pesan di kasir"')
-    agent_enabled: bool = Field(description="Free-text agent (C9/C14); off until T-086 ships")
+    agent_enabled: bool = Field(
+        description="Free-text agent (C9/C14) is set up (OPENAI_BASE_URL + MODEL_NAME)"
+    )
     privacy_notice: PrivacyNotice
 
 
@@ -71,7 +73,7 @@ async def table_page(token: str, request: Request) -> TablePage:
         outlet=ChatOutlet(**info),
         table=TableOut(name=ref.table_name, area=ref.area),
         web_ordering=scope.web_ordering,
-        agent_enabled=False,
+        agent_enabled=chat.agent_enabled(request),
         privacy_notice=chat.privacy_notice(),
     )
 

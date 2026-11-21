@@ -3,9 +3,10 @@
 Contract: docs/architecture/screen-endpoint-map.md → "Customer web chat (C1-C15)". The outlet
 link (`/public/o/{slug}`, `public_outlet.py`) and the table QR (`/public/t/{token}`,
 `public_table.py`) each resolve their scope in a dependency and register the same routes here:
-menu, quote, chat session, Pesanan Saya, order status, QRIS, Saya sudah bayar, cancel, and
-recommendation cards. No sign-in: the slug or token is the only credential, plus the per-order
-access key (`X-Order-Key`). Error codes are for the page only; it shows friendly copy (C13).
+menu, quote, chat session, Pesanan Saya, order status, QRIS, Saya sudah bayar, cancel,
+recommendation cards, and the agent (C9 AI, C14, C15). No sign-in: the slug or token is the only
+credential, plus the per-order access key (`X-Order-Key`). Error codes are for the page only; it
+shows friendly copy (C13).
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, Header, Request, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app import db
@@ -26,6 +28,7 @@ from app.api.errors import ApiError
 from app.api.photos import attach_photo_urls
 from app.api.v1.ops.orders import LineIn, MenuItem, QuoteLine
 from app.core import catalog, idempotency, qris, recommendations, web_chat
+from app.core.agent import gateway
 from app.core.pricing import LineInput, PricedOrder, quote
 
 OrderKey = Header(default=None, alias="X-Order-Key")
@@ -50,6 +53,8 @@ _LIMIT_PER_SESSION = 120
 _LIMIT_PER_CLIENT = 1200
 _LIMIT_PER_SCOPE = 300
 _hits: dict[str, deque[float]] = {}
+# Agent messages per chat session per minute: each one costs model calls.
+_AGENT_PER_SESSION = 10
 
 
 def client_address(request: Request) -> str:
@@ -337,6 +342,18 @@ async def create_order(
     return out
 
 
+class AgentMessageIn(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+    context: Literal["recommend", "order", "book", "auto"] = Field(
+        default="auto", description="Where the customer typed: C9, C14, C15, or the main menu"
+    )
+
+
+def agent_enabled(request: Request) -> bool:
+    """C1/C8 `agent_enabled`: the text box talks to the agent only when a model is set up."""
+    return request.app.state.agent_model is not None
+
+
 # Shared routes ------------------------------------------------------------------------------
 
 
@@ -498,3 +515,49 @@ def register(router: APIRouter, param: str, current: Callable[..., Any]) -> None
             )
             for r in rows
         ]
+
+    @router.post(
+        f"{base}/agent/messages",
+        response_class=StreamingResponse,
+        responses={200: {"content": {"text/event-stream": {}}}},
+    )
+    async def agent_message(
+        body: AgentMessageIn,
+        request: Request,
+        scope: web_chat.ChatScope = Scope,
+        session: str | None = ChatSession,
+    ) -> StreamingResponse:
+        """C9 AI / C14 / C15: one free-text message to the agent, answered as server-sent
+        events — `delta` ({text}) while the reply is written, then one `final` ({reply_text,
+        cards, quick_replies, order_draft, booking_draft, out_of_scope}) or one `error`
+        ({code, fallback: buttons|cards}). Read-only, outlet-scoped tools, ≤ 4 data-tool calls
+        and 30 s (FR6.6). Drafts create nothing: Pesan & bayar / Konfirmasi booking go through
+        the button-flow endpoints."""
+        key = web_chat.check_session(session)
+        make_model = request.app.state.agent_model
+        if make_model is None:
+            raise ApiError(503, "agent_unavailable", "the chat assistant is not available")
+        rate_limit(f"agent:{key}", _AGENT_PER_SESSION)
+        context = body.context
+        if context == "book" and not (scope.table_id is None and scope.reservations_enabled):
+            context = "auto"
+        db_pool = pool(request)
+
+        async def events() -> Any:
+            async for event in gateway.run_turn(
+                pool=db_pool,
+                make_model=make_model,
+                scope=scope,
+                session=key,
+                text=body.text.strip(),
+                context=context,
+            ):
+                if event.event == "final" and event.data["cards"]:
+                    await attach_photo_urls(request, event.data["cards"])
+                yield event.sse()
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
