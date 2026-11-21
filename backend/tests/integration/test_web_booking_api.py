@@ -348,6 +348,7 @@ def test_calendar_file_has_alert_at_reminder_time(client, enabled) -> None:
     text = res.text
     start = _tomorrow_at(18, 30).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
     assert f"DTSTART:{start}" in text and "TRIGGER:-PT120M" in text  # AC9.5
+    assert datetime.fromisoformat(b["reminder_at"]) == _tomorrow_at(16, 30)  # C11 copy
     assert b["booking_code"] in text and "Losari" in text
 
 

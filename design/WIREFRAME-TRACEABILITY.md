@@ -136,7 +136,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | C6 Bayar QRIS statis + "Saya sudah bayar" + batas waktu (+ item habis saat pesan) | US-062, US-014, US-021 | T-028, T-036, T-034 |
 | C7 Status pesanan live, link pesanan, Pesanan Saya (+ pembayaran ditolak) | US-015, US-062 | T-055, T-145 |
 | C8 Dari QR meja `/t/<token>`: sapaan meja, nama saja, bayar dulu | US-013, US-009 | T-050, T-053, T-134 |
-| C9 Rekomendasi: kartu pilihan owner/terlaris + AI (ack, fallback 30 detik) | US-028, US-029, US-052 | T-073, T-074, T-115 |
+| C9 Rekomendasi: kartu pilihan owner/terlaris + AI (ack, fallback 30 detik) | US-028, US-029, US-052 | T-073, T-074, T-115 (kartu ✅ T-145; AI menyusul) |
 | C10 Reservasi: orang → tanggal → jam → nama + HP + privasi → Cek lagi (+ batas 2 booking, maks party) | US-023, US-040 | T-058, T-060, T-076 |
 | C11 Booking terkonfirmasi: kode booking, Tambah ke kalender (.ics), link | US-025 | T-061 |
 | C12 Reservasi Saya: dari HP ini / kode booking + no HP; jadwal ulang, batal, cutoff | US-025 | T-061 |
