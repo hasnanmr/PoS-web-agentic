@@ -182,7 +182,7 @@ export default function ReservationsPage() {
           <>
             <Timeline board={data} now={now} selected={selected} onSelect={setSelected} />
             <MobileList board={data} now={now} selected={selected} onSelect={setSelected} onChanged={refresh} />
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="hidden md:block">
                 {selected && data.reservations.some((r) => r.id === selected) ? (
                   <DetailCard key={selected} id={selected} board={data} now={now} onChanged={refresh} />

@@ -99,7 +99,7 @@ export default function StaffAttendancePage() {
                 <div className="mt-2 text-[13px] font-semibold">{r.needs_correction_count} catatan</div>
               </section>
             </div>
-            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
               <Card className="min-w-0">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[600px] text-left text-[12px]">

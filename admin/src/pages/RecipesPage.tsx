@@ -60,7 +60,7 @@ function RecipeTab({ stockItems }: { stockItems: StockItem[] }) {
   const [selected, setSelected] = useState<string>()
   const current = selected ?? products.data?.[0]?.id
   return (
-    <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
       <Card title="Pilih menu">
         {products.loading && !products.data ? <Loading /> : (
           <ul>

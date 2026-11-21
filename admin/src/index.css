@@ -84,4 +84,20 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;
   overflow-x: hidden;
+  /* clip, not hidden, where supported: hidden makes a scroll container that breaks sticky headers. */
+  overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Phones (iPhone 15/16 Safari, Galaxy S25 Chrome): iOS Safari zooms the page in when a field with
+ * text under 16px gets focus, and does not zoom back out. Fields use 16px below the md breakpoint;
+ * desktop keeps the wireframe's 12–13px.
+ */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }

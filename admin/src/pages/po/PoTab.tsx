@@ -70,7 +70,7 @@ export function PoTab({ outletId, month, focusId }: {
     <div className="space-y-4">
       {dash.error ? <Alert>Kartu PO belum bisa dimuat: {errorMessage(dash.error)}</Alert> : null}
       {!d ? (dash.loading ? <Loading /> : null) : (
-        <div className="grid gap-4 lg:grid-cols-[1fr_376px]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_376px]">
           <SummaryCard data={d} month={month} outletName={outletName}
             onDrill={(drill) => showList({ drill })} />
           <div className="space-y-4 lg:row-span-2">
@@ -87,7 +87,7 @@ export function PoTab({ outletId, month, focusId }: {
           <h2 className="text-[14px] font-semibold text-text">Daftar PO · {outletName}</h2>
           <p className="text-[11px] text-text-muted">Chip status untuk semua PO · angka di Ringkasan PO membuka daftar ini berisi PO yang sama</p>
         </div>
-        <div className="grid gap-4 lg:grid-cols-[1fr_396px]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_396px]">
           <PoList key={`${outletId}|${listVersion}`} outletId={outletId} month={month} filter={filter}
             selected={selected} onFilter={setFilter} onSelect={setSelected} />
           {selected ? (

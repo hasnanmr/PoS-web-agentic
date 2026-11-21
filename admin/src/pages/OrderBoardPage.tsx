@@ -224,9 +224,9 @@ function QrisCheckDialog({ order, onClose, onChecked }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 sm:items-center" role="dialog" aria-modal="true"
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center" role="dialog" aria-modal="true"
       aria-label={`Cek QRIS ${order.order_no}`}>
-      <div className="w-full max-w-md rounded-lg bg-surface p-4 text-[13px]">
+      <div className="max-h-full w-full max-w-md overflow-y-auto overscroll-contain rounded-lg bg-surface p-4 text-[13px]">
         <h2 className="text-[16px] font-bold">Cek pembayaran QRIS · {order.order_no}</h2>
         <p className="mb-3 text-[12px] text-text-muted">
           {where(order)} · {formatTime(order.created_at, outlet?.timezone ?? 'Asia/Jakarta')}{order.bill_id ? ' · dibayar lewat bill' : ''}

@@ -29,7 +29,7 @@ export function AppShell() {
 
   return (
     <ShellContext.Provider value={shell}>
-      <div className="flex min-h-dvh w-full overflow-x-hidden bg-page text-text">
+      <div className="flex min-h-dvh w-full overflow-x-clip bg-page pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-text">
         <aside className="sticky top-0 hidden h-dvh md:block">
           <Sidebar role={role} />
         </aside>
@@ -42,13 +42,13 @@ export function AppShell() {
               className="absolute inset-0 bg-text/40"
               onClick={() => setDrawerOpen(false)}
             />
-            <div className="relative h-full w-[220px] max-w-[85vw] shadow-xl">
+            <div className="relative h-full w-[220px] max-w-[85vw] bg-surface pb-[env(safe-area-inset-bottom)] shadow-xl">
               <Sidebar role={role} onNavigate={() => setDrawerOpen(false)} />
             </div>
           </div>
         )}
 
-        <main className="min-w-0 flex-1 pb-16 md:pb-0">
+        <main className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
           <Outlet />
         </main>
 

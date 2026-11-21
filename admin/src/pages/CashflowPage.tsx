@@ -94,7 +94,7 @@ export default function CashflowPage() {
                 ['PB1 dikembalikan lewat refund', formatRupiah(r.breakdown.pb1 - r.totals.pb1_collected.amount)],
               ]} />
             </div>
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <Card className="lg:col-span-2" title={SERIES_TITLE[r.granularity]}>
                 <p className="-mt-2 mb-2 text-[11px] text-text-muted">
                   {periodCaption(r.from, r.to)} · dari ledger · batas hari mengikuti zona waktu tiap outlet
@@ -130,7 +130,7 @@ export default function CashflowPage() {
             </div>
           </>
         )}
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {r && <BreakdownCard r={r} />}
           <RecentExpenses outletId={outletId} version={expensesVersion} all={allExpenses} onShowAll={() => setAllExpenses(true)}
             onChanged={() => { setExpensesVersion((v) => v + 1); void report.reload() }} />

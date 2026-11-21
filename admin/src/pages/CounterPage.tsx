@@ -342,8 +342,8 @@ function AddonModal({ item, onClose, onAdd }: { item: MenuItem; onClose: () => v
     })
   }
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label={`Add-on ${item.name}`}>
-      <div className="w-full max-w-md rounded-lg bg-surface p-4">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center" role="dialog" aria-modal="true" aria-label={`Add-on ${item.name}`}>
+      <div className="max-h-full w-full max-w-md overflow-y-auto overscroll-contain rounded-lg bg-surface p-4">
         <h2 className="text-[16px] font-bold">{item.name}</h2>
         <p className="mb-3 text-[12px] text-text-muted">{formatRupiah(item.price)}</p>
         {item.addon_groups.map((g) => (

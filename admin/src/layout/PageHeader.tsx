@@ -14,8 +14,15 @@ interface PageHeaderProps {
 export function PageHeader({ title, actions, tabs }: PageHeaderProps) {
   const { openDrawer } = useShell()
   const { me, outlet } = useSession()
+  const outletLine = (className: string) => (
+    <p className={`pl-10 text-[11px] text-text-muted md:hidden ${className}`}>
+      {me.tenant?.name} – {outlet?.name ?? 'belum ada outlet'}
+    </p>
+  )
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-surface px-4 py-3 md:px-6 md:py-4">
+    // Sticky on desktop only: on a phone the header with filters (O2) would cover a quarter of the
+    // screen, so it scrolls away with the page and the bottom nav stays.
+    <header className="z-10 border-b border-border bg-surface px-4 py-3 md:sticky md:top-0 md:px-6 md:py-4">
       <div className={`flex items-center gap-3 ${tabs ? 'flex-wrap' : ''}`}>
         <button
           type="button"
@@ -29,11 +36,11 @@ export function PageHeader({ title, actions, tabs }: PageHeaderProps) {
           {title}
         </h1>
         {tabs && <div className="min-w-0 flex-1">{tabs}</div>}
+        {/* With tabs the filters wrap to their own line: keep the outlet line under the title (M1). */}
+        {tabs && outletLine('basis-full')}
         {actions}
       </div>
-      <p className="mt-0.5 pl-10 text-[11px] text-text-muted md:hidden">
-        {me.tenant?.name} – {outlet?.name ?? 'belum ada outlet'}
-      </p>
+      {!tabs && outletLine('mt-0.5')}
     </header>
   )
 }
