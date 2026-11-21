@@ -27,6 +27,7 @@ from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from app.core import crypto
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.localtime import local_day_bounds
@@ -210,6 +211,15 @@ async def _finish_job(conn: AsyncConnection, res_id: UUID, status: str) -> None:
 
 
 # Writes ----------------------------------------------------------------------------------
+def phone_index(phone: str) -> str:
+    """Blind index of the guest phone, digits only (same index as `customers.phone_index`)."""
+    return crypto.blind_index("".join(c for c in phone if c.isdigit() or c == "+"), "phone")
+
+
+def booking_code_index(code: str) -> str:
+    return crypto.blind_index(code.strip().upper(), "booking_code")
+
+
 async def _event(
     conn: AsyncConnection,
     ctx: ActorContext,
@@ -273,16 +283,19 @@ async def _insert(
             await conn.execute(
                 "insert into app.reservations (id, tenant_id, outlet_id, table_id, contact_id,"
                 " guest_name, guest_phone, party_size, starts_at, ends_at, source, status,"
-                " created_by_actor, created_by_id, customer_id, booking_code, access_key_hash)"
-                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                " created_by_actor, created_by_id, customer_id, booking_code, access_key_hash,"
+                " guest_phone_index, booking_code_index)"
+                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,"
+                " %s, %s)",
                 (
                     res_id,
                     ctx.tenant_id,
                     outlet_id,
                     table_id,
                     values.get("contact_id"),
-                    values.get("guest_name"),
-                    values.get("guest_phone"),
+                    # Personal data is stored encrypted (app.core.crypto, glossary §10).
+                    crypto.encrypt(values.get("guest_name"), "reservations.guest_name"),
+                    crypto.encrypt(values.get("guest_phone"), "reservations.guest_phone"),
                     values["party_size"],
                     values["starts_at"],
                     values["ends_at"],
@@ -291,8 +304,12 @@ async def _insert(
                     ctx.actor_type.value,
                     ctx.actor_id,
                     values.get("customer_id"),
-                    values.get("booking_code"),
+                    crypto.encrypt(values.get("booking_code"), "reservations.booking_code"),
                     values.get("access_key_hash"),
+                    phone_index(values["guest_phone"]) if values.get("guest_phone") else None,
+                    booking_code_index(values["booking_code"])
+                    if values.get("booking_code")
+                    else None,
                 ),
             )
     except errors.ExclusionViolation:
@@ -578,7 +595,7 @@ async def reschedule(
 # Reads -----------------------------------------------------------------------------------
 _ROW_SQL = """
 select r.id, r.outlet_id, r.table_id, t.name as table_name,
-       coalesce(r.guest_name, c.display_name) as guest_name, r.guest_phone,
+       r.guest_name as guest_name_enc, c.display_name as contact_name, r.guest_phone,
        c.phone as contact_phone,
        r.party_size, r.starts_at, r.ends_at, r.status::text as status, r.source::text as source,
        (select e.created_at from app.reservation_events e
@@ -588,6 +605,15 @@ from app.reservations r
 join app.tables t on t.id = r.table_id
 left join app.whatsapp_contacts c on c.id = r.contact_id
 """
+
+
+def _decrypt_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Guest name and phone are stored encrypted; WhatsApp contacts (Phase 3) are not."""
+    name = crypto.decrypt(row.pop("guest_name_enc"), "reservations.guest_name")
+    contact = row.pop("contact_name")
+    row["guest_name"] = name or contact
+    row["guest_phone"] = crypto.decrypt(row["guest_phone"], "reservations.guest_phone")
+    return row
 
 
 def _public(row: dict[str, Any], now: datetime) -> dict[str, Any]:
@@ -612,7 +638,7 @@ async def board(conn: AsyncConnection, outlet_id: UUID, day: date | None) -> dic
         " order by r.starts_at, t.name",
         (outlet_id, start, end),
     )
-    rows = await cur.fetchall()
+    rows = [_decrypt_row(r) for r in await cur.fetchall()]
     used = {r["table_id"] for r in rows}
     await cur.execute(
         "select id, name, capacity, area, is_bookable, is_active from app.tables"
@@ -654,6 +680,7 @@ async def detail(conn: AsyncConnection, res_id: UUID) -> dict[str, Any]:
     row = await cur.fetchone()
     if row is None:
         raise NotFoundError("reservation")
+    row = _decrypt_row(row)
     await cur.execute(
         """
         select e.event, e.from_status::text as from_status, e.to_status::text as to_status,

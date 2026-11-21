@@ -20,7 +20,7 @@ from uuid import UUID
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
-from app.core import notifications, orders, payments
+from app.core import crypto, notifications, orders, payments
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.payments import PaymentInput
@@ -78,7 +78,7 @@ async def pending_queue(conn: AsyncConnection, outlet_id: UUID) -> list[dict[str
 _PROOF_SQL = """
 select p.id, p.kind, p.order_id, p.outlet_id, p.status::text as status, p.storage_path,
        p.received_at, p.reviewed_at, p.rejection_reason, u.display_name as reviewed_by,
-       coalesce(cu.phone, c.phone) as phone, o.customer_name
+       cu.phone as customer_phone, c.phone as contact_phone
 from app.payment_proofs p
 join app.orders o on o.id = p.order_id
 left join app.whatsapp_contacts c on c.id = o.contact_id
@@ -117,7 +117,9 @@ async def detail(conn: AsyncConnection, proof_id: UUID) -> dict[str, Any]:
         "total": order["total"],
         "order_status": order["status"],
         "payment_status": order["payment_status"],
-        "customer_phone_masked": mask_phone(proof["phone"]),
+        "customer_phone_masked": mask_phone(
+            crypto.decrypt(proof["customer_phone"], "customers.phone") or proof["contact_phone"]
+        ),
         "received_at": proof["received_at"],
         "timezone": order["timezone"],
         # The unpaid timer stops when a proof arrives (glossary §5 rule 6).

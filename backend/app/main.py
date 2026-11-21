@@ -42,6 +42,7 @@ from app.auth.principal import PgUserDirectory, UserDirectory
 from app.auth.supabase_admin import AuthAdmin, SupabaseAdmin
 from app.auth.tokens import JwksCache, TokenVerifier, http_jwks_fetcher
 from app.config import Settings, get_settings
+from app.core import crypto
 from app.logging import configure_logging
 from app.storage import ObjectStorage, SupabaseStorage
 
@@ -90,6 +91,9 @@ def create_app(
     """Build the app. Tests may inject a verifier and a user directory."""
     settings = settings or get_settings()
     configure_logging(settings.log_level, service="api", app_env=settings.app_env)
+    crypto.configure(
+        settings.data_encryption_key.get_secret_value() if settings.data_encryption_key else None
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

@@ -444,6 +444,14 @@ def test_phone_is_masked_in_detail(client, ctx) -> None:
     res = _book(client, ctx, guest_phone="+62 813 1234 5090", starts_at=_tomorrow(14))
     assert res.json()["phone_masked"] == "+62 813-xxxx-090"
     assert "guest_phone" not in res.json()
+    # Stored encrypted (glossary §10); the board and the detail decrypt in the API.
+    stored = admin_sql(
+        "select guest_name, guest_phone, guest_phone_index from app.reservations where id = %s",
+        (res.json()["id"],),
+    )[0]
+    assert stored[0].startswith("enc:v1:") and stored[1].startswith("enc:v1:")
+    assert len(stored[2]) == 64 and "5090" not in stored[1]
+    assert res.json()["guest_name"] == "Dewi"
 
 
 # No-show hold (T-064) --------------------------------------------------------------------

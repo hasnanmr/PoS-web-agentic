@@ -17,7 +17,7 @@ from app.config import Settings
 from app.main import create_app
 
 from ..auth.keys import make_token, make_verifier
-from ._db import ADMIN_URL, APP_URL, admin_sql, cleanup_domain, invite_owner
+from ._db import ADMIN_URL, APP_URL, admin_sql, cleanup_domain, invite_owner, plain
 
 pytestmark = pytest.mark.skipif(
     not (ADMIN_URL and APP_URL), reason="TEST_DATABASE_URL / TEST_APP_DATABASE_URL not set"
@@ -81,7 +81,7 @@ def ctx(client: TestClient) -> dict[str, Any]:
     rows = admin_sql(
         "select name, id, qr_token from app.tables where outlet_id = %s order by name", (outlet,)
     )
-    tables = {r[0]: {"id": str(r[1]), "token": r[2]} for r in rows}
+    tables = {r[0]: {"id": str(r[1]), "token": plain(r[2], "tables.qr_token")} for r in rows}
     return {
         "tenant": tenant,
         "outlet": outlet,
@@ -93,7 +93,9 @@ def ctx(client: TestClient) -> dict[str, Any]:
 
 
 def _token(ctx: dict[str, Any], table: str = "m05") -> str:
-    return admin_sql("select qr_token from app.tables where id = %s", (ctx[table]["id"],))[0][0]
+    stored = admin_sql("select qr_token from app.tables where id = %s", (ctx[table]["id"],))[0][0]
+    assert stored.startswith("enc:v1:")  # the token is stored encrypted, looked up by SHA-256
+    return plain(stored, "tables.qr_token")
 
 
 def _upload_qris(client: TestClient, ctx: dict[str, Any]) -> None:
@@ -268,7 +270,14 @@ def test_web_order_is_pay_first_and_never_joins_the_open_bill(client, ctx) -> No
         " where id = %s",
         (order["order_id"],),
     )[0]
-    assert row == ("web_table", "pay_first", None, "Rina", "kurang manis")
+    assert row[3].startswith("enc:v1:")  # the name is stored encrypted
+    assert (*row[:3], plain(row[3], "orders.customer_name"), row[4]) == (
+        "web_table",
+        "pay_first",
+        None,
+        "Rina",
+        "kurang manis",
+    )
     bill_after = client.get(f"/api/v1/ops/bills/{bill_id}", headers=ctx["staff"]).json()
     assert bill_after["total"] == bill_before["total"]  # AC2.17
 

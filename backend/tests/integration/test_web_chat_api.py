@@ -19,7 +19,7 @@ from app.core.web_chat import PRIVACY_NOTICE_VERSION
 from app.main import create_app
 
 from ..auth.keys import make_token, make_verifier
-from ._db import ADMIN_URL, APP_URL, admin_sql, cleanup_domain, invite_owner
+from ._db import ADMIN_URL, APP_URL, admin_sql, cleanup_domain, invite_owner, plain
 
 pytestmark = pytest.mark.skipif(
     not (ADMIN_URL and APP_URL), reason="TEST_DATABASE_URL / TEST_APP_DATABASE_URL not set"
@@ -81,7 +81,10 @@ def ctx(client: TestClient) -> dict[str, Any]:
     assert res.status_code == 201, res.text
     slug = f"senja-dago-{uuid4().hex[:6]}"
     admin_sql("update app.outlets set public_slug = %s where id = %s", (slug, outlet))
-    token = admin_sql("select qr_token from app.tables where outlet_id = %s", (outlet,))[0][0]
+    token = plain(
+        admin_sql("select qr_token from app.tables where outlet_id = %s", (outlet,))[0][0],
+        "tables.qr_token",
+    )
     return {
         "tenant": tenant,
         "outlet": outlet,
@@ -239,9 +242,17 @@ def test_pickup_order_records_customer_and_privacy_notice(client, ctx) -> None:
         " join app.privacy_notice_acknowledgements a on a.customer_id = c.id where o.id = %s",
         (order["order_id"],),
     )
-    assert row == [
-        ("web_online", "pickup", "pay_first", None, "Bima", "081234567890", PRIVACY_NOTICE_VERSION)
-    ]
+    channel, type_, mode, table, name, phone, version = row[0]
+    assert (channel, type_, mode, table, version) == (
+        "web_online",
+        "pickup",
+        "pay_first",
+        None,
+        PRIVACY_NOTICE_VERSION,
+    )
+    assert name.startswith("enc:v1:") and phone.startswith("enc:v1:")  # stored encrypted
+    assert plain(name, "customers.name") == "Bima"
+    assert plain(phone, "customers.phone") == "081234567890"
     status = _status(client, ctx, order).json()
     assert status["fulfillment"] == "pickup" and status["customer_name"] == "Bima"
     card = _board_card(client, ctx, order["order_id"])

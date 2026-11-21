@@ -19,6 +19,13 @@ def admin_sql(sql: str, params: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:
         return cur.fetchall() if cur.description else []
 
 
+def plain(value: str | None, context: str) -> str | None:
+    """Decrypt a stored value (tests run with the local dev key, like the app under test)."""
+    from app.core import crypto
+
+    return crypto.decrypt(value, context)
+
+
 def cleanup_domain(domain: str) -> None:
     """Delete every tenant whose users or owner invitations use `@domain`, with all its rows."""
     assert ADMIN_URL
