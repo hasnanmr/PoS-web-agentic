@@ -147,10 +147,11 @@ function CounterScreen() {
       if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus() }
       if (e.key === 'F9') { e.preventDefault(); submit() }
     }
-    if (paying) return // the payment dialog handles its own keys
+    // The payment dialog handles its own keys; the add-on popup must not submit the cart behind it.
+    if (paying || picking) return
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [submit, paying])
+  }, [submit, paying, picking])
 
   function add(item: MenuItem, optionIds: string[]) {
     const key = `${item.product_id}:${[...optionIds].sort().join(',')}`
