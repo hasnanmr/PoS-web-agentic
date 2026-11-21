@@ -87,7 +87,9 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
     setPicked((p) => {
       const cur = p[groupId] ?? []
       if (single) return { ...p, [groupId]: cur[0] === optionId ? [] : [optionId] }
-      return { ...p, [groupId]: cur.includes(optionId) ? cur.filter((o) => o !== optionId) : [...cur, optionId] }
+      if (cur.includes(optionId)) return { ...p, [groupId]: cur.filter((o) => o !== optionId) }
+      const max = item.addon_groups.find((g) => g.id === groupId)?.max_select
+      return max && cur.length >= max ? p : { ...p, [groupId]: [...cur, optionId] }
     })
   }
   const requiredOnly = () => item.addon_groups.filter((g) => g.is_required).flatMap((g) => picked[g.id] ?? [])
@@ -95,10 +97,13 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
     <div className="space-y-2">
       {item.addon_groups.map((g) => {
         const single = g.selection === 'single'
+        // C3: "Pilih susu · wajib, pilih 1", "Tambahan · opsional, maks 2".
+        const limit = single ? 'pilih 1' : g.max_select ? `maks ${g.max_select}` : ''
+        const full = !single && !!g.max_select && (picked[g.id] ?? []).length >= g.max_select
         return (
           <Bubble key={g.id}>
             <p className="mb-2 font-semibold">
-              {g.name} · {g.is_required ? (single ? 'wajib, pilih 1' : 'wajib') : 'opsional'}
+              {g.name} · {[g.is_required ? 'wajib' : 'opsional', limit].filter(Boolean).join(', ')}
             </p>
             <div role={single ? 'radiogroup' : 'group'} aria-label={g.name} className="space-y-1.5">
               {g.options.map((o) => {
@@ -106,7 +111,7 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
                 const mark = single ? (on ? '✓ ' : '') : on ? '☑ ' : '☐ '
                 return (
                   <button key={o.id} type="button" role={single ? 'radio' : 'checkbox'} aria-checked={on}
-                    disabled={!o.available} onClick={() => toggle(g.id, o.id, single)}
+                    disabled={!o.available || (full && !on)} onClick={() => toggle(g.id, o.id, single)}
                     className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-[13px] disabled:opacity-40 ${
                       on ? 'border-primary bg-primary-soft font-semibold text-primary' : 'border-primary/40 bg-surface text-primary'}`}>
                     <span>{mark}{o.name}{!o.available ? ' · habis' : ''}</span>

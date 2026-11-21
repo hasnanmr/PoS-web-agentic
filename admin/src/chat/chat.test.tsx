@@ -586,6 +586,25 @@ describe('C9 AI / C14 / C15 agent', () => {
   })
 })
 
+describe('C3 add-on limits', () => {
+  it('"Tambahan · opsional, maks 2" stops a third choice', async () => {
+    const user = userEvent.setup()
+    const roti: ChatMenuItem = { ...AMERICANO, product_id: 'p-roti', name: 'Roti Bakar', addon_groups: [{
+      id: 'g-tambah', name: 'Tambahan', selection: 'multiple', is_required: false, max_select: 2,
+      options: ['Keju', 'Cokelat', 'Susu'].map((n) => ({ id: `o-${n}`, name: n, price: 3000, available: true })),
+    }] }
+    renderChat({ [`GET ${O}/menu`]: [roti] })
+    await user.click(await screen.findByRole('button', { name: /Pesan/ }))
+    await user.click(await screen.findByRole('button', { name: 'Tambah Roti Bakar' }))
+    expect(screen.getByText('Tambahan · opsional, maks 2')).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /Keju/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Cokelat/ }))
+    expect(screen.getByRole('checkbox', { name: /Susu/ })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: /Keju/ }))
+    expect(screen.getByRole('checkbox', { name: /Susu/ })).toBeEnabled()
+  })
+})
+
 describe('C5 delivery details', () => {
   it('the bottom text box ("Ketik alamat…") fills the address field', async () => {
     const user = userEvent.setup()

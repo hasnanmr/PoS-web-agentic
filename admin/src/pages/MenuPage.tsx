@@ -322,7 +322,7 @@ function ProductEditor({ productId, priceOutlet, onChanged, onDeleted, onError }
           <div key={g.id} className="rounded-md border border-border p-2.5 text-[12px]">
             <div className="flex items-center justify-between">
               <span>
-                <span className="font-semibold">{g.name}</span> · {g.is_required ? 'REQUIRED' : 'optional'} · {g.selection === 'single' ? 'pilih 1' : 'pilih banyak'}
+                <span className="font-semibold">{g.name}</span> · {g.is_required ? 'REQUIRED' : 'optional'} · {g.selection === 'single' ? 'pilih 1' : g.max_select ? `maks ${g.max_select}` : 'pilih banyak'}
               </span>
               <button type="button" aria-label={`Ubah grup ${g.name}`} className="text-text-muted hover:text-text"
                 onClick={() => setEditingGroup(g)}>✎</button>
@@ -397,17 +397,22 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
   const [name, setName] = useState(group?.name ?? '')
   const [selection, setSelection] = useState<'single' | 'multiple'>(group?.selection ?? 'single')
   const [required, setRequired] = useState(group?.is_required ?? false)
+  // "maks N" (multiple choice only): null = no cap; must stay below the number of options.
+  const [maxSelect, setMaxSelect] = useState<number | null>(group?.max_select ?? null)
   const [options, setOptions] = useState<OptionDraft[]>(
     group?.options.map((o) => ({ id: o.id, name: o.name, price: String(o.prices.find((x) => x.outlet_id === priceOutlet)?.price ?? '') }))
       ?? [{ id: null, name: '', price: '' }],
   )
   const update = (i: number, patch: Partial<OptionDraft>) => setOptions(options.map((o, j) => (j === i ? { ...o, ...patch } : o)))
 
+  const namedCount = options.filter((o) => o.name.trim()).length
+
   async function save() {
     const body = {
       name: name.trim(),
       selection,
       is_required: required,
+      max_select: selection === 'multiple' && maxSelect !== null && maxSelect < namedCount ? maxSelect : null,
       options: options.filter((o) => o.name.trim()).map((o) => ({
         id: o.id,
         name: o.name.trim(),
@@ -433,6 +438,15 @@ function GroupEditor({ group, productId, priceOutlet, onDone, onError }: {
           <option value="single">pilih 1</option>
           <option value="multiple">pilih banyak</option>
         </Select>
+        {selection === 'multiple' && (
+          <Select aria-label="Maks pilihan" className="h-8 w-auto" value={maxSelect ?? ''}
+            onChange={(e) => setMaxSelect(e.target.value === '' ? null : Number(e.target.value))}>
+            <option value="">tanpa batas</option>
+            {Array.from({ length: Math.max(0, Math.min(namedCount, 10) - 2) }, (_, i) => i + 2).map((n) => (
+              <option key={n} value={n}>maks {n}</option>
+            ))}
+          </Select>
+        )}
       </div>
       {options.map((o, i) => (
         <div key={o.id ?? `new-${i}`} className="flex items-center gap-2">

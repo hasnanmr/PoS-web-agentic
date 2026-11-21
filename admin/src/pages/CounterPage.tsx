@@ -337,7 +337,9 @@ function AddonModal({ item, onClose, onAdd }: { item: MenuItem; onClose: () => v
     setChosen((c) => {
       const current = c[groupId] ?? []
       if (single) return { ...c, [groupId]: current[0] === optionId && !required ? [] : [optionId] }
-      return { ...c, [groupId]: current.includes(optionId) ? current.filter((x) => x !== optionId) : [...current, optionId] }
+      if (current.includes(optionId)) return { ...c, [groupId]: current.filter((x) => x !== optionId) }
+      const max = item.addon_groups.find((g) => g.id === groupId)?.max_select
+      return max && current.length >= max ? c : { ...c, [groupId]: [...current, optionId] }
     })
   }
   return (
@@ -348,7 +350,7 @@ function AddonModal({ item, onClose, onAdd }: { item: MenuItem; onClose: () => v
         {item.addon_groups.map((g) => (
           <fieldset key={g.id} className="mb-3">
             <legend className="mb-1 text-[13px] font-semibold">
-              {g.name} <span className="text-[11px] font-normal text-text-muted">· {g.is_required ? 'wajib' : 'opsional'} · {g.selection === 'single' ? 'pilih 1' : 'pilih banyak'}</span>
+              {g.name} <span className="text-[11px] font-normal text-text-muted">· {g.is_required ? 'wajib' : 'opsional'} · {g.selection === 'single' ? 'pilih 1' : g.max_select ? `maks ${g.max_select}` : 'pilih banyak'}</span>
             </legend>
             <div className="space-y-1">
               {g.options.map((o) => (
@@ -357,7 +359,9 @@ function AddonModal({ item, onClose, onAdd }: { item: MenuItem; onClose: () => v
                     <input type="radio" name={g.id} disabled={!o.available} checked={(chosen[g.id] ?? []).includes(o.id)}
                       onChange={() => {}} onClick={() => toggle(g.id, o.id, true, g.is_required)} />
                   ) : (
-                    <input type="checkbox" name={g.id} disabled={!o.available} checked={(chosen[g.id] ?? []).includes(o.id)}
+                    <input type="checkbox" name={g.id}
+                      disabled={!o.available || (!!g.max_select && (chosen[g.id] ?? []).length >= g.max_select && !(chosen[g.id] ?? []).includes(o.id))}
+                      checked={(chosen[g.id] ?? []).includes(o.id)}
                       onChange={() => toggle(g.id, o.id, false, g.is_required)} />
                   )}
                   <span className="flex-1">{o.name}</span>

@@ -127,6 +127,8 @@ export interface AddonGroup {
   name: string
   selection: 'single' | 'multiple'
   is_required: boolean
+  /** "maks N" for a multiple-choice group; null = no cap. */
+  max_select?: number | null
   sort_order: number
   options: AddonOption[]
 }
@@ -201,6 +203,8 @@ export interface MenuGroup {
   name: string
   selection: 'single' | 'multiple'
   is_required: boolean
+  /** "maks N" for a multiple-choice group; null = no cap. */
+  max_select?: number | null
   options: MenuOption[]
 }
 export interface MenuItem {
