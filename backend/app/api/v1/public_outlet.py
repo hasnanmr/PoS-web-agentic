@@ -239,20 +239,23 @@ async def _idempotent(
     scope: web_chat.ChatScope,
     operation: str,
     idempotency_key: str | None,
+    access_key: str | None,
     body: dict[str, Any],
     work: Any,
+    replay: Any,
     model: type[BaseModel],
-    *,
-    secret: tuple[str, str] | None = None,
 ) -> Any:
-    """Idempotent write (FR6.4). `secret` = (field, value): an access key the caller already
-    holds and whose hash is part of `body`'s fingerprint; it is blanked in the cache and filled
-    in again on replay, so the cache never holds the key itself (FR2.15)."""
+    """Idempotent booking write (FR6.4). The cache holds only the reservation id: no access
+    key and no name (FR2.15, FR12.2). A replay rebuilds the answer from the reservation row
+    through `replay(conn, reservation_id)`, which checks the booking key again, and the key's
+    hash is part of the fingerprint, so a replay without the same key gets nothing."""
     key = idempotency.check_key(idempotency_key)
     if key is None:
         raise ApiError(422, "validation_failed", "Idempotency-Key is required")
     name = f"{operation}:{scope.outlet_id}"
-    fp = idempotency.fingerprint(str(scope.outlet_id), body)
+    fp = idempotency.fingerprint(
+        str(scope.outlet_id), body, web_chat.hash_key(access_key) if access_key else None
+    )
     ctx = scope.actor()
     try:
         async with db.transaction(chat.pool(request), ctx) as conn:
@@ -260,14 +263,10 @@ async def _idempotent(
             if cached is not None:
                 response.status_code = status.HTTP_200_OK
                 response.headers["Idempotent-Replay"] = "true"
-                if secret:
-                    cached = {**cached, secret[0]: secret[1]}
-                return model(**cached)
+                return model(**await replay(conn, UUID(cached["reservation_id"])))
             out = model(**await work(conn, ctx))
-            cache = out.model_dump(mode="json")
-            if secret:
-                cache[secret[0]] = ""
-            await idempotency.store(conn, ctx, name, key, fp, cache)
+            reservation_id = str(out.reservation_id)  # type: ignore[attr-defined]
+            await idempotency.store(conn, ctx, name, key, fp, {"reservation_id": reservation_id})
     except psycopg.errors.UniqueViolation as exc:
         if "idempotency_keys" in str(exc):
             raise ApiError(409, "conflict", "the same request is already being processed") from None
@@ -312,16 +311,21 @@ async def create_booking(
         )
         return {**row, "access_key": access_key}
 
+    async def replay(conn: Any, reservation_id: UUID) -> dict[str, Any]:
+        row = await web_booking.read(conn, scope, reservation_id, access_key)
+        return {**row, "access_key": access_key}
+
     return await _idempotent(
         request,
         response,
         scope,
         "web_booking.create",
         idempotency_key,
-        {**body.model_dump(mode="json"), "key_hash": web_chat.hash_key(access_key)},
+        access_key,
+        body.model_dump(mode="json"),
         work,
+        replay,
         BookingCreated,
-        secret=("access_key", access_key),
     )
 
 
@@ -341,14 +345,23 @@ _misses: dict[str, deque[float]] = {}
 
 
 def _lookup_guard(request: Request, *, miss: bool = False) -> None:
+    """Refuse after too many misses from one client address. Entries are made only on a miss
+    and dropped once stale, so memory stays bounded (like `public_chat.rate_limit`)."""
     now = time.monotonic()
     key = chat.client_address(request)
-    hits = _misses.setdefault(key, deque())
-    while hits and hits[0] < now - _LOOKUP_WINDOW:
-        hits.popleft()
+    hits = _misses.get(key)
+    if hits is not None:
+        while hits and hits[0] < now - _LOOKUP_WINDOW:
+            hits.popleft()
+        if not hits:
+            del _misses[key]
+            hits = None
     if miss:
-        hits.append(now)
-    elif len(hits) >= _LOOKUP_MISSES:
+        _misses.setdefault(key, deque()).append(now)
+        if len(_misses) > 10_000:
+            for k in [k for k, v in _misses.items() if not v or v[-1] < now - _LOOKUP_WINDOW]:
+                del _misses[k]
+    elif hits is not None and len(hits) >= _LOOKUP_MISSES:
         raise ApiError(429, "too_many_requests", "too many wrong attempts; wait a moment")
 
 
@@ -388,9 +401,19 @@ async def read_booking(
 
 @router.post("/{slug}/reservations/{reservation_id}/cancel")
 async def cancel_booking(
-    slug: str, reservation_id: UUID, request: Request, booking_key: str | None = BookingKey
+    slug: str,
+    reservation_id: UUID,
+    request: Request,
+    booking_key: str | None = BookingKey,
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        description="Accepted like every write (FR6.4); cancel is idempotent by itself",
+    ),
 ) -> Booking:
-    """C12 "Batalkan": until the cutoff; frees the table; repeating it is harmless."""
+    """C12 "Batalkan": until the cutoff; frees the table. Repeating it returns the same
+    cancelled booking, with or without the same Idempotency-Key."""
+    idempotency.check_key(idempotency_key)
     scope = await _resolve(slug, request)
     ctx = scope.actor()
     async with db.transaction(chat.pool(request), ctx) as conn:
@@ -416,14 +439,19 @@ async def reschedule_booking(
             conn, ctx, scope, reservation_id, booking_key, body.start_at
         )
 
+    async def replay(conn: Any, res_id: UUID) -> dict[str, Any]:
+        return await web_booking.read(conn, scope, res_id, booking_key)
+
     return await _idempotent(
         request,
         response,
         scope,
         f"web_booking.reschedule:{reservation_id}",
         idempotency_key,
+        booking_key,
         body.model_dump(mode="json"),
         work,
+        replay,
         Booking,
     )
 

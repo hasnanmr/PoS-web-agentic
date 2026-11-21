@@ -19577,7 +19577,7 @@
     },
     "/api/v1/public/o/{slug}/reservations/{reservation_id}/cancel": {
       "post": {
-        "description": "C12 \"Batalkan\": until the cutoff; frees the table; repeating it is harmless.",
+        "description": "C12 \"Batalkan\": until the cutoff; frees the table. Repeating it returns the same\ncancelled booking, with or without the same Idempotency-Key.",
         "operationId": "cancel_booking_api_v1_public_o__slug__reservations__reservation_id__cancel_post",
         "parameters": [
           {
@@ -19613,6 +19613,24 @@
                 }
               ],
               "title": "X-Booking-Key"
+            }
+          },
+          {
+            "description": "Accepted like every write (FR6.4); cancel is idempotent by itself",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Accepted like every write (FR6.4); cancel is idempotent by itself",
+              "title": "Idempotency-Key"
             }
           }
         ],

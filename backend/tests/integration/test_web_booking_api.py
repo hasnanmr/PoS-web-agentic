@@ -143,7 +143,7 @@ def _cancel(client: TestClient, ctx: dict[str, Any], b: dict[str, Any]) -> Any:
     return client.post(
         f"{_base(ctx)}/reservations/{b['reservation_id']}/cancel",
         headers={"X-Booking-Key": b["access_key"]},
-    )
+    )  # without Idempotency-Key: cancel is idempotent by itself
 
 
 def test_disabled_outlet_takes_no_bookings(client, ctx) -> None:
@@ -357,3 +357,129 @@ def test_repeated_wrong_lookups_are_limited(client, enabled) -> None:
         assert codes[:5] == [404] * 5 and codes[5] == 429
     finally:
         public_outlet._misses.clear()
+
+
+def test_reschedule_leaves_a_table_that_is_no_longer_bookable(client, enabled) -> None:
+    ctx = enabled
+    b = _booked(client, ctx, _tomorrow_at(8), party=2, phone="0819-1000-0001")
+    table = admin_sql(
+        "select table_id::text from app.reservations where id = %s", (b["reservation_id"],)
+    )[0][0]
+    admin_sql("update app.tables set is_bookable = false where id = %s", (table,))
+    try:
+        res = client.post(
+            f"{_base(ctx)}/reservations/{b['reservation_id']}/reschedule",
+            headers={"X-Booking-Key": b["access_key"], "Idempotency-Key": uuid4().hex},
+            json={"start_at": _tomorrow_at(8, 30).isoformat()},
+        )
+        assert res.status_code == 200, res.text
+        moved = admin_sql(
+            "select table_id::text from app.reservations where id = %s", (b["reservation_id"],)
+        )[0][0]
+        assert moved != table
+    finally:
+        admin_sql("update app.tables set is_bookable = true where id = %s", (table,))
+
+
+def test_replays_need_the_key_and_cache_no_personal_data(client, enabled) -> None:
+    ctx = enabled
+    key, booking_key = uuid4().hex, _new_key()
+    b = _booked(
+        client,
+        ctx,
+        _tomorrow_at(7),
+        key=key,
+        booking_key=booking_key,
+        party=2,
+        phone="0819-2000-0001",
+        name="Laras",
+    )
+    cached = admin_sql("select response::text from app.idempotency_keys where key = %s", (key,))[0][
+        0
+    ]
+    assert "Laras" not in cached and booking_key not in cached  # only the reservation id
+    url = f"{_base(ctx)}/reservations/{b['reservation_id']}/reschedule"
+    body = {"start_at": _tomorrow_at(7, 30).isoformat()}
+    idem = uuid4().hex
+    ok = client.post(
+        url, headers={"X-Booking-Key": booking_key, "Idempotency-Key": idem}, json=body
+    )
+    assert ok.status_code == 200, ok.text
+    stolen = client.post(
+        url, headers={"X-Booking-Key": "x" * 40, "Idempotency-Key": idem}, json=body
+    )
+    assert stolen.status_code in (404, 409) and "Laras" not in stolen.text
+    again = client.post(
+        url, headers={"X-Booking-Key": booking_key, "Idempotency-Key": idem}, json=body
+    )
+    assert again.status_code == 200 and again.json()["label"] == "07:30"
+
+
+def test_cancel_records_the_customer_reason_and_hides_the_calendar(client, enabled) -> None:
+    ctx = enabled
+    b = _booked(client, ctx, _tomorrow_at(11, 30), party=2, phone="0819-3000-0001")
+    res = client.post(
+        f"{_base(ctx)}/reservations/{b['reservation_id']}/cancel",
+        headers={"X-Booking-Key": b["access_key"], "Idempotency-Key": uuid4().hex},
+    )
+    assert res.status_code == 200 and res.json()["status"] == "cancelled"
+    reason = admin_sql(
+        "select data->>'reason' from app.reservation_events where reservation_id = %s"
+        " and to_status = 'cancelled'",
+        (b["reservation_id"],),
+    )
+    assert reason == [("Dibatalkan pelanggan dari web chat",)]
+    ics = client.get(
+        f"{_base(ctx)}/reservations/{b['reservation_id']}/calendar.ics",
+        params={"key": b["access_key"]},
+    )
+    assert ics.status_code == 404
+
+
+def test_calendar_lines_are_folded(client, enabled) -> None:
+    ctx = enabled
+    long_name = "Kopi Losari Pantai Makassar Cabang Utama Dekat Anjungan"
+    admin_sql("update app.outlets set name = %s where id = %s", (long_name, ctx["outlet"]))
+    try:
+        b = _booked(client, ctx, _tomorrow_at(12, 30), party=2, phone="0819-4000-0001")
+        text = client.get(
+            f"{_base(ctx)}/reservations/{b['reservation_id']}/calendar.ics",
+            params={"key": b["access_key"]},
+        ).text
+        assert all(len(line.encode()) <= 75 for line in text.split("\r\n"))
+        unfolded = text.replace("\r\n ", "")
+        assert f"LOCATION:{long_name}" in unfolded and "15 menit" in unfolded
+    finally:
+        admin_sql("update app.outlets set name = 'Losari' where id = %s", (ctx["outlet"],))
+
+
+def test_lookup_keys_are_capped_per_booking(client, enabled) -> None:
+    ctx = enabled
+    b = _booked(client, ctx, _tomorrow_at(13, 30), party=2, phone="0819-5000-0001")
+    keys = []
+    for _ in range(7):
+        res = client.post(
+            f"{_base(ctx)}/reservations/lookup",
+            json={"booking_code": b["booking_code"], "phone": "081950000001"},
+        )
+        assert res.status_code == 200
+        keys.append(res.json()["access_key"])
+    count = admin_sql(
+        "select count(*) from app.reservation_access_keys where reservation_id = %s",
+        (b["reservation_id"],),
+    )
+    assert count == [(5,)]
+    url = f"{_base(ctx)}/reservations/{b['reservation_id']}"
+    assert client.get(url, headers={"X-Booking-Key": keys[-1]}).status_code == 200
+    assert client.get(url, headers={"X-Booking-Key": keys[0]}).status_code == 404  # oldest gone
+    assert client.get(url, headers={"X-Booking-Key": b["access_key"]}).status_code == 200
+
+
+def test_lookup_guard_keeps_no_entry_without_a_miss(client, enabled) -> None:
+    public_outlet._misses.clear()
+    b = _booked(client, enabled, _tomorrow_at(14, 30), party=2, phone="0819-6000-0001")
+    res = client.post(
+        f"{_base(enabled)}/reservations/lookup",
+        json={"booking_code": b["booking_code"], "phone": "081960000001"},
+    )
+    assert res.status_code == 200 and public_outlet._misses == {}

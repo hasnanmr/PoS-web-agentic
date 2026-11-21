@@ -433,12 +433,25 @@ def _require_action(row: dict[str, Any], action: str, now: datetime) -> None:
 
 
 async def _set_status(
-    conn: AsyncConnection, ctx: ActorContext, res_id: UUID, action: str, to_status: str
+    conn: AsyncConnection,
+    ctx: ActorContext,
+    res_id: UUID,
+    action: str,
+    to_status: str,
+    reason: str | None = None,
 ) -> None:
     row = await _lock(conn, res_id)
     _require_action(row, action, datetime.now(UTC))
     await conn.execute("update app.reservations set status = %s where id = %s", (to_status, res_id))
-    await _event(conn, ctx, row, "status_changed", from_status=row["status"], to_status=to_status)
+    await _event(
+        conn,
+        ctx,
+        row,
+        "status_changed",
+        from_status=row["status"],
+        to_status=to_status,
+        data={"reason": reason} if reason else None,
+    )
     if row["status"] == "booked":
         await _finish_job(conn, res_id, "cancelled")
 
@@ -447,8 +460,11 @@ async def seat(conn: AsyncConnection, ctx: ActorContext, res_id: UUID) -> None:
     await _set_status(conn, ctx, res_id, "seat", "seated")
 
 
-async def cancel(conn: AsyncConnection, ctx: ActorContext, res_id: UUID) -> None:
-    await _set_status(conn, ctx, res_id, "cancel", "cancelled")
+async def cancel(
+    conn: AsyncConnection, ctx: ActorContext, res_id: UUID, reason: str | None = None
+) -> None:
+    """`reason` shows in the S6 history (e.g. the customer cancelled in the web chat)."""
+    await _set_status(conn, ctx, res_id, "cancel", "cancelled", reason)
 
 
 async def mark_no_show(conn: AsyncConnection, ctx: ActorContext, res_id: UUID) -> None:
@@ -512,7 +528,16 @@ async def reschedule(
     if starts_at == row["starts_at"]:
         return
     ends_at = starts_at + timedelta(minutes=settings["default_duration_minutes"])
-    candidates = [row["table_id"]]
+    # The current table first, but only while the outlet still offers it for this party
+    # (active, bookable, big enough), like `move` and `_candidate_tables` (PR #64 review).
+    candidates: list[UUID] = []
+    cur = await conn.execute(
+        "select 1 from app.tables where id = %s and outlet_id = %s and is_active"
+        " and is_bookable and capacity >= %s",
+        (row["table_id"], row["outlet_id"], row["party_size"]),
+    )
+    if await cur.fetchone() is not None:
+        candidates.append(row["table_id"])
     for t in await _candidate_tables(conn, row["outlet_id"], row["party_size"], starts_at, ends_at):
         if t not in candidates:
             candidates.append(t)

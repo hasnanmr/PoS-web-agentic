@@ -1,7 +1,8 @@
 -- T-061 (C12, FR9.5, AC9.12): a booking made on one phone can be opened on another with its
 -- booking code + the phone number used for it. That phone gets its own access key, so the
 -- first phone's key (`reservations.access_key_hash`) keeps working. Only SHA-256 hashes are
--- stored. The keys stop mattering once the booking is finished (the chat reads upcoming ones).
+-- stored, at most 5 extra keys per booking. The keys stop mattering once the booking is
+-- finished (the chat reads upcoming ones).
 create table app.reservation_access_keys (
   id              bigint generated always as identity primary key,
   tenant_id       uuid not null,
@@ -20,4 +21,5 @@ create policy outlet_scope on app.reservation_access_keys to app_backend
 create policy no_device on app.reservation_access_keys as restrictive to app_backend
   using (app.current_actor() is distinct from 'device')
   with check (app.current_actor() is distinct from 'device');
-grant select, insert on app.reservation_access_keys to app_backend;
+-- Delete: only the oldest extra keys beyond the per-booking cap (web_booking.MAX_EXTRA_KEYS).
+grant select, insert, delete on app.reservation_access_keys to app_backend;

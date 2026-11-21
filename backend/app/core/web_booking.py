@@ -25,7 +25,7 @@ from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from psycopg import AsyncConnection
+from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
 
 from app.core import reservations, web_chat
@@ -34,6 +34,7 @@ from app.core.errors import ConflictError, DomainError, NotFoundError, Validatio
 from app.core.tables import get_settings
 
 MAX_UPCOMING_PER_PHONE = 2
+MAX_EXTRA_KEYS = 5  # keys from "Cari dengan kode + HP" kept per booking
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I/L
 CUSTOMER_CANCEL_REASON = "Dibatalkan pelanggan dari web chat"
 
@@ -138,27 +139,38 @@ async def create(
     customer_id = await web_chat.record_customer(
         conn, ctx, scope.outlet_id, name=name, phone=phone, notice_version=notice_version
     )
-    code = await _new_code(conn, scope.outlet_id)
-    try:
-        res_id = await reservations.create_booking(
-            conn,
-            ctx,
-            scope.outlet_id,
-            party_size=party_size,
-            starts_at=start_at,
-            source="web_chat",
-            guest_name=name,
-            guest_phone=phone,
-            web={
-                "customer_id": customer_id,
-                "booking_code": code,
-                "access_key_hash": access_key_hash,
-            },
-        )
-    except ConflictError as exc:
-        if exc.code in ("no_table_available", "conflict"):
-            raise ConflictError("slot_unavailable", "that time was just taken") from None
-        raise
+    res_id: UUID | None = None
+    for _ in range(5):
+        code = await _new_code(conn, scope.outlet_id)
+        try:
+            # A savepoint: two confirms at once can draw the same code; the loser retries
+            # with a new one instead of failing (PR #64 review).
+            async with conn.transaction():
+                res_id = await reservations.create_booking(
+                    conn,
+                    ctx,
+                    scope.outlet_id,
+                    party_size=party_size,
+                    starts_at=start_at,
+                    source="web_chat",
+                    guest_name=name,
+                    guest_phone=phone,
+                    web={
+                        "customer_id": customer_id,
+                        "booking_code": code,
+                        "access_key_hash": access_key_hash,
+                    },
+                )
+            break
+        except errors.UniqueViolation as exc:
+            if "reservations_booking_code_key" not in str(exc):
+                raise
+        except ConflictError as exc:
+            if exc.code in ("no_table_available", "conflict"):
+                raise ConflictError("slot_unavailable", "that time was just taken") from None
+            raise
+    if res_id is None:
+        raise ConflictError("conflict", "could not create a booking code; try again")
     return await booking(conn, scope, res_id)
 
 
@@ -272,6 +284,13 @@ async def lookup(
         " values (%s, %s, %s, %s)",
         (ctx.tenant_id, scope.outlet_id, row[0], new_key_hash),
     )
+    # At most this many extra keys per booking: the oldest stop working first (PR #64 review).
+    await conn.execute(
+        "delete from app.reservation_access_keys where reservation_id = %s and id not in ("
+        " select id from app.reservation_access_keys where reservation_id = %s"
+        " order by id desc limit %s)",
+        (row[0], row[0], MAX_EXTRA_KEYS),
+    )
     return row[0]
 
 
@@ -308,7 +327,7 @@ async def cancel(
     if current["status"] == "cancelled":
         return current
     await _require_change_window(conn, scope, res_id)
-    await reservations.cancel(conn, ctx, res_id)
+    await reservations.cancel(conn, ctx, res_id, CUSTOMER_CANCEL_REASON)
     return await booking(conn, scope, res_id)
 
 
@@ -350,6 +369,9 @@ async def calendar(
     """The booking as an iCalendar event with an alert at the outlet's reminder offset
     (AC9.5). Times are UTC instants, so every calendar shows the outlet's local time."""
     row = await read(conn, scope, res_id, key)
+    if row["status"] not in ("booked", "seated"):
+        # A cancelled, finished, or no-show booking gets no calendar event (PR #64 review).
+        raise NotFoundError("reservation")
     settings = await _settings(conn, scope)
     cur = await conn.execute("select ends_at from app.reservations where id = %s", (res_id,))
     ends_at = (await cur.fetchone())[0]  # type: ignore[index]
@@ -382,7 +404,24 @@ async def calendar(
             "END:VALARM",
         ]
     lines += ["END:VEVENT", "END:VCALENDAR"]
-    return "\r\n".join(lines) + "\r\n"
+    return "".join(_fold(line) + "\r\n" for line in lines)
+
+
+def _fold(line: str) -> str:
+    """RFC 5545 §3.1: content lines are at most 75 octets; longer ones continue on the next
+    line after CRLF + one space, never splitting a UTF-8 character."""
+    out: list[str] = []
+    current, size = "", 0
+    for ch in line:
+        width = len(ch.encode())
+        limit = 75 if not out else 74  # continuation lines start with a space
+        if size + width > limit:
+            out.append(current)
+            current, size = "", 0
+        current += ch
+        size += width
+    out.append(current)
+    return "\r\n ".join(out)
 
 
 def validate_name(name: str) -> str:
