@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1/ops", tags=["ops: reservations"])
 
 Action = Literal["seat", "move", "cancel", "no_show", "complete"]
 Status = Literal["booked", "seated", "completed", "cancelled", "no_show"]
-Source = Literal["whatsapp", "phone", "in_person", "walk_in"]
+Source = Literal["whatsapp", "phone", "in_person", "walk_in", "web_chat"]
 
 
 class BoardTable(BaseModel):

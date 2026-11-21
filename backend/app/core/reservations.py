@@ -273,8 +273,8 @@ async def _insert(
             await conn.execute(
                 "insert into app.reservations (id, tenant_id, outlet_id, table_id, contact_id,"
                 " guest_name, guest_phone, party_size, starts_at, ends_at, source, status,"
-                " created_by_actor, created_by_id)"
-                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                " created_by_actor, created_by_id, customer_id, booking_code, access_key_hash)"
+                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     res_id,
                     ctx.tenant_id,
@@ -290,6 +290,9 @@ async def _insert(
                     values["status"],
                     ctx.actor_type.value,
                     ctx.actor_id,
+                    values.get("customer_id"),
+                    values.get("booking_code"),
+                    values.get("access_key_hash"),
                 ),
             )
     except errors.ExclusionViolation:
@@ -310,8 +313,10 @@ async def create_booking(
     contact_id: UUID | None = None,
     table_id: UUID | None = None,
     now: datetime | None = None,
+    web: dict[str, Any] | None = None,
 ) -> UUID:
-    """S6 "+ Booking telepon / langsung" (and later the WhatsApp flow).
+    """S6 "+ Booking telepon / langsung" and the web chat (C10, source `web_chat`; `web`
+    carries `customer_id`, `booking_code`, and `access_key_hash`).
 
     Without `table_id` the smallest free bookable table that fits is assigned. Errors:
     `conflict` (the chosen table is taken), `no_table_available`, `validation_failed`
@@ -334,6 +339,7 @@ async def create_booking(
         "ends_at": ends_at,
         "source": source,
         "status": "booked",
+        **(web or {}),
     }
     res_id: UUID | None = None
     if table_id is not None:
@@ -480,6 +486,67 @@ async def move(conn: AsyncConnection, ctx: ActorContext, res_id: UUID, table_id:
         row,
         "table_changed",
         data={"from_table_id": str(row["table_id"]), "to_table_id": str(table_id)},
+    )
+
+
+async def reschedule(
+    conn: AsyncConnection,
+    ctx: ActorContext,
+    res_id: UUID,
+    starts_at: datetime,
+    *,
+    now: datetime | None = None,
+) -> None:
+    """C12 "Jadwal ulang": a new time for a `booked` booking, same party. The current table is
+    kept when it is still free, otherwise the smallest free table that fits is taken; the
+    exclusion constraint still guards every move (FR9.3). The caller checks the cutoff."""
+    now = now or datetime.now(UTC)
+    if starts_at.tzinfo is None:
+        raise ValidationFailedError("starts_at needs a time zone offset", {"field": "starts_at"})
+    row = await _lock(conn, res_id)
+    if row["status"] != "booked":
+        raise ConflictError("invalid_transition", f"cannot reschedule a {row['status']} booking")
+    settings = await get_settings(conn, row["outlet_id"])
+    tz = await _outlet_tz(conn, row["outlet_id"])
+    check_booking_time(starts_at, settings, tz, now)
+    if starts_at == row["starts_at"]:
+        return
+    ends_at = starts_at + timedelta(minutes=settings["default_duration_minutes"])
+    candidates = [row["table_id"]]
+    for t in await _candidate_tables(conn, row["outlet_id"], row["party_size"], starts_at, ends_at):
+        if t not in candidates:
+            candidates.append(t)
+    moved_to: UUID | None = None
+    for table_id in candidates:
+        try:
+            async with conn.transaction():
+                await conn.execute(
+                    "update app.reservations set table_id = %s, starts_at = %s, ends_at = %s"
+                    " where id = %s",
+                    (table_id, starts_at, ends_at, res_id),
+                )
+        except errors.ExclusionViolation:
+            continue
+        moved_to = table_id
+        break
+    if moved_to is None:
+        raise ConflictError("no_table_available", "no free table fits this party at that time")
+    await _event(
+        conn,
+        ctx,
+        row,
+        "rescheduled",
+        data={
+            "from_starts_at": row["starts_at"].isoformat(),
+            "to_starts_at": starts_at.isoformat(),
+            "from_table_id": str(row["table_id"]),
+            "to_table_id": str(moved_to),
+        },
+    )
+    await conn.execute(
+        "update app.scheduled_jobs set run_at = %s where job_key = %s"
+        " and status in ('pending', 'enqueued')",
+        (starts_at + HOLD, f"no_show_release:{res_id}"),
     )
 
 

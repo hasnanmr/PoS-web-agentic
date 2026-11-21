@@ -5,22 +5,27 @@ link `/o/<slug>` takes online orders (pickup or delivery, name + phone, address 
 always paid first with the outlet's static QRIS (FR2.3, FR2.6). No sign-in: the slug is the only
 credential, plus the per-order access key (`X-Order-Key`). An unknown or old slug is
 `outlet_link_invalid` (404, C13 card 1) with no outlet data. The routes shared with the table QR
-live in `public_chat.py`; reservations (C10-C12) follow in Wave 6 (T-060, T-061).
+live in `public_chat.py`; reservations (C10-C12, T-060, T-061) are at the end of this file.
 """
 
 from __future__ import annotations
 
+import time
+from collections import deque
+from datetime import date, datetime
 from typing import Any, Literal
+from uuid import UUID
 
-from fastapi import APIRouter, Header, Request, Response, status
+import psycopg
+from fastapi import APIRouter, Header, Query, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 
 from app import db
 from app.api.errors import ApiError
 from app.api.v1 import public_chat as chat
 from app.api.v1.public_chat import ChatOutlet, LineIn, PrivacyNotice, WebOrderCreated
-from app.core import orders, web_chat
-from app.core.errors import ValidationFailedError
+from app.core import idempotency, orders, web_booking, web_chat
+from app.core.errors import NotFoundError, ValidationFailedError
 
 router = APIRouter(prefix="/api/v1/public/o", tags=["public: web chat from the outlet link (C1)"])
 
@@ -134,3 +139,278 @@ async def place_order(
         )
 
     return await chat.create_order(request, response, scope, idempotency_key, body, build)
+
+
+# C10-C12 reservations (T-060, T-061) -------------------------------------------------------------
+
+BookingKey = Header(default=None, alias="X-Booking-Key")
+
+
+class TimeSlot(BaseModel):
+    start_at: datetime
+    label: str = Field(description='Outlet-local "19:00"')
+
+
+class Availability(BaseModel):
+    date: date
+    timezone: str
+    max_party_size: int
+    last_date: date = Field(description="Last date inside the booking window")
+    times: list[TimeSlot]
+
+
+class BookingIn(BaseModel):
+    party_size: int = Field(ge=1, le=100)
+    start_at: datetime
+    customer: CustomerIn
+    privacy_notice_version: str = Field(max_length=40)
+    source: Literal["buttons", "agent"] = "buttons"
+
+
+class Booking(BaseModel):
+    reservation_id: UUID
+    booking_code: str
+    start_at: datetime
+    label: str
+    timezone: str
+    party_size: int
+    status: str
+    guest_name: str | None = Field(description="Cleared once the booking is finished")
+    hold_until: datetime | None
+    change_until: datetime = Field(description="Cancel/reschedule allowed until (cutoff)")
+    can_change: bool
+    outlet_name: str
+
+
+class BookingCreated(Booking):
+    access_key: str = Field(description="Keep on the phone; send as `X-Booking-Key`")
+
+
+class BookingRef(BaseModel):
+    id: UUID
+    key: str = Field(min_length=8, max_length=200)
+
+
+class BookingsStatusIn(BaseModel):
+    reservations: list[BookingRef] = Field(max_length=10)
+
+
+class LookupIn(BaseModel):
+    booking_code: str = Field(min_length=6, max_length=6)
+    phone: str = Field(min_length=8, max_length=20)
+
+
+class LookupOut(BaseModel):
+    reservation_id: UUID
+    access_key: str
+
+
+class RescheduleIn(BaseModel):
+    start_at: datetime
+
+
+@router.get("/{slug}/availability")
+async def availability(
+    slug: str,
+    request: Request,
+    party_size: int = Query(ge=1, le=100),
+    date: date = Query(),  # noqa: B008 - FastAPI query parameter
+) -> Availability:
+    """C10: free start times for the party on an outlet-local date (AC9.1, AC9.3)."""
+    scope = await _resolve(slug, request)
+    async with db.transaction(chat.pool(request), scope.actor()) as conn:
+        out = await web_booking.availability(conn, scope, party_size, date)
+    return Availability(**out)
+
+
+async def _idempotent(
+    request: Request,
+    response: Response,
+    scope: web_chat.ChatScope,
+    operation: str,
+    idempotency_key: str | None,
+    body: dict[str, Any],
+    work: Any,
+    model: type[BaseModel],
+) -> Any:
+    key = idempotency.check_key(idempotency_key)
+    if key is None:
+        raise ApiError(422, "validation_failed", "Idempotency-Key is required")
+    name = f"{operation}:{scope.outlet_id}"
+    fp = idempotency.fingerprint(str(scope.outlet_id), body)
+    ctx = scope.actor()
+    try:
+        async with db.transaction(chat.pool(request), ctx) as conn:
+            cached = await idempotency.lookup(conn, ctx, name, key, fp)
+            if cached is not None:
+                response.status_code = status.HTTP_200_OK
+                response.headers["Idempotent-Replay"] = "true"
+                return model(**cached)
+            out = model(**await work(conn, ctx))
+            await idempotency.store(conn, ctx, name, key, fp, out.model_dump(mode="json"))
+    except psycopg.errors.UniqueViolation as exc:
+        if "idempotency_keys" in str(exc):
+            raise ApiError(409, "conflict", "the same request is already being processed") from None
+        raise
+    return out
+
+
+@router.post("/{slug}/reservations", status_code=status.HTTP_201_CREATED)
+async def create_booking(
+    slug: str,
+    body: BookingIn,
+    request: Request,
+    response: Response,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> BookingCreated:
+    """C10 "Konfirmasi booking": smallest free table, booking code, 2 upcoming per phone."""
+    scope = await _resolve(slug, request)
+    name = web_booking.validate_name(body.customer.name or "")
+    phone = web_chat.clean_phone(body.customer.phone)
+    access_key = web_chat.new_access_key()
+
+    async def work(conn: Any, ctx: Any) -> dict[str, Any]:
+        row = await web_booking.create(
+            conn,
+            ctx,
+            scope,
+            party_size=body.party_size,
+            start_at=body.start_at,
+            name=name,
+            phone=phone,
+            notice_version=body.privacy_notice_version,
+            access_key_hash=web_chat.hash_key(access_key),
+        )
+        return {**row, "access_key": access_key}
+
+    return await _idempotent(
+        request,
+        response,
+        scope,
+        "web_booking.create",
+        idempotency_key,
+        body.model_dump(mode="json"),
+        work,
+        BookingCreated,
+    )
+
+
+@router.post("/{slug}/reservations/status")
+async def bookings_status(slug: str, body: BookingsStatusIn, request: Request) -> list[Booking]:
+    """C12 "Reservasi Saya": upcoming bookings whose keys this phone kept."""
+    scope = await _resolve(slug, request)
+    async with db.transaction(chat.pool(request), scope.actor()) as conn:
+        rows = await web_booking.overview(conn, scope, [(r.id, r.key) for r in body.reservations])
+    return [Booking(**r) for r in rows]
+
+
+# Wrong code/phone pairs per client address: after this many misses in the window, refuse.
+_LOOKUP_MISSES = 5
+_LOOKUP_WINDOW = 600.0
+_misses: dict[str, deque[float]] = {}
+
+
+def _lookup_guard(request: Request, *, miss: bool = False) -> None:
+    now = time.monotonic()
+    key = chat.client_address(request)
+    hits = _misses.setdefault(key, deque())
+    while hits and hits[0] < now - _LOOKUP_WINDOW:
+        hits.popleft()
+    if miss:
+        hits.append(now)
+    elif len(hits) >= _LOOKUP_MISSES:
+        raise ApiError(429, "too_many_requests", "too many wrong attempts; wait a moment")
+
+
+@router.post("/{slug}/reservations/lookup")
+async def lookup_booking(slug: str, body: LookupIn, request: Request) -> LookupOut:
+    """C12 "Cari dengan kode + HP": same answer for a wrong code or a wrong phone (AC9.12)."""
+    scope = await _resolve(slug, request)
+    _lookup_guard(request)
+    try:
+        phone = web_chat.clean_phone(body.phone)
+    except ValidationFailedError:
+        _lookup_guard(request, miss=True)
+        raise ApiError(404, "booking_not_found", "booking not found") from None
+    access_key = web_chat.new_access_key()
+    ctx = scope.actor()
+    try:
+        async with db.transaction(chat.pool(request), ctx) as conn:
+            res_id = await web_booking.lookup(
+                conn, ctx, scope, body.booking_code, phone, web_chat.hash_key(access_key)
+            )
+    except NotFoundError:
+        _lookup_guard(request, miss=True)
+        raise ApiError(404, "booking_not_found", "booking not found") from None
+    return LookupOut(reservation_id=res_id, access_key=access_key)
+
+
+@router.get("/{slug}/reservations/{reservation_id}")
+async def read_booking(
+    slug: str, reservation_id: UUID, request: Request, booking_key: str | None = BookingKey
+) -> Booking:
+    """C11/C12: the booking, only with a key this phone holds."""
+    scope = await _resolve(slug, request)
+    async with db.transaction(chat.pool(request), scope.actor()) as conn:
+        row = await web_booking.read(conn, scope, reservation_id, booking_key)
+    return Booking(**row)
+
+
+@router.post("/{slug}/reservations/{reservation_id}/cancel")
+async def cancel_booking(
+    slug: str, reservation_id: UUID, request: Request, booking_key: str | None = BookingKey
+) -> Booking:
+    """C12 "Batalkan": until the cutoff; frees the table; repeating it is harmless."""
+    scope = await _resolve(slug, request)
+    ctx = scope.actor()
+    async with db.transaction(chat.pool(request), ctx) as conn:
+        row = await web_booking.cancel(conn, ctx, scope, reservation_id, booking_key)
+    return Booking(**row)
+
+
+@router.post("/{slug}/reservations/{reservation_id}/reschedule")
+async def reschedule_booking(
+    slug: str,
+    reservation_id: UUID,
+    body: RescheduleIn,
+    request: Request,
+    response: Response,
+    booking_key: str | None = BookingKey,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> Booking:
+    """C12 "Jadwal ulang": a free time, until the cutoff (AC9.6)."""
+    scope = await _resolve(slug, request)
+
+    async def work(conn: Any, ctx: Any) -> dict[str, Any]:
+        return await web_booking.reschedule(
+            conn, ctx, scope, reservation_id, booking_key, body.start_at
+        )
+
+    return await _idempotent(
+        request,
+        response,
+        scope,
+        f"web_booking.reschedule:{reservation_id}",
+        idempotency_key,
+        body.model_dump(mode="json"),
+        work,
+        Booking,
+    )
+
+
+@router.get("/{slug}/reservations/{reservation_id}/calendar.ics")
+async def booking_calendar(
+    slug: str, reservation_id: UUID, request: Request, key: str = Query(min_length=8)
+) -> Response:
+    """C11 "Tambah ke kalender": the key is in the query so the phone can open it as a link."""
+    scope = await _resolve(slug, request)
+    async with db.transaction(chat.pool(request), scope.actor()) as conn:
+        text = await web_booking.calendar(conn, scope, reservation_id, key)
+    return Response(
+        content=text,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="reservasi.ics"',
+            "Cache-Control": "no-store",
+        },
+    )
