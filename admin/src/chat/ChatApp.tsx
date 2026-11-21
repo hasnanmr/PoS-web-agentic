@@ -107,6 +107,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [cart, setCart] = useState<CartLine[]>([])
   const [fulfillment, setFulfillment] = useState<'pickup' | 'delivery' | null>(null)
+  const [typedAddress, setTypedAddress] = useState({ text: '', seq: 0 })
   const saved = loadDetails()
   const [details, setDetails] = useState<Details>({ name: saved?.name ?? '', phone: saved?.phone ?? '', address: saved?.address ?? '' })
   const [prefilled, setPrefilled] = useState(Boolean(saved))
@@ -258,6 +259,12 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       addLine(step.item, step.optionIds, text.slice(0, 200))
       return
     }
+    // C5 "Ketik alamat…": on the delivery details step the text box fills the address.
+    if (step.name === 'details' && scope.kind === 'o' && fulfillment === 'delivery') {
+      say('me', text)
+      setTypedAddress((a) => ({ text: text.trim(), seq: a.seq + 1 }))
+      return
+    }
     if (page?.agent_enabled) { void askAgent(text.trim().slice(0, 500)); return }
     say('me', text)
     say('info', 'Untuk sekarang pakai tombol di atas ya. Ketik "menu" kapan saja untuk kembali ke menu utama.')
@@ -349,6 +356,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       subtitle={page.table ? `${tableLabel(page.table.name)} · ${page.table.area ? `${page.table.area} · ` : ''}dine-in` : outletSubtitle(page)} />
   )
   const placeholder = step.name === 'note' ? 'Tulis catatan…'
+    : step.name === 'details' && mode === 'delivery' ? 'Ketik alamat…'
     : page.agent_enabled && step.name === 'recs' ? 'Ceritakan seleramu…'
       : page.agent_enabled && step.name === 'menu' ? 'Tulis pesananmu…'
         : step.name === 'main' || step.name === 'menu' ? 'Ketik pesanan atau "menu"…' : 'Ketik "menu"…'
@@ -407,7 +415,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       )}
       {(step.name === 'cart' || step.name === 'details' || step.name === 'summary') && (
         <Checkout footerSlot={footerSlot} chat={chat} page={page} scope={scope} step={step.name} mode={mode} cart={cart} byId={byId}
-          fulfillment={fulfillment} details={details} prefilled={prefilled} remember={remember}
+          fulfillment={fulfillment} details={details} prefilled={prefilled} remember={remember} typedAddress={typedAddress}
           onQuantity={setQuantity} onAddMore={() => go('+ Tambah menu', { name: 'menu' })}
           onEmpty={() => { setCart([]); say('info', 'Keranjang sudah dikosongkan.') }}
           onFulfillment={(f) => {
@@ -615,7 +623,7 @@ function Checkout(props: {
   footerSlot: HTMLDivElement | null
   chat: ChatApi; page: ChatPage; scope: Scope; step: 'cart' | 'details' | 'summary'; mode: 'pickup' | 'delivery' | 'table'
   cart: CartLine[]; byId: Map<string, ChatMenuItem>; fulfillment: 'pickup' | 'delivery' | null; details: Details
-  prefilled: boolean; remember: boolean
+  prefilled: boolean; remember: boolean; typedAddress: { text: string; seq: number }
   onQuantity: (i: number, q: number) => void; onAddMore: () => void; onEmpty: () => void
   onFulfillment: (f: 'pickup' | 'delivery') => void; onTableNext: () => void
   onRemember: (on: boolean) => void; onClearSaved: () => void; onDetails: (d: Details) => void; onEditDetails: () => void
@@ -696,7 +704,7 @@ function Checkout(props: {
         </>
       )}
       {step === 'details' && (
-        <DetailsForm mode={mode} initial={details} prefilled={props.prefilled} remember={props.remember}
+        <DetailsForm mode={mode} initial={details} typedAddress={props.typedAddress} prefilled={props.prefilled} remember={props.remember}
           privacyUrl={page.privacy_notice.url} error={null} onRemember={props.onRemember}
           onClearSaved={props.onClearSaved} onSubmit={props.onDetails} />
       )}

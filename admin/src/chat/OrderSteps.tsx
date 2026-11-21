@@ -204,9 +204,11 @@ export interface Details {
   address: string
 }
 
-export function DetailsForm({ mode, initial, prefilled, remember, privacyUrl, error, onRemember, onClearSaved, onSubmit }: {
+export function DetailsForm({ mode, initial, typedAddress, prefilled, remember, privacyUrl, error, onRemember, onClearSaved, onSubmit }: {
   mode: 'pickup' | 'delivery' | 'table'
   initial: Details
+  /** C5: an address typed in the bottom text box ("Ketik alamat…") fills the address field. */
+  typedAddress?: { text: string; seq: number }
   prefilled: boolean
   remember: boolean
   privacyUrl: string
@@ -217,6 +219,11 @@ export function DetailsForm({ mode, initial, prefilled, remember, privacyUrl, er
 }) {
   const [d, setD] = useState<Details>(initial)
   const [touched, setTouched] = useState(false)
+  const [addressSeq, setAddressSeq] = useState(typedAddress?.seq ?? 0)
+  if (typedAddress && typedAddress.seq !== addressSeq) {
+    setAddressSeq(typedAddress.seq)
+    setD({ ...d, address: typedAddress.text.slice(0, 300) })
+  }
   const needPhone = mode !== 'table'
   const needAddress = mode === 'delivery'
   const ok = d.name.trim() && (!needPhone || d.phone.trim()) && (!needAddress || d.address.trim())

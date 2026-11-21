@@ -586,6 +586,18 @@ describe('C9 AI / C14 / C15 agent', () => {
   })
 })
 
+describe('C5 delivery details', () => {
+  it('the bottom text box ("Ketik alamat…") fills the address field', async () => {
+    const user = userEvent.setup()
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'cart', fulfillment: 'delivery',
+      cart: { lines: [{ product_id: 'p-americano', quantity: 1, addon_option_ids: [], note: null }] } } })
+    await user.click(await screen.findByRole('button', { name: /Diantar/ }))
+    const box = await screen.findByPlaceholderText('Ketik alamat…')
+    await user.type(box, 'Jl. Dipatiukur No. 35, kos hijau{Enter}')
+    expect(screen.getByLabelText(/Alamat antar/)).toHaveValue('Jl. Dipatiukur No. 35, kos hijau')
+  })
+})
+
 describe('resume after a refresh (FR6.2)', () => {
   it('the menu comes back even with an empty cart', async () => {
     renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'menu' } })
