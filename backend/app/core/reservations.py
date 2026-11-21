@@ -14,6 +14,9 @@ WhatsApp flow (T-060) and the agent (T-088) later.
   table (FR9.10). A `no_show_release` job is written for the scheduler (T-104); until the
   poller runs, `release_no_shows` also runs before every read or write of an outlet's
   reservations, so an expired hold never blocks a new booking and the board is current.
+- A table in use (open dine-in order or open bill, `app.core.occupancy`, FR9.11) is skipped
+  for bookings that start today (outlet-local); bookings on other days are unaffected and
+  existing bookings are never moved, only flagged on the board (`table_occupied`).
 """
 
 from __future__ import annotations
@@ -27,7 +30,7 @@ from psycopg import AsyncConnection, errors
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from app.core import crypto
+from app.core import crypto, occupancy
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.core.localtime import local_day_bounds
@@ -112,8 +115,11 @@ async def _candidate_tables(
     party_size: int,
     starts_at: datetime,
     ends_at: datetime,
+    *,
+    skip: set[UUID] | frozenset[UUID] = frozenset(),
 ) -> list[UUID]:
-    """Free bookable tables that fit the party, smallest first (then by name)."""
+    """Free bookable tables that fit the party, smallest first (then by name); `skip` are
+    tables occupied now (FR9.11), passed for a start today."""
     cur = await conn.execute(
         """
         select t.id from app.tables t
@@ -126,7 +132,17 @@ async def _candidate_tables(
         """,
         (outlet_id, party_size, starts_at, ends_at),
     )
-    return [r[0] for r in await cur.fetchall()]
+    return [r[0] for r in await cur.fetchall() if r[0] not in skip]
+
+
+async def _occupied_if_today(
+    conn: AsyncConnection, outlet_id: UUID, starts_at: datetime, tz: str, now: datetime
+) -> set[UUID]:
+    """Tables to skip for a booking starting at `starts_at`: the occupied ones when it starts
+    today (outlet-local), none for another day (FR9.11)."""
+    if not occupancy.starts_today(starts_at, tz, now):
+        return set()
+    return await occupancy.occupied_table_ids(conn, outlet_id)
 
 
 async def available_start_times(
@@ -143,6 +159,7 @@ async def available_start_times(
     slot = datetime.combine(day, settings["bookable_from"], tzinfo=zone)
     last = datetime.combine(day, settings["bookable_until"], tzinfo=zone)
     await release_no_shows(conn, outlet_id)
+    occupied = await _occupied_if_today(conn, outlet_id, slot, tz, now)
     times: list[datetime] = []
     while slot <= last:
         try:
@@ -150,7 +167,9 @@ async def available_start_times(
         except ValidationFailedError:
             slot += SLOT_STEP
             continue
-        if await _candidate_tables(conn, outlet_id, party_size, slot, slot + duration):
+        if await _candidate_tables(
+            conn, outlet_id, party_size, slot, slot + duration, skip=occupied
+        ):
             times.append(slot.astimezone(UTC))
         slot += SLOT_STEP
     return times
@@ -335,9 +354,11 @@ async def create_booking(
     """S6 "+ Booking telepon / langsung" and the web chat (C10, source `web_chat`; `web`
     carries `customer_id`, `booking_code`, and `access_key_hash`).
 
-    Without `table_id` the smallest free bookable table that fits is assigned. Errors:
-    `conflict` (the chosen table is taken), `no_table_available`, `validation_failed`
-    (party above the maximum, outside the hours or window, a table that is too small)."""
+    Without `table_id` the smallest free bookable table that fits is assigned; for a start
+    today, occupied tables are skipped (FR9.11). Errors: `conflict` (the chosen table is
+    taken), `table_occupied` (the chosen table is occupied and the start is today),
+    `no_table_available`, `validation_failed` (party above the maximum, outside the hours or
+    window, a table that is too small)."""
     now = now or datetime.now(UTC)
     if starts_at.tzinfo is None:
         raise ValidationFailedError("starts_at needs a time zone offset", {"field": "starts_at"})
@@ -358,6 +379,7 @@ async def create_booking(
         "status": "booked",
         **(web or {}),
     }
+    occupied = await _occupied_if_today(conn, outlet_id, starts_at, tz, now)
     res_id: UUID | None = None
     if table_id is not None:
         table = await _require_table(conn, outlet_id, table_id)
@@ -366,11 +388,15 @@ async def create_booking(
                 "this table is not open for reservations", {"field": "table_id"}
             )
         _check_fits(table, party_size)
+        if table_id in occupied:
+            raise ConflictError("table_occupied", "this table is in use today")
         res_id = await _insert(conn, ctx, outlet_id, table_id, values)
         if res_id is None:
             raise ConflictError("conflict", "this table is already booked or occupied at that time")
     else:
-        for candidate in await _candidate_tables(conn, outlet_id, party_size, starts_at, ends_at):
+        for candidate in await _candidate_tables(
+            conn, outlet_id, party_size, starts_at, ends_at, skip=occupied
+        ):
             res_id = await _insert(conn, ctx, outlet_id, candidate, values)
             if res_id is not None:
                 table_id = candidate
@@ -394,10 +420,13 @@ async def create_walk_in(
     conn: AsyncConnection, ctx: ActorContext, outlet_id: UUID, *, table_id: UUID, party_size: int
 ) -> UUID:
     """S6 "Tandai meja terisi (tanpa reservasi)": the table is occupied from now for the
-    outlet's default duration. Any table may be used (bookable or not)."""
+    outlet's default duration. Any table may be used (bookable or not), but not one that is
+    already occupied by an open order or bill (`table_occupied`, FR9.11)."""
     settings = await get_settings(conn, outlet_id)
     table = await _require_table(conn, outlet_id, table_id)
     _check_fits(table, party_size)
+    if await occupancy.is_occupied(conn, table_id):
+        raise ConflictError("table_occupied", "this table is already in use")
     await release_no_shows(conn, outlet_id)
     cur = await conn.execute("select now()")
     start = (await cur.fetchone())[0]  # type: ignore[index]
@@ -504,6 +533,14 @@ async def move(conn: AsyncConnection, ctx: ActorContext, res_id: UUID, table_id:
             "this table is not open for reservations", {"field": "table_id"}
         )
     _check_fits(table, row["party_size"])
+    if (
+        row["status"] == "booked"
+        and occupancy.starts_today(
+            row["starts_at"], await _outlet_tz(conn, row["outlet_id"]), datetime.now(UTC)
+        )
+        and await occupancy.is_occupied(conn, table_id)
+    ):
+        raise ConflictError("table_occupied", "this table is in use today")
     try:
         async with conn.transaction():
             await conn.execute(
@@ -532,7 +569,8 @@ async def reschedule(
 ) -> None:
     """C12 "Jadwal ulang": a new time for a `booked` booking, same party. The current table is
     kept when it is still free, otherwise the smallest free table that fits is taken; the
-    exclusion constraint still guards every move (FR9.3). The caller checks the cutoff."""
+    exclusion constraint still guards every move (FR9.3); occupied tables are skipped for a
+    new time today (FR9.11). The caller checks the cutoff."""
     now = now or datetime.now(UTC)
     if starts_at.tzinfo is None:
         raise ValidationFailedError("starts_at needs a time zone offset", {"field": "starts_at"})
@@ -547,15 +585,18 @@ async def reschedule(
     ends_at = starts_at + timedelta(minutes=settings["default_duration_minutes"])
     # The current table first, but only while the outlet still offers it for this party
     # (active, bookable, big enough), like `move` and `_candidate_tables` (PR #64 review).
+    occupied = await _occupied_if_today(conn, row["outlet_id"], starts_at, tz, now)
     candidates: list[UUID] = []
     cur = await conn.execute(
         "select 1 from app.tables where id = %s and outlet_id = %s and is_active"
         " and is_bookable and capacity >= %s",
         (row["table_id"], row["outlet_id"], row["party_size"]),
     )
-    if await cur.fetchone() is not None:
+    if await cur.fetchone() is not None and row["table_id"] not in occupied:
         candidates.append(row["table_id"])
-    for t in await _candidate_tables(conn, row["outlet_id"], row["party_size"], starts_at, ends_at):
+    for t in await _candidate_tables(
+        conn, row["outlet_id"], row["party_size"], starts_at, ends_at, skip=occupied
+    ):
         if t not in candidates:
             candidates.append(t)
     moved_to: UUID | None = None
@@ -645,11 +686,26 @@ async def board(conn: AsyncConnection, outlet_id: UUID, day: date | None) -> dic
         " where outlet_id = %s order by name",
         (outlet_id,),
     )
+    is_today = day == now.astimezone(ZoneInfo(tz)).date()
+    occupied = await occupancy.details(conn, outlet_id) if is_today else {}
     tables = [
-        {k: t[k] for k in ("id", "name", "capacity", "area", "is_bookable")}
+        {
+            **{k: t[k] for k in ("id", "name", "capacity", "area", "is_bookable")},
+            "occupancy": occupied.get(t["id"]),
+        }
         for t in await cur.fetchall()
         if t["is_active"] or t["id"] in used
     ]
+    public_rows = []
+    for r in rows:
+        out = _public(r, now)
+        # A booking later today on a table in use: staff move one of them (FR9.11).
+        out["table_occupied"] = (
+            r["status"] == "booked"
+            and r["table_id"] in occupied
+            and occupancy.starts_today(r["starts_at"], tz, now)
+        )
+        public_rows.append(out)
     return {
         "date": day,
         "timezone": tz,
@@ -665,7 +721,7 @@ async def board(conn: AsyncConnection, outlet_id: UUID, day: date | None) -> dic
             )
         },
         "tables": tables,
-        "reservations": [_public(r, now) for r in rows],
+        "reservations": public_rows,
     }
 
 
