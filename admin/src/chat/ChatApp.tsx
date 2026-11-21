@@ -154,8 +154,13 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       } else if (session.cart_expired) {
         setMsgs([{ id: nextId.current++, kind: 'expired', text: '' }])
         setStep({ name: 'main' })
+      } else if (session.step === 'recs') {
+        // Browsing Rekomendasi or the menu comes back there even with an empty cart.
+        setStep({ name: 'recs' })
+      } else if (session.step === 'menu' || session.step.startsWith('addons') || session.step === 'note') {
+        setStep({ name: 'menu' })
       } else if (session.cart.lines.length > 0 && RESUME_STEPS.has(session.step)) {
-        setStep(session.step === 'menu' || session.step.startsWith('addons') || session.step === 'note' ? { name: 'menu' } : { name: 'cart' })
+        setStep({ name: 'cart' })
       }
       restored.current = true
       setLoad('ready')

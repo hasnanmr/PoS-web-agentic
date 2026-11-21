@@ -575,6 +575,25 @@ describe('C9 AI / C14 / C15 agent', () => {
   })
 })
 
+describe('resume after a refresh (FR6.2)', () => {
+  it('the menu comes back even with an empty cart', async () => {
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'menu' } })
+    expect(await screen.findByText(/Pilih kategori/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Reservasi meja/ })).not.toBeInTheDocument()
+  })
+
+  it('Rekomendasi comes back even with an empty cart', async () => {
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'recs' }, [`GET ${O}/recommendations`]: [] })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Reservasi meja/ })).not.toBeInTheDocument())
+    expect(screen.queryByText(/Selamat datang/)).not.toBeInTheDocument()
+  })
+
+  it('checkout steps with an empty cart start from the main menu', async () => {
+    renderChat({ [`GET ${O}/chat-session`]: { ...SESSION, step: 'summary' } })
+    expect(await screen.findByRole('button', { name: /Reservasi meja/ })).toBeInTheDocument()
+  })
+})
+
 describe('chat transcript storage', () => {
   it('is per session and dropped after 2 hours without activity', async () => {
     const { loadTranscript, saveTranscript, TRANSCRIPT_IDLE_MS } = await import('./storage')
