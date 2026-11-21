@@ -214,7 +214,9 @@ def build_tools(run: Runner, scope: web_chat.ChatScope, turn: TurnResult) -> lis
                 {
                     "grup": g["name"],
                     "wajib": g["is_required"],
-                    "pilih": "satu" if g["selection"] == "single" else "boleh beberapa",
+                    "pilih": "satu"
+                    if g["selection"] == "single"
+                    else (f"maks {g['max_select']}" if g.get("max_select") else "boleh beberapa"),
                     "opsi": [
                         {
                             "id": o["id"],

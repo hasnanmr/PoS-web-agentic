@@ -44,6 +44,7 @@ class MenuGroup(BaseModel):
     name: str
     selection: Literal["single", "multiple"]
     is_required: bool
+    max_select: int | None = None
     options: list[MenuOption]
 
 

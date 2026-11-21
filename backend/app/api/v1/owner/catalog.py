@@ -90,6 +90,7 @@ class AddonGroupRow(BaseModel):
     name: str
     selection: Literal["single", "multiple"]
     is_required: bool
+    max_select: int | None = None
     sort_order: int
     options: list[AddonOptionRow]
 
@@ -139,6 +140,8 @@ class AddonGroupInput(BaseModel):
     name: Name60
     selection: Literal["single", "multiple"] = "single"
     is_required: bool = False
+    # "maks N" for a multiple-choice group (null = no cap); 2..9 and below the option count.
+    max_select: int | None = Field(default=None, ge=2, le=9)
     options: list[AddonOptionInput] = Field(min_length=1, max_length=10)
 
 
@@ -355,6 +358,7 @@ async def _save_group(
             selection=body.selection,
             is_required=body.is_required,
             options=options,
+            max_select=body.max_select,
         )
         cur = await conn.execute("select product_id from app.addon_groups where id = %s", (gid,))
         pid = (await cur.fetchone())[0]  # type: ignore[index]
