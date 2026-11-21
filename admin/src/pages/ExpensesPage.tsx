@@ -88,7 +88,8 @@ export default function ExpensesPage() {
               caption={`${s.po_owed.count} PO${s.po_owed.overdue_count ? ` · ${s.po_owed.overdue_count} lewat jatuh tempo` : ''}`} />
           </div>
         ) : summary.loading ? <Loading /> : null}
-        <div className="grid gap-4 lg:grid-cols-3">
+        {/* grid-cols-1 (minmax(0,1fr)) keeps the wide history table scrolling inside its card on phones. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {historyReady ? (
             <History className="lg:col-span-2" baseQuery={historyQuery} source={source} onSource={setSource} summary={s} version={version}
               onViewPo={(id) => navigate(`/dashboard?tab=po&po=${id}`)} onChanged={() => { setVersion((v) => v + 1) }} />

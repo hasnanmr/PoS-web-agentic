@@ -148,7 +148,7 @@ export function OrdersDrawer({ drill, outletCount, onClose }: { drill: Drill; ou
     <div className={`fixed inset-0 z-40 flex justify-end bg-text/30 ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
       role="dialog" aria-modal="true" aria-label={title(drill)}>
       <button type="button" aria-label="Tutup drawer" className="flex-1 cursor-default" onClick={close} />
-      <div className={`h-full w-full max-w-[460px] overflow-y-auto overscroll-contain bg-surface p-5 shadow-xl ${leaving ? 'animate-drawer-out' : 'animate-drawer-in'}`}>
+      <div className={`h-full w-full max-w-[460px] overflow-y-auto overscroll-contain bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl ${leaving ? 'animate-drawer-out' : 'animate-drawer-in'}`}>
         {openId ? (
           <OrderDetailPanel orderId={openId} onClose={close} onBack={() => setOpenId(undefined)}
             onChanged={() => void result.reload()} />

@@ -109,7 +109,7 @@ export function PoForm({ defaultOutletId, onCancel, onOpened }: {
     `rounded-lg border p-3 text-left ${term === value ? 'border-2 border-primary bg-primary-soft' : 'border-border bg-surface'}`
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_336px]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_336px]">
       <section aria-label="Form Buka PO" className="rounded-lg border border-border bg-surface p-4">
         <div className="grid gap-x-3 sm:grid-cols-3">
           <Field label={role === 'owner' ? 'Outlet *' : 'Outlet * (yang ditugaskan)'} htmlFor="po-outlet">

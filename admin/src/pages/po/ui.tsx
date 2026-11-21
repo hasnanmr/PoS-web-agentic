@@ -60,10 +60,10 @@ export function Dialog({ label, onClose, children, wide = false }: {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 sm:items-center" role="dialog"
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center" role="dialog"
       aria-modal="true" aria-label={label} onKeyDown={onKeyDown}>
       <div ref={panel} tabIndex={-1}
-        className={`max-h-[90vh] w-full overflow-y-auto rounded-lg border-2 border-primary bg-surface p-5 outline-none ${wide ? 'max-w-[680px]' : 'max-w-[620px]'}`}>
+        className={`max-h-[90dvh] w-full overflow-y-auto rounded-lg border-2 border-primary bg-surface p-5 outline-none ${wide ? 'max-w-[680px]' : 'max-w-[620px]'}`}>
         {children}
       </div>
     </div>

@@ -5,7 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#1E4FA3" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: env(safe-area-inset-*) works on iPhone (home bar, notch in landscape). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- iOS Safari turns long numbers (Rp 12.450.000, order numbers) into phone links; turn that off. -->
+    <meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />
+    <!-- The app has a light theme only: no forced dark mode on Chrome Android / Samsung. -->
+    <meta name="color-scheme" content="light" />
     <title>Thinker</title>
   </head>
   <body>

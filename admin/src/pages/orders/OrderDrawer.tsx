@@ -16,7 +16,7 @@ export function OrderDrawer({ orderId, onClose, onChanged }: { orderId: string; 
   return (
     <div className="fixed inset-0 z-40 flex animate-fade-in justify-end bg-text/30" role="dialog" aria-modal="true" aria-label="Detail order">
       <button type="button" aria-label="Tutup detail" className="flex-1 cursor-default" onClick={onClose} />
-      <div className="h-full w-full max-w-[440px] animate-drawer-in overflow-y-auto overscroll-contain bg-surface p-4 shadow-xl">
+      <div className="h-full w-full max-w-[440px] animate-drawer-in overflow-y-auto overscroll-contain bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl">
         <OrderDetailPanel orderId={orderId} onClose={onClose} onChanged={onChanged} />
       </div>
     </div>

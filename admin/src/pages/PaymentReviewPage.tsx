@@ -56,7 +56,7 @@ export default function PaymentReviewPage() {
       <div className="space-y-4 p-4 md:p-6">
         {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
         {queue.error ? <Alert>Antrian belum bisa dimuat: {errorMessage(queue.error)}</Alert> : null}
-        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
           <Card title={`Antrian · proof_submitted (${items.length})`}>
             {queue.loading && !queue.data ? <Loading /> : (
               <ul className="space-y-2">

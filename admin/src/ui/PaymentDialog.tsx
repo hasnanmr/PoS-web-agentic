@@ -44,9 +44,9 @@ export function PaymentDialog({ method, total, outletId, busy, error, onConfirm,
 
   const title = method === 'cash' ? 'Pembayaran cash' : 'Pembayaran QRIS'
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 sm:items-center"
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-text/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center"
       role="dialog" aria-modal="true" aria-label={title}>
-      <div className="w-full max-w-md rounded-lg bg-surface p-5">
+      <div className="max-h-full w-full max-w-md overflow-y-auto overscroll-contain rounded-lg bg-surface p-5">
         <h2 className="text-[16px] font-bold">{title}</h2>
         <div className="mt-2 flex justify-between text-[15px] font-bold">
           <span>Total</span><span>{formatRupiah(total)}</span>
