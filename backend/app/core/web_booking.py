@@ -31,7 +31,7 @@ from psycopg.rows import dict_row
 from app.core import reservations, web_chat
 from app.core.actor import ActorContext
 from app.core.errors import ConflictError, DomainError, NotFoundError, ValidationFailedError
-from app.core.tables import get_settings
+from app.core.tables import HOLD_MINUTES, get_settings
 
 MAX_UPCOMING_PER_PHONE = 2
 MAX_EXTRA_KEYS = 5  # keys from "Cari dengan kode + HP" kept per booking
@@ -378,7 +378,8 @@ async def calendar(
     reminder = settings["reminder_offset_minutes"]
     summary = _ics_text(f"Reservasi {scope.outlet_name} ({row['party_size']} orang)")
     description = _ics_text(
-        f"Kode booking: {row['booking_code']}\nMeja ditahan sampai 15 menit setelah jam booking."
+        f"Kode booking: {row['booking_code']}\nMeja ditahan sampai {HOLD_MINUTES} menit setelah"
+        " jam booking."
     )
     lines = [
         "BEGIN:VCALENDAR",
