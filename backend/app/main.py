@@ -163,6 +163,9 @@ def create_app(
             "timezone": settings.default_timezone,
             "db_configured": bool(settings.database_url),
             "auth_configured": app.state.token_verifier is not None,
+            "agent_configured": settings.agent_configured,
         },
     )
+    if settings.agent_config_warning:
+        logger.warning(settings.agent_config_warning)
     return app
