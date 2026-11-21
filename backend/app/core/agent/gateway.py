@@ -315,9 +315,13 @@ async def run_turn(
                                 if delta:
                                     queue.put_nowait(AgentEvent("delta", {"text": delta}))
                         elif mode == "values":
+                            # The reply is the model's latest non-empty text this turn. Models
+                            # often write the answer next to a tool call ("Nasi goreng tidak
+                            # ada…" + pilihan_cepat) and then end with an empty message; taking
+                            # only the last tool-free message dropped that answer.
                             last = chunk["messages"][-1] if chunk.get("messages") else None
-                            if isinstance(last, AIMessage) and not last.tool_calls:
-                                reply = _text(last).strip()
+                            if isinstance(last, AIMessage) and (said := _text(last).strip()):
+                                reply = said
             except AgentLimitReached as exc:
                 failure = "agent_limit"
                 log.info(
