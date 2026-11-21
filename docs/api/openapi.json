@@ -536,47 +536,6 @@
         "title": "AuditRow",
         "type": "object"
       },
-      "Availability": {
-        "properties": {
-          "limiting_stock_item": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limiting Stock Item"
-          },
-          "outlet_id": {
-            "format": "uuid",
-            "title": "Outlet Id",
-            "type": "string"
-          },
-          "outlet_name": {
-            "title": "Outlet Name",
-            "type": "string"
-          },
-          "portions_available": {
-            "title": "Portions Available",
-            "type": "integer"
-          },
-          "sold_out": {
-            "title": "Sold Out",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "outlet_id",
-          "outlet_name",
-          "portions_available",
-          "sold_out",
-          "limiting_stock_item"
-        ],
-        "title": "Availability",
-        "type": "object"
-      },
       "BestSellerItem": {
         "properties": {
           "name": {
@@ -1096,66 +1055,224 @@
         "title": "BoardTable",
         "type": "object"
       },
-      "BookingIn": {
+      "Booking": {
         "properties": {
-          "guest_name": {
-            "maxLength": 60,
-            "minLength": 1,
-            "title": "Guest Name",
+          "booking_code": {
+            "title": "Booking Code",
             "type": "string"
           },
-          "guest_phone": {
+          "can_change": {
+            "title": "Can Change",
+            "type": "boolean"
+          },
+          "change_until": {
+            "description": "Cancel/reschedule allowed until (cutoff)",
+            "format": "date-time",
+            "title": "Change Until",
+            "type": "string"
+          },
+          "guest_name": {
             "anyOf": [
               {
-                "pattern": "^\\+?[0-9 -]{8,20}$",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Guest Phone"
+            "description": "Cleared once the booking is finished",
+            "title": "Guest Name"
+          },
+          "hold_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Until"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
           },
           "party_size": {
-            "maximum": 100.0,
-            "minimum": 1.0,
             "title": "Party Size",
             "type": "integer"
           },
-          "source": {
-            "enum": [
-              "phone",
-              "in_person"
-            ],
-            "title": "Source",
+          "reservation_id": {
+            "format": "uuid",
+            "title": "Reservation Id",
             "type": "string"
           },
-          "starts_at": {
+          "start_at": {
             "format": "date-time",
-            "title": "Starts At",
+            "title": "Start At",
             "type": "string"
           },
-          "table_id": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id",
+          "booking_code",
+          "start_at",
+          "label",
+          "timezone",
+          "party_size",
+          "status",
+          "guest_name",
+          "hold_until",
+          "change_until",
+          "can_change",
+          "outlet_name"
+        ],
+        "title": "Booking",
+        "type": "object"
+      },
+      "BookingCreated": {
+        "properties": {
+          "access_key": {
+            "description": "Keep on the phone; send as `X-Booking-Key`",
+            "title": "Access Key",
+            "type": "string"
+          },
+          "booking_code": {
+            "title": "Booking Code",
+            "type": "string"
+          },
+          "can_change": {
+            "title": "Can Change",
+            "type": "boolean"
+          },
+          "change_until": {
+            "description": "Cancel/reschedule allowed until (cutoff)",
+            "format": "date-time",
+            "title": "Change Until",
+            "type": "string"
+          },
+          "guest_name": {
             "anyOf": [
               {
-                "format": "uuid",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Omit to assign the smallest free fit",
-            "title": "Table Id"
+            "description": "Cleared once the booking is finished",
+            "title": "Guest Name"
+          },
+          "hold_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Until"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
+          },
+          "party_size": {
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "reservation_id": {
+            "format": "uuid",
+            "title": "Reservation Id",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
           }
         },
         "required": [
-          "guest_name",
+          "reservation_id",
+          "booking_code",
+          "start_at",
+          "label",
+          "timezone",
           "party_size",
-          "starts_at",
-          "source"
+          "status",
+          "guest_name",
+          "hold_until",
+          "change_until",
+          "can_change",
+          "outlet_name",
+          "access_key"
         ],
-        "title": "BookingIn",
+        "title": "BookingCreated",
+        "type": "object"
+      },
+      "BookingRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key"
+        ],
+        "title": "BookingRef",
+        "type": "object"
+      },
+      "BookingsStatusIn": {
+        "properties": {
+          "reservations": {
+            "items": {
+              "$ref": "#/components/schemas/BookingRef"
+            },
+            "maxItems": 10,
+            "title": "Reservations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reservations"
+        ],
+        "title": "BookingsStatusIn",
         "type": "object"
       },
       "Breakdown": {
@@ -3191,6 +3308,47 @@
           "quantity"
         ],
         "title": "LineIn",
+        "type": "object"
+      },
+      "LookupIn": {
+        "properties": {
+          "booking_code": {
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Booking Code",
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "minLength": 8,
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "booking_code",
+          "phone"
+        ],
+        "title": "LookupIn",
+        "type": "object"
+      },
+      "LookupOut": {
+        "properties": {
+          "access_key": {
+            "title": "Access Key",
+            "type": "string"
+          },
+          "reservation_id": {
+            "format": "uuid",
+            "title": "Reservation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id",
+          "access_key"
+        ],
+        "title": "LookupOut",
         "type": "object"
       },
       "LowStock": {
@@ -7930,6 +8088,20 @@
         "title": "RejectIn",
         "type": "object"
       },
+      "RescheduleIn": {
+        "properties": {
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_at"
+        ],
+        "title": "RescheduleIn",
+        "type": "object"
+      },
       "ReservationDetail": {
         "properties": {
           "allowed_actions": {
@@ -8020,7 +8192,8 @@
               "whatsapp",
               "phone",
               "in_person",
-              "walk_in"
+              "walk_in",
+              "web_chat"
             ],
             "title": "Source",
             "type": "string"
@@ -8263,7 +8436,8 @@
               "whatsapp",
               "phone",
               "in_person",
-              "walk_in"
+              "walk_in",
+              "web_chat"
             ],
             "title": "Source",
             "type": "string"
@@ -9852,6 +10026,26 @@
         "title": "Tile",
         "type": "object"
       },
+      "TimeSlot": {
+        "properties": {
+          "label": {
+            "description": "Outlet-local \"19:00\"",
+            "title": "Label",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_at",
+          "label"
+        ],
+        "title": "TimeSlot",
+        "type": "object"
+      },
       "Times": {
         "properties": {
           "clock_in_at": {
@@ -10494,6 +10688,109 @@
         "title": "Board",
         "type": "object"
       },
+      "app__api__v1__ops__reservations__BookingIn": {
+        "properties": {
+          "guest_name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Guest Name",
+            "type": "string"
+          },
+          "guest_phone": {
+            "anyOf": [
+              {
+                "pattern": "^\\+?[0-9 -]{8,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Phone"
+          },
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "phone",
+              "in_person"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omit to assign the smallest free fit",
+            "title": "Table Id"
+          }
+        },
+        "required": [
+          "guest_name",
+          "party_size",
+          "starts_at",
+          "source"
+        ],
+        "title": "BookingIn",
+        "type": "object"
+      },
+      "app__api__v1__owner__catalog__Availability": {
+        "properties": {
+          "limiting_stock_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limiting Stock Item"
+          },
+          "outlet_id": {
+            "format": "uuid",
+            "title": "Outlet Id",
+            "type": "string"
+          },
+          "outlet_name": {
+            "title": "Outlet Name",
+            "type": "string"
+          },
+          "portions_available": {
+            "title": "Portions Available",
+            "type": "integer"
+          },
+          "sold_out": {
+            "title": "Sold Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "outlet_name",
+          "portions_available",
+          "sold_out",
+          "limiting_stock_item"
+        ],
+        "title": "Availability",
+        "type": "object"
+      },
       "app__api__v1__owner__catalog__Created": {
         "properties": {
           "catalog_sync": {
@@ -10643,6 +10940,85 @@
           "is_bookable"
         ],
         "title": "TableOut",
+        "type": "object"
+      },
+      "app__api__v1__public_outlet__Availability": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "last_date": {
+            "description": "Last date inside the booking window",
+            "format": "date",
+            "title": "Last Date",
+            "type": "string"
+          },
+          "max_party_size": {
+            "title": "Max Party Size",
+            "type": "integer"
+          },
+          "times": {
+            "items": {
+              "$ref": "#/components/schemas/TimeSlot"
+            },
+            "title": "Times",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "timezone",
+          "max_party_size",
+          "last_date",
+          "times"
+        ],
+        "title": "Availability",
+        "type": "object"
+      },
+      "app__api__v1__public_outlet__BookingIn": {
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerIn"
+          },
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "privacy_notice_version": {
+            "maxLength": 40,
+            "title": "Privacy Notice Version",
+            "type": "string"
+          },
+          "source": {
+            "default": "buttons",
+            "enum": [
+              "buttons",
+              "agent"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "party_size",
+          "start_at",
+          "customer",
+          "privacy_notice_version"
+        ],
+        "title": "BookingIn",
         "type": "object"
       },
       "app__api__v1__public_table__TableOut": {
@@ -12252,7 +12628,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BookingIn"
+                "$ref": "#/components/schemas/app__api__v1__ops__reservations__BookingIn"
               }
             }
           },
@@ -16468,7 +16844,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Availability"
+                    "$ref": "#/components/schemas/app__api__v1__owner__catalog__Availability"
                   },
                   "title": "Response Product Availability Api V1 Owner Products  Product Id  Availability Get",
                   "type": "array"
@@ -18117,6 +18493,70 @@
         ]
       }
     },
+    "/api/v1/public/o/{slug}/availability": {
+      "get": {
+        "description": "C10: free start times for the party on an outlet-local date (AC9.1, AC9.3).",
+        "operationId": "availability_api_v1_public_o__slug__availability_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "party_size",
+            "required": true,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Party Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__v1__public_outlet__Availability"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Availability",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
     "/api/v1/public/o/{slug}/chat-session": {
       "get": {
         "description": "C1/C8 resume: step and cart of this phone's chat; empty after 2 idle hours.",
@@ -18803,6 +19243,515 @@
           }
         },
         "summary": "Recommendation Cards",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations": {
+      "post": {
+        "description": "C10 \"Konfirmasi booking\": smallest free table, booking code, 2 upcoming per phone. The\npage makes the access key and sends it as `X-Booking-Key`; only its hash is stored, also\nnot in the idempotency cache, and a replay must carry the same key.",
+        "operationId": "create_booking_api_v1_public_o__slug__reservations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "description": "Access key made by the page (32-128 URL-safe characters); required",
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Access key made by the page (32-128 URL-safe characters); required",
+              "title": "X-Booking-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__public_outlet__BookingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/lookup": {
+      "post": {
+        "description": "C12 \"Cari dengan kode + HP\": same answer for a wrong code or a wrong phone (AC9.12).",
+        "operationId": "lookup_booking_api_v1_public_o__slug__reservations_lookup_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lookup Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/status": {
+      "post": {
+        "description": "C12 \"Reservasi Saya\": upcoming bookings whose keys this phone kept.",
+        "operationId": "bookings_status_api_v1_public_o__slug__reservations_status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingsStatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Booking"
+                  },
+                  "title": "Response Bookings Status Api V1 Public O  Slug  Reservations Status Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bookings Status",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}": {
+      "get": {
+        "description": "C11/C12: the booking, only with a key this phone holds.",
+        "operationId": "read_booking_api_v1_public_o__slug__reservations__reservation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Booking-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}/calendar.ics": {
+      "get": {
+        "description": "C11 \"Tambah ke kalender\": the key is in the query so the phone can open it as a link.",
+        "operationId": "booking_calendar_api_v1_public_o__slug__reservations__reservation_id__calendar_ics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "minLength": 8,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Booking Calendar",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}/cancel": {
+      "post": {
+        "description": "C12 \"Batalkan\": until the cutoff; frees the table. Repeating it returns the same\ncancelled booking, with or without the same Idempotency-Key.",
+        "operationId": "cancel_booking_api_v1_public_o__slug__reservations__reservation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Booking-Key"
+            }
+          },
+          {
+            "description": "Accepted like every write (FR6.4); cancel is idempotent by itself",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Accepted like every write (FR6.4); cancel is idempotent by itself",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Booking",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
+    "/api/v1/public/o/{slug}/reservations/{reservation_id}/reschedule": {
+      "post": {
+        "description": "C12 \"Jadwal ulang\": a free time, until the cutoff (AC9.6).",
+        "operationId": "reschedule_booking_api_v1_public_o__slug__reservations__reservation_id__reschedule_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reservation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reservation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Booking-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Booking-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reschedule Booking",
         "tags": [
           "public: web chat from the outlet link (C1)"
         ]

@@ -40,3 +40,13 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ENV_VARS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setitem(Settings.model_config, "env_file", None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_public_rate_limits() -> None:
+    """The public web chat limits are per API process; tests share one process, so each test
+    starts with fresh counters (a test that checks the limit fills them itself)."""
+    from app.api.v1 import public_chat, public_outlet
+
+    public_chat._hits.clear()
+    public_outlet._misses.clear()
