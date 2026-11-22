@@ -254,6 +254,21 @@ export function FulfillmentChoice({ value, deliveryFee, onPick }: {
   )
 }
 
+/** C8 table QR: eat here or take away; a takeaway order still carries the table. */
+export function TableChoice({ value, onPick }: {
+  value: 'dine_in' | 'takeaway' | null; onPick: (v: 'dine_in' | 'takeaway') => void
+}) {
+  return (
+    <Bubble>
+      <p className="mb-2">Makan di sini atau dibawa pulang?</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Choice className="text-center" selected={value === 'dine_in'} onClick={() => onPick('dine_in')}>🍽 Makan di sini</Choice>
+        <Choice className="text-center" selected={value === 'takeaway'} onClick={() => onPick('takeaway')}>🛍 Bawa pulang</Choice>
+      </div>
+    </Bubble>
+  )
+}
+
 // C5 / C8 --------------------------------------------------------------------------------------------
 
 export interface Details {
@@ -356,15 +371,16 @@ function maskPhone(phone: string): string {
   return digits.length >= 8 ? `${digits.slice(0, 4)}-xxxx-${digits.slice(-3)}` : phone
 }
 
-export function SummaryCard({ quote, mode, details, tableName, items, onEdit }: {
+export function SummaryCard({ quote, mode, details, tableName, tableType = 'dine_in', items, onEdit }: {
   quote: ChatQuote | null; mode: 'pickup' | 'delivery' | 'table'; details: Details; tableName: string | null
+  tableType?: 'dine_in' | 'takeaway'
   items: string[]; onEdit: () => void
 }) {
   return (
     <Bubble>
       <p className="mb-1 font-semibold">Ringkasan pesanan</p>
       {mode === 'table' && (
-        <p className="mb-1">Dine-in · {tableName} · a.n. {details.name}</p>
+        <p className="mb-1">{tableType === 'takeaway' ? 'Takeaway' : 'Dine-in'} · {tableName} · a.n. {details.name}</p>
       )}
       <ul className="mb-2 text-[12px] text-text-muted">{items.map((t, i) => <li key={i}>{t}</li>)}</ul>
       {quote ? (

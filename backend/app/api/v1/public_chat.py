@@ -201,7 +201,7 @@ class OrdersStatusIn(BaseModel):
 class OrderOverview(BaseModel):
     order_id: UUID
     order_no: str
-    fulfillment: Literal["dine_in", "pickup", "delivery"]
+    fulfillment: Literal["dine_in", "takeaway", "pickup", "delivery"]
     status: str
     payment_status: str
     total: int
@@ -238,7 +238,7 @@ class WebOrderStatus(BaseModel):
     id: UUID
     order_no: str
     created_at: datetime
-    fulfillment: Literal["dine_in", "pickup", "delivery"]
+    fulfillment: Literal["dine_in", "takeaway", "pickup", "delivery"]
     customer_name: str | None
     delivery_address: str | None = Field(description="Cleared once the order is finished")
     note: str | None

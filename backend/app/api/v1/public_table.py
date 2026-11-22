@@ -3,14 +3,14 @@
 Contract: docs/architecture/screen-endpoint-map.md → "Customer web chat (C1-C15)" and the Q0-Q5
 section it replaces. No sign-in: the table token in the path is the only credential, plus the
 per-order access key (`X-Order-Key`). Unknown or replaced tokens are `table_qr_invalid` (404,
-C13 card 2). Orders are dine-in for this table, always paid first with the static QRIS. The
-routes shared with the outlet link (menu, quote, chat session, status, payment) live in
-`public_chat.py`.
+C13 card 2). Orders are dine-in or takeaway (a takeaway still records this table), always paid
+first with the static QRIS. The routes shared with the outlet link (menu, quote, chat session,
+status, payment) live in `public_chat.py`.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Header, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
@@ -83,6 +83,10 @@ async def table_page(token: str, request: Request) -> TablePage:
 
 class TableOrderIn(chat.OrderTextFields):
     items: list[LineIn] = Field(min_length=1, max_length=50)
+    fulfillment: Literal["dine_in", "takeaway"] = Field(
+        default="dine_in",
+        description='C8 "Makan di sini" / "Bawa pulang"; a takeaway order keeps its table',
+    )
     customer_name: str | None = Field(default=None, max_length=40)
     privacy_notice_version: str | None = Field(
         default=None,
@@ -109,7 +113,7 @@ async def place_order(
         description="Access key made by the page (32-128 URL-safe characters); recommended",
     ),
 ) -> WebOrderCreated:
-    """C8 "Pesan & bayar": a pay-first dine-in order for this table (stock deducted)."""
+    """C8 "Pesan & bayar": a pay-first dine-in or takeaway order from this table (stock taken)."""
     scope = await current_scope(token, request)
     ctx = scope.actor()
 
@@ -127,6 +131,7 @@ async def place_order(
         assert scope.table_id is not None  # noqa: S101
         return orders.WebOrder(
             table_id=scope.table_id,
+            table_type=body.fulfillment,
             lines=chat.lines(body.items),
             access_key_hash=key_hash,
             note=body.note,

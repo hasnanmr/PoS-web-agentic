@@ -273,7 +273,7 @@ describe('C8 table order', () => {
       [`POST ${T}/quote`]: { ...QUOTE, subtotal: 44000, pb1_amount: 4400, total: 48400 },
       [`POST ${T}/orders`]: new ApiError(409, 'web_ordering_unavailable', 'x'),
     }, 't')
-    await user.click(await screen.findByRole('button', { name: 'Lanjut' }))
+    await user.click(await screen.findByRole('button', { name: '🍽 Makan di sini' }))
     expect(screen.queryByLabelText(/No HP/)).not.toBeInTheDocument()
     await user.type(screen.getByLabelText(/Nama untuk dipanggil staf/), 'Rina')
     await user.click(screen.getByRole('button', { name: 'Lanjut ke ringkasan' }))
@@ -283,6 +283,24 @@ describe('C8 table order', () => {
     const call = vi.mocked(api.post).mock.calls.find(([p]) => p === `${T}/orders`)!
     expect(call[1]).toMatchObject({ customer_name: 'Rina', privacy_notice_version: '2026-11-20', expected_total: 48400 })
     expect(await screen.findByText(/pesanan dilayani langsung di kasir/)).toBeInTheDocument()
+  })
+
+  it('"Bawa pulang" sends a takeaway order that keeps the table', async () => {
+    const user = userEvent.setup()
+    const { api } = renderChat({
+      [`GET ${T}/chat-session`]: { ...SESSION, step: 'cart', cart: { lines: [{ product_id: 'p-americano', quantity: 1, addon_option_ids: [], note: null }] } },
+      [`POST ${T}/quote`]: { ...QUOTE, subtotal: 22000, pb1_amount: 2200, total: 24200 },
+      [`POST ${T}/orders`]: new ApiError(409, 'web_ordering_unavailable', 'x'),
+    }, 't')
+    expect(await screen.findByText('Makan di sini atau dibawa pulang?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '🛍 Bawa pulang' }))
+    await user.type(screen.getByLabelText(/Nama untuk dipanggil staf/), 'Rina')
+    await user.click(screen.getByRole('button', { name: 'Lanjut ke ringkasan' }))
+    expect(await screen.findByText('Takeaway · Meja 05 · a.n. Rina')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Pesan & bayar · Rp 24.200/ }))
+    await waitFor(() => expect(vi.mocked(api.post).mock.calls.some(([p]) => p === `${T}/orders`)).toBe(true))
+    const call = vi.mocked(api.post).mock.calls.find(([p]) => p === `${T}/orders`)!
+    expect(call[1]).toMatchObject({ fulfillment: 'takeaway', customer_name: 'Rina' })
   })
 })
 

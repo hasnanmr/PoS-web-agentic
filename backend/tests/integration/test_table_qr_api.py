@@ -487,3 +487,44 @@ def test_owner_downloads_qr_and_replaces_the_token(client, ctx) -> None:
         (table,),
     )
     assert audit == [(1,)]
+
+
+def test_takeaway_from_the_table_keeps_the_table_and_the_kitchen_flow(client, ctx) -> None:
+    """C8 "🛍 Bawa pulang": a takeaway order, still marked with the table it came from."""
+    token = _token(ctx)
+    americano = _menu(client, token)["Americano"]["product_id"]
+    res = _place(
+        client,
+        token,
+        [{"product_id": americano, "quantity": 1, "note": "tanpa es"}],
+        customer_name="Rina",
+        fulfillment="takeaway",
+    )
+    assert res.status_code == 201, res.text
+    order = {**res.json(), "token": token}
+    assert order["status"] == "pending_payment"
+
+    status = _status(client, order).json()
+    assert status["fulfillment"] == "takeaway"
+    card = _card(client, ctx, order["order_id"])
+    assert card["channel"] == "web_table" and card["type"] == "takeaway"
+    assert card["table"] == "M05"
+    assert "preparing" not in card["allowed_actions"]  # unpaid
+
+    _claim(client, order)
+    proof = _card(client, ctx, order["order_id"])["proof_id"]
+    res = client.post(
+        f"/api/v1/ops/payment-proofs/{proof}/accept",
+        headers=ctx["staff"],
+        json={"merchant_account_checked": True},
+    )
+    assert res.status_code == 200, res.text
+    card = _card(client, ctx, order["order_id"])
+    assert card["status"] == "confirmed" and "preparing" in card["allowed_actions"]
+
+
+def test_table_order_rejects_pickup_or_delivery(client, ctx) -> None:
+    token = _token(ctx)
+    americano = _menu(client, token)["Americano"]["product_id"]
+    res = _place(client, token, [{"product_id": americano, "quantity": 1}], fulfillment="delivery")
+    assert res.status_code in (400, 422), res.text
