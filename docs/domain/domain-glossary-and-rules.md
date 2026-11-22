@@ -46,6 +46,7 @@ Decisions recorded from the product owner on 2026-11-17:
 | PB1 | `pb1` | Regional restaurant tax (PBJT F&B, Law No. 1/2022), set per outlet, up to 10%. |
 | Meja | `table` | A table at an outlet with seat capacity and optional area. |
 | Reservasi | `reservation` | A table booking (or a walk-in occupancy) for a time range. |
+| Meja terisi | derived (FR9.11) | A table with an open dine-in order (table QR or counter, from creation until completed/cancelled) or an open bill, active in the last 12 hours and not released with "Kosongkan meja". Not bookable for slots that start today. |
 | Kontak WhatsApp | `whatsapp_contact` | A customer identified by phone number within a tenant. |
 | Membership / consent | `customer_consent` | Customer's consent for the tenant to keep their data. |
 | Tablet absensi | `attendance_device` | A tablet paired to one outlet, the only place staff clock in/out. At most one active tablet per outlet; the owner forgets it ("Lupakan perangkat") before pairing a new one. |
@@ -164,6 +165,7 @@ Rules:
 - Hold: 15 minutes after booking time, then automatic `no_show` and table released (FR9.10).
 - Settings per outlet: enabled, bookable hours, default duration, booking window (days ahead), max party size, reminder offset, cancellation cutoff.
 - Walk-in occupancy is a reservation with source `walk_in` and status `seated`, so it blocks overlapping bookings (FR9.7).
+- Automatic occupancy (FR9.11, PRD v0.22): a table is occupied from the creation of a dine-in order on it (`web_table` or `counter`, `pending_payment` included) or the opening of an open bill, until every such order is `completed`/`cancelled` and the bill is `closed`/`voided`. While occupied it is skipped for slots starting on the outlet-local current day only; other days are unaffected. It is derived, not a reservation row, so it is outside the `no_overlap` constraint and never cancels or moves a booking (a conflicting booking later today is flagged for staff instead). Override: "Kosongkan meja" (staff or owner, audit-logged) sets `tables.occupancy_released_at`; only orders/bills created after that occupy the table again. Orders/bills whose latest activity is older than 12 hours are ignored.
 
 ## 9. Access and roles
 

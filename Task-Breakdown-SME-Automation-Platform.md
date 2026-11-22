@@ -136,6 +136,7 @@ The web chat (PRD §5.2, §5.6) serves both entry points from one frontend build
 | T-063 | Implement table occupancy for walk-in guests (no reservation) and availability blocking. | US-027 | T-057, T-058, T-062 | P0 |
 | T-064 | Implement 15-minute post-booking hold, automatic no-show, table release, and seated-before-deadline behavior. | US-027 | T-060, T-062, T-104 | P0 |
 | T-065 | Add reservation tests for capacity limits, timezone display, double-booking, the 2-booking limit, calendar file times, code + phone lookup, cutoff, walk-ins, reassignment, and no-show release. | US-022–US-027 | T-057–T-064 | P0 |
+| T-149 | Implement automatic table occupancy (FR9.11, PRD v0.22): shared occupancy function (open dine-in orders from table QR or counter + open bills, 12-hour cap, release timestamp), skip occupied tables for slots starting today in S6, C10, C12 reschedule and the agent tool, `table_occupied` errors, S6 `occupancy` / `table_occupied` fields, `POST /ops/tables/{id}/release-occupancy` with audit log, migration for `tables.occupancy_released_at/_by`, O2 `current_crowd` on the same function, and tests for AC9.14–AC9.19. S6/M4 UI waits for the wireframe. | US-024, US-027 | T-033, T-058, T-063, T-140 | P0 |
 
 ## Wave 7 — Admin application and recommendations
 
