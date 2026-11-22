@@ -135,11 +135,11 @@ describe('C2–C6 ordering from the outlet link', () => {
     await user.click(within(menu).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
 
     // AC2.3: the required group must be answered first.
-    expect(screen.getByRole('button', { name: 'Lanjut' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^Tambah ke keranjang/ })).toBeDisabled()
     await user.click(screen.getByRole('radio', { name: /Oat milk/ }))
-    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
-    expect(await screen.findByText(/Catatan untuk dapur\?/)).toBeInTheDocument()
-    await user.type(screen.getByRole('textbox', { name: 'Ketik pesan' }), 'kurang manis{Enter}')
+    // Q2a: the kitchen note sits with the add-ons, not in the chat box.
+    await user.type(screen.getByRole('textbox', { name: 'Catatan untuk dapur' }), 'kurang manis')
+    await user.click(screen.getByRole('button', { name: 'Tambah ke keranjang · Rp 30.000' }))
     expect(await screen.findByText(/Masuk keranjang: 1× Es Kopi Susu Senja \(Oat milk\) · ✎ kurang manis — Rp 30.000/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /3?1 item · Rp 30.000/ }))
@@ -564,8 +564,7 @@ describe('C9 AI / C14 / C15 agent', () => {
     const cards = screen.getByRole('list', { name: 'Rekomendasi asisten' })
     await user.click(within(cards).getByRole('button', { name: 'Tambah Es Kopi Susu Senja' }))
     await user.click(screen.getByRole('radio', { name: /Oat milk/ }))
-    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
-    expect(await screen.findByText(/Catatan untuk dapur\?/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Catatan untuk dapur' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '18:30' }))
     expect(await screen.findByText('Oke, jam 18:30.')).toBeInTheDocument()
     expect(sent(fetchMock, 1).body.text).toBe('18:30')

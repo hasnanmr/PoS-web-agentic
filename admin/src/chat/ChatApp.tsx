@@ -437,7 +437,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
           canBook={scope.kind === 'o' && page.reservations_enabled} onAdd={startAdd} />
       )}
       {step.name === 'addons' && (
-        <AddonPicker item={step.item} onDone={(ids) => setStep({ name: 'note', item: step.item, optionIds: ids })} />
+        <AddonPicker item={step.item} onDone={(ids, note) => addLine(step.item, ids, note)} />
       )}
       {step.name === 'note' && (
         <NotePrompt onSkip={() => { say('me', 'Tanpa catatan'); addLine(step.item, step.optionIds, null) }}

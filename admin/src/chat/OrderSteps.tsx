@@ -77,7 +77,9 @@ export function MenuCards({ outletName, menu, cart, webOrdering, canBook = false
 
 // C3 ------------------------------------------------------------------------------------------------
 
-export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (optionIds: string[]) => void }) {
+export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (optionIds: string[], note: string | null) => void }) {
+  const [note, setNote] = useState('')
+  const kitchenNote = () => note.trim().slice(0, 200) || null
   const [picked, setPicked] = useState<Record<string, string[]>>(() => {
     // A required single-choice group starts empty: the customer must answer it (AC2.3).
     return Object.fromEntries(item.addon_groups.map((g) => [g.id, []]))
@@ -123,9 +125,21 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
           </Bubble>
         )
       })}
-      <div className="grid max-w-[92%] grid-cols-2 gap-2">
-        <Action tone="quiet" disabled={missing} onClick={() => onDone(requiredOnly())}>Lewati</Action>
-        <Action disabled={missing} onClick={() => onDone(Object.values(picked).flat())}>Lanjut</Action>
+      {/* Same bubble flow as Q2a: the kitchen note is chosen together with the add-ons. */}
+      <Bubble>
+        <label className="block">
+          <span className="mb-1 block font-semibold">Catatan untuk dapur (opsional)</span>
+          <input aria-label="Catatan untuk dapur" value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="Mis. kurang manis, tanpa es" maxLength={200} enterKeyHint="done" autoComplete="off"
+            className={inputClass} />
+        </label>
+        <p className="mt-1 text-[11px] text-text-muted">Untuk item ini saja. Item sama dengan catatan beda jadi baris terpisah.</p>
+      </Bubble>
+      <div className="grid max-w-[92%] grid-cols-[auto_1fr] gap-2">
+        <Action tone="quiet" disabled={missing} onClick={() => onDone(requiredOnly(), kitchenNote())}>Lewati</Action>
+        <Action disabled={missing} onClick={() => onDone(Object.values(picked).flat(), kitchenNote())}>
+          Tambah ke keranjang · {formatRupiah(lineUnitPrice(item, Object.values(picked).flat()))}
+        </Action>
       </div>
     </div>
   )
