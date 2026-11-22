@@ -217,6 +217,41 @@ describe('C2–C6 ordering from the outlet link', () => {
     expect(screen.queryByRole('button', { name: /^Tambah / })).not.toBeInTheDocument()
   })
 
+  it('the kitchen note is typed in the same bubble as "Tanpa catatan" (C3)', async () => {
+    const user = userEvent.setup()
+    renderChat({})
+    await user.click(await screen.findByRole('button', { name: /Pesan$/ }))
+    await user.click(await screen.findByRole('button', { name: 'Tambah Americano' }))
+    expect(screen.queryByRole('button', { name: 'Tambah dengan catatan' })).not.toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: 'Catatan untuk dapur' }), 'kurang manis')
+    expect(screen.queryByRole('button', { name: 'Tanpa catatan' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Tambah dengan catatan' }))
+    expect(await screen.findByText(/Masuk keranjang: 1× Americano · ✎ kurang manis/)).toBeInTheDocument()
+  })
+
+  it('each cart line has "✎ + Catatan" to write or change its note (Q3)', async () => {
+    const user = userEvent.setup()
+    renderChat({ [`POST ${O}/quote`]: QUOTE })
+    await user.click(await screen.findByRole('button', { name: /Pesan$/ }))
+    await user.click(await screen.findByRole('button', { name: 'Tambah Americano' }))
+    await user.click(screen.getByRole('button', { name: 'Tanpa catatan' }))
+    await user.click(await screen.findByRole('button', { name: 'Tambah lagi Americano' }))
+    await user.type(screen.getByRole('textbox', { name: 'Catatan untuk dapur' }), 'tanpa es')
+    await user.click(screen.getByRole('button', { name: 'Tambah dengan catatan' }))
+    await user.click(screen.getByRole('button', { name: /Lihat keranjang/ }))
+    await user.click(await screen.findByRole('button', { name: 'Tambah catatan Americano' }))
+    await user.type(screen.getByRole('textbox', { name: 'Catatan untuk dapur · Americano' }), 'kurang manis')
+    await user.click(screen.getByRole('button', { name: 'Simpan catatan' }))
+    expect(await screen.findByRole('button', { name: 'Ubah catatan Americano: kurang manis' })).toBeInTheDocument()
+    // Changing it to the same note as the other line joins the two lines.
+    await user.click(screen.getByRole('button', { name: 'Ubah catatan Americano: kurang manis' }))
+    const box = screen.getByRole('textbox', { name: 'Catatan untuk dapur · Americano' })
+    await user.clear(box)
+    await user.type(box, 'tanpa es{Enter}')
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /catatan Americano/ })).toHaveLength(1))
+    expect(screen.getByRole('button', { name: 'Ubah catatan Americano: tanpa es' })).toBeInTheDocument()
+  })
+
   it('typing "menu" returns to the main menu and keeps the cart', async () => {
     const user = userEvent.setup()
     renderChat({})

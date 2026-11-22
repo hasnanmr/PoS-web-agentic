@@ -271,6 +271,18 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
     setCart((c) => (quantity <= 0 ? c.filter((_, i) => i !== index) : c.map((l, i) => (i === index ? { ...l, quantity: Math.min(99, quantity) } : l))))
   }
 
+  // Q3 "✎ + Catatan" in the cart: a line that now matches another (same item, add-ons, note) joins it.
+  function setLineNote(index: number, note: string | null) {
+    setCart((c) => {
+      const edited = { ...c[index], note: note ? note.slice(0, 200) : null }
+      const key = (l: CartLine) => `${l.product_id}|${[...l.addon_option_ids].sort().join()}|${l.note ?? ''}`
+      const twin = c.findIndex((l, i) => i !== index && key(l) === key(edited))
+      if (twin < 0) return c.map((l, i) => (i === index ? edited : l))
+      return c.flatMap((l, i) => (i === index ? []
+        : i === twin ? [{ ...l, quantity: Math.min(99, l.quantity + edited.quantity) }] : [l]))
+    })
+  }
+
   // Text box ---------------------------------------------------------------------------------------------
   function onText(text: string) {
     if (text.trim().toLowerCase() === 'menu') { mainMenu(); return }
@@ -428,7 +440,8 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
         <AddonPicker item={step.item} onDone={(ids) => setStep({ name: 'note', item: step.item, optionIds: ids })} />
       )}
       {step.name === 'note' && (
-        <NotePrompt onSkip={() => { say('me', 'Tanpa catatan'); addLine(step.item, step.optionIds, null) }} />
+        <NotePrompt onSkip={() => { say('me', 'Tanpa catatan'); addLine(step.item, step.optionIds, null) }}
+          onNote={(note) => { say('me', note); addLine(step.item, step.optionIds, note) }} />
       )}
       {step.name === 'recs' && !step.quiet && (
         <Recommendations chat={chat} byId={byId} webOrdering={page.web_ordering} agent={page.agent_enabled} onAdd={startAdd} />
@@ -436,7 +449,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       {(step.name === 'cart' || step.name === 'details' || step.name === 'summary') && (
         <Checkout footerSlot={footerSlot} chat={chat} page={page} scope={scope} step={step.name} mode={mode} cart={cart} byId={byId}
           fulfillment={fulfillment} details={details} prefilled={prefilled} remember={remember} typedAddress={typedAddress}
-          onQuantity={setQuantity} onAddMore={() => go('+ Tambah menu', { name: 'menu' })}
+          onQuantity={setQuantity} onNote={setLineNote} onAddMore={() => go('+ Tambah menu', { name: 'menu' })}
           onEmpty={() => { setCart([]); say('info', 'Keranjang sudah dikosongkan.') }}
           onFulfillment={(f) => {
             setFulfillment(f)
@@ -648,7 +661,7 @@ function Checkout(props: {
   chat: ChatApi; page: ChatPage; scope: Scope; step: 'cart' | 'details' | 'summary'; mode: 'pickup' | 'delivery' | 'table'
   cart: CartLine[]; byId: Map<string, ChatMenuItem>; fulfillment: 'pickup' | 'delivery' | null; details: Details
   prefilled: boolean; remember: boolean; typedAddress: { text: string; seq: number }
-  onQuantity: (i: number, q: number) => void; onAddMore: () => void; onEmpty: () => void
+  onQuantity: (i: number, q: number) => void; onNote: (i: number, note: string | null) => void; onAddMore: () => void; onEmpty: () => void
   onFulfillment: (f: 'pickup' | 'delivery') => void; onTableNext: () => void
   onRemember: (on: boolean) => void; onClearSaved: () => void; onDetails: (d: Details) => void; onEditDetails: () => void
   onCart: (lines: CartLine[]) => void; onMenu: () => void
@@ -719,7 +732,7 @@ function Checkout(props: {
     <div className="space-y-2">
       {step === 'cart' && (
         <>
-          <CartCard cart={cart} byId={byId} onQuantity={props.onQuantity} onAddMore={props.onAddMore} onEmpty={props.onEmpty} />
+          <CartCard cart={cart} byId={byId} onQuantity={props.onQuantity} onNote={props.onNote} onAddMore={props.onAddMore} onEmpty={props.onEmpty} />
           {cart.length > 0 && (mode === 'table' ? (
             <div className="max-w-[92%]"><Action onClick={props.onTableNext}>Lanjut</Action></div>
           ) : (
