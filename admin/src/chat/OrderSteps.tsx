@@ -77,7 +77,9 @@ export function MenuCards({ outletName, menu, cart, webOrdering, canBook = false
 
 // C3 ------------------------------------------------------------------------------------------------
 
-export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (optionIds: string[]) => void }) {
+export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (optionIds: string[], note: string | null) => void }) {
+  const [note, setNote] = useState('')
+  const kitchenNote = () => note.trim().slice(0, 200) || null
   const [picked, setPicked] = useState<Record<string, string[]>>(() => {
     // A required single-choice group starts empty: the customer must answer it (AC2.3).
     return Object.fromEntries(item.addon_groups.map((g) => [g.id, []]))
@@ -123,29 +125,53 @@ export function AddonPicker({ item, onDone }: { item: ChatMenuItem; onDone: (opt
           </Bubble>
         )
       })}
-      <div className="grid max-w-[92%] grid-cols-2 gap-2">
-        <Action tone="quiet" disabled={missing} onClick={() => onDone(requiredOnly())}>Lewati</Action>
-        <Action disabled={missing} onClick={() => onDone(Object.values(picked).flat())}>Lanjut</Action>
+      {/* Same bubble flow as Q2a: the kitchen note is chosen together with the add-ons. */}
+      <Bubble>
+        <label className="block">
+          <span className="mb-1 block font-semibold">Catatan untuk dapur (opsional)</span>
+          <input aria-label="Catatan untuk dapur" value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="Mis. kurang manis, tanpa es" maxLength={200} enterKeyHint="done" autoComplete="off"
+            className={inputClass} />
+        </label>
+        <p className="mt-1 text-[11px] text-text-muted">Untuk item ini saja. Item sama dengan catatan beda jadi baris terpisah.</p>
+      </Bubble>
+      <div className="grid max-w-[92%] grid-cols-[auto_1fr] gap-2">
+        <Action tone="quiet" disabled={missing} onClick={() => onDone(requiredOnly(), kitchenNote())}>Lewati</Action>
+        <Action disabled={missing} onClick={() => onDone(Object.values(picked).flat(), kitchenNote())}>
+          Tambah ke keranjang · {formatRupiah(lineUnitPrice(item, Object.values(picked).flat()))}
+        </Action>
       </div>
     </div>
   )
 }
 
-export function NotePrompt({ onSkip }: { onSkip: () => void }) {
+// The note is typed in the same bubble as "Tanpa catatan" (owner request): customers did not see
+// that the bottom text box took the note.
+export function NotePrompt({ onSkip, onNote }: { onSkip: () => void; onNote: (note: string) => void }) {
+  const [note, setNote] = useState('')
+  const value = note.trim()
   return (
     <Bubble>
       <p>Catatan untuk dapur? (opsional, untuk item ini saja)</p>
-      <Choice className="mt-2 text-center" onClick={onSkip}>Tanpa catatan</Choice>
+      <form className="mt-2 space-y-2" onSubmit={(e) => { e.preventDefault(); if (value) onNote(value) }}>
+        <input aria-label="Catatan untuk dapur" value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder="Mis. kurang manis, tanpa es" maxLength={200} enterKeyHint="done" autoComplete="off"
+          className={inputClass} />
+        {value
+          ? <Action type="submit">Tambah dengan catatan</Action>
+          : <Choice className="text-center" onClick={onSkip}>Tanpa catatan</Choice>}
+      </form>
     </Bubble>
   )
 }
 
 // C4 ------------------------------------------------------------------------------------------------
 
-export function CartCard({ cart, byId, onQuantity, onAddMore, onEmpty }: {
+export function CartCard({ cart, byId, onQuantity, onNote, onAddMore, onEmpty }: {
   cart: CartLine[]; byId: Map<string, ChatMenuItem>; onQuantity: (index: number, quantity: number) => void
-  onAddMore: () => void; onEmpty: () => void
+  onNote?: (index: number, note: string | null) => void; onAddMore: () => void; onEmpty: () => void
 }) {
+  const [editing, setEditing] = useState<number | null>(null)
   return (
     <Bubble>
       <p className="mb-2 font-semibold">Keranjang kamu</p>
@@ -160,11 +186,18 @@ export function CartCard({ cart, byId, onQuantity, onAddMore, onEmpty }: {
               <li key={`${l.product_id}-${i}`} className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                   <p>{l.quantity}× {item?.name ?? 'Item'}</p>
-                  {(addons.length > 0 || l.note) && (
-                    <p className="text-[11px] text-text-muted">
-                      {addons.length > 0 && `+ ${addons.join(', ')}`}{addons.length > 0 && l.note && ' · '}{l.note && `✎ ${l.note}`}
-                    </p>
-                  )}
+                  {addons.length > 0 && <p className="text-[11px] text-text-muted">+ {addons.join(', ')}</p>}
+                  {/* Q3: "✎ kurang manis" / "✎ + Catatan" on every line, editable in place. */}
+                  {onNote && editing === i ? (
+                    <NoteEditor initial={l.note ?? ''} name={item?.name ?? 'item'}
+                      onSave={(note) => { onNote(i, note); setEditing(null) }} onCancel={() => setEditing(null)} />
+                  ) : onNote ? (
+                    <button type="button" onClick={() => setEditing(i)}
+                      aria-label={l.note ? `Ubah catatan ${item?.name ?? 'item'}: ${l.note}` : `Tambah catatan ${item?.name ?? 'item'}`}
+                      className={`-mx-1 mt-0.5 rounded px-1 py-0.5 text-left text-[11px] active:bg-primary-soft ${l.note ? 'text-text-muted' : 'font-semibold text-primary'}`}>
+                      ✎ {l.note ?? '+ Catatan'}
+                    </button>
+                  ) : l.note && <p className="text-[11px] text-text-muted">✎ {l.note}</p>}
                 </div>
                 {/* Same "− 1 +" as the wireframe, with a finger-sized tap area around each sign. */}
                 <div className="-my-2 flex shrink-0 items-center font-semibold text-primary">
@@ -185,6 +218,23 @@ export function CartCard({ cart, byId, onQuantity, onAddMore, onEmpty }: {
         {cart.length > 0 && <> <span className="text-text-muted">·</span> <TextLink onClick={onEmpty}>Kosongkan keranjang</TextLink></>}
       </p>
     </Bubble>
+  )
+}
+
+function NoteEditor({ initial, name, onSave, onCancel }: {
+  initial: string; name: string; onSave: (note: string | null) => void; onCancel: () => void
+}) {
+  const [note, setNote] = useState(initial)
+  return (
+    <form className="mt-1 space-y-1.5" onSubmit={(e) => { e.preventDefault(); onSave(note.trim() || null) }}>
+      <input aria-label={`Catatan untuk dapur · ${name}`} value={note} onChange={(e) => setNote(e.target.value)} autoFocus
+        placeholder="Mis. kurang manis, tanpa es" maxLength={200} enterKeyHint="done" autoComplete="off"
+        className={`${inputClass} py-1.5 text-[12px]`} />
+      <div className="flex gap-3">
+        <TextLink type="submit">Simpan catatan</TextLink>
+        <TextLink className="text-text-muted" onClick={onCancel}>Batal</TextLink>
+      </div>
+    </form>
   )
 }
 
