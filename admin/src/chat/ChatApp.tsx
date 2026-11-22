@@ -26,7 +26,7 @@ import { BookedCard, BookingFlow, MyBookings, type BookingPreset, type Person } 
 import { friendly, isRetryable } from './copy'
 import { cartTotal, describeLine, lineUnitPrice } from './cart'
 import {
-  AddonPicker, CartCard, DetailsForm, FulfillmentChoice, MenuCards, NotePrompt, SummaryCard, type Details,
+  AddonPicker, CartCard, DetailsForm, FulfillmentChoice, MenuCards, NotePrompt, SummaryCard, TableChoice, type Details,
 } from './OrderSteps'
 import { MyOrders, PayCard, StatusCard } from './PayStatus'
 import { isActive, useObjectUrl } from './status'
@@ -38,7 +38,7 @@ import {
 import type {
   Booking, CartLine, ChatMenuItem, ChatPage, ChatQuote, OrderOverview, OrderStatus, RecommendationCard, Scope,
 } from './types'
-import { Action, ActionBar, Bubble, BottomBar, ChatHeader, Choice, Mine, TextLink } from './ui'
+import { ActionBar, Bubble, BottomBar, ChatHeader, Choice, Mine, TextLink } from './ui'
 import { useVisualViewport } from './viewport'
 
 type Step =
@@ -114,6 +114,8 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [cart, setCart] = useState<CartLine[]>([])
   const [fulfillment, setFulfillment] = useState<'pickup' | 'delivery' | null>(null)
+  // C8: kept on this page only (the chat session stores no fulfillment for a table).
+  const [tableType, setTableType] = useState<'dine_in' | 'takeaway' | null>(null)
   const [typedAddress, setTypedAddress] = useState({ text: '', seq: 0 })
   const saved = loadDetails()
   const [details, setDetails] = useState<Details>({ name: saved?.name ?? '', phone: saved?.phone ?? '', address: saved?.address ?? '' })
@@ -448,14 +450,17 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       )}
       {(step.name === 'cart' || step.name === 'details' || step.name === 'summary') && (
         <Checkout footerSlot={footerSlot} chat={chat} page={page} scope={scope} step={step.name} mode={mode} cart={cart} byId={byId}
-          fulfillment={fulfillment} details={details} prefilled={prefilled} remember={remember} typedAddress={typedAddress}
+          fulfillment={fulfillment} tableType={tableType} details={details} prefilled={prefilled} remember={remember} typedAddress={typedAddress}
           onQuantity={setQuantity} onNote={setLineNote} onAddMore={() => go('+ Tambah menu', { name: 'menu' })}
           onEmpty={() => { setCart([]); say('info', 'Keranjang sudah dikosongkan.') }}
           onFulfillment={(f) => {
             setFulfillment(f)
             go(f === 'delivery' ? '🛵 Diantar' : '🛍 Ambil di outlet', { name: 'details' })
           }}
-          onTableNext={() => setStep({ name: 'details' })}
+          onTableType={(t) => {
+            setTableType(t)
+            go(t === 'takeaway' ? '🛍 Bawa pulang' : '🍽 Makan di sini', { name: 'details' })
+          }}
           onRemember={(on) => { setRemember(on); if (!on) { clearDetails(); setPrefilled(false) } }}
           onClearSaved={() => { clearDetails(); setPrefilled(false); setRemember(false); setDetails({ name: '', phone: '', address: '' }) }}
           onDetails={(d) => {
@@ -659,10 +664,11 @@ function Recommendations({ chat, byId, webOrdering, agent, onAdd }: {
 function Checkout(props: {
   footerSlot: HTMLDivElement | null
   chat: ChatApi; page: ChatPage; scope: Scope; step: 'cart' | 'details' | 'summary'; mode: 'pickup' | 'delivery' | 'table'
-  cart: CartLine[]; byId: Map<string, ChatMenuItem>; fulfillment: 'pickup' | 'delivery' | null; details: Details
+  cart: CartLine[]; byId: Map<string, ChatMenuItem>; fulfillment: 'pickup' | 'delivery' | null
+  tableType: 'dine_in' | 'takeaway' | null; details: Details
   prefilled: boolean; remember: boolean; typedAddress: { text: string; seq: number }
   onQuantity: (i: number, q: number) => void; onNote: (i: number, note: string | null) => void; onAddMore: () => void; onEmpty: () => void
-  onFulfillment: (f: 'pickup' | 'delivery') => void; onTableNext: () => void
+  onFulfillment: (f: 'pickup' | 'delivery') => void; onTableType: (t: 'dine_in' | 'takeaway') => void
   onRemember: (on: boolean) => void; onClearSaved: () => void; onDetails: (d: Details) => void; onEditDetails: () => void
   onCart: (lines: CartLine[]) => void; onMenu: () => void
   onPlaced: (o: { order_id: string; access_key: string; order_no: string }) => void
@@ -688,7 +694,7 @@ function Checkout(props: {
   async function place() {
     if (!quote) return
     const body: OrderBody = mode === 'table'
-      ? { items: cart, customer_name: details.name.trim(), privacy_notice_version: page.privacy_notice.version, expected_total: quote.total }
+      ? { items: cart, fulfillment: props.tableType ?? 'dine_in', customer_name: details.name.trim(), privacy_notice_version: page.privacy_notice.version, expected_total: quote.total }
       : {
         items: cart, fulfillment: mode, privacy_notice_version: page.privacy_notice.version, expected_total: quote.total,
         customer: { name: details.name.trim(), phone: details.phone.trim(), ...(mode === 'delivery' ? { address: details.address.trim() } : {}) },
@@ -734,7 +740,7 @@ function Checkout(props: {
         <>
           <CartCard cart={cart} byId={byId} onQuantity={props.onQuantity} onNote={props.onNote} onAddMore={props.onAddMore} onEmpty={props.onEmpty} />
           {cart.length > 0 && (mode === 'table' ? (
-            <div className="max-w-[92%]"><Action onClick={props.onTableNext}>Lanjut</Action></div>
+            <TableChoice value={props.tableType} onPick={props.onTableType} />
           ) : (
             <FulfillmentChoice value={props.fulfillment} deliveryFee={page.delivery_fee} onPick={props.onFulfillment} />
           ))}
@@ -748,6 +754,7 @@ function Checkout(props: {
       {step === 'summary' && cart.length > 0 && (
         <>
           <SummaryCard quote={quote} mode={mode} details={details} tableName={page.table ? tableLabel(page.table.name) : null}
+            tableType={props.tableType ?? 'dine_in'}
             items={items} onEdit={props.onEditDetails} />
           {soldOut && (
             <Bubble tone="danger">

@@ -5110,6 +5110,7 @@
           "fulfillment": {
             "enum": [
               "dine_in",
+              "takeaway",
               "pickup",
               "delivery"
             ],
@@ -9971,6 +9972,16 @@
             "description": "Total the page showed; `price_changed` if it differs",
             "title": "Expected Total"
           },
+          "fulfillment": {
+            "default": "dine_in",
+            "description": "C8 \"Makan di sini\" / \"Bawa pulang\"; a takeaway order keeps its table",
+            "enum": [
+              "dine_in",
+              "takeaway"
+            ],
+            "title": "Fulfillment",
+            "type": "string"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/LineIn"
@@ -10592,6 +10603,7 @@
           "fulfillment": {
             "enum": [
               "dine_in",
+              "takeaway",
               "pickup",
               "delivery"
             ],
@@ -20427,7 +20439,7 @@
     },
     "/api/v1/public/t/{token}/orders": {
       "post": {
-        "description": "C8 \"Pesan & bayar\": a pay-first dine-in order for this table (stock deducted).",
+        "description": "C8 \"Pesan & bayar\": a pay-first dine-in or takeaway order from this table (stock taken).",
         "operationId": "place_order_api_v1_public_t__token__orders_post",
         "parameters": [
           {

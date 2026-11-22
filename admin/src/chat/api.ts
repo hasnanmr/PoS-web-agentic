@@ -22,7 +22,7 @@ export interface OrderBody {
   note?: string | null
   expected_total?: number
   privacy_notice_version: string
-  fulfillment?: 'pickup' | 'delivery'
+  fulfillment?: 'pickup' | 'delivery' | 'dine_in' | 'takeaway'
   customer?: { name: string; phone: string; address?: string | null }
   customer_name?: string
 }

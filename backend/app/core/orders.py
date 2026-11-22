@@ -328,7 +328,8 @@ async def create_counter_order(
 class WebOrder:
     """Web chat "Pesan & bayar" (T-134 table QR, T-141 outlet link; FR2.3, FR2.6, FR2.13).
 
-    A table order (`table_id` set) is dine-in for that table, channel `web_table`; an outlet
+    A table order (`table_id` set) is channel `web_table`, dine-in or takeaway (C8 "Bawa pulang":
+    the table is kept so staff know who ordered, but it does not occupy the table); an outlet
     link order (`table_id` None) is pickup or delivery, channel `web_online`, with a customer
     record and, for delivery, an address and the outlet's flat delivery fee."""
 
@@ -341,6 +342,7 @@ class WebOrder:
     fulfillment: Literal["pickup", "delivery"] | None = None
     delivery_address: str | None = None
     customer_id: UUID | None = None
+    table_type: Literal["dine_in", "takeaway"] = "dine_in"
 
 
 async def create_web_order(
@@ -353,7 +355,7 @@ async def create_web_order(
     if draft.table_id is not None:
         await _check_table(conn, outlet_id, draft.table_id)
         channel: Channel = "web_table"
-        order_type: OrderType = "dine_in"
+        order_type: OrderType = draft.table_type
     else:
         if draft.fulfillment not in ("pickup", "delivery"):
             raise ValidationFailedError("choose pickup or delivery", {"field": "fulfillment"})

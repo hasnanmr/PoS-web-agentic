@@ -9,7 +9,7 @@ import type { OrderOverview, OrderStatus } from './types'
 import { Action, Bubble, TextLink } from './ui'
 
 const FULFILLMENT_WORD: Record<OrderStatus['fulfillment'], string> = {
-  dine_in: 'dine-in', pickup: 'pickup', delivery: 'delivery',
+  dine_in: 'dine-in', takeaway: 'takeaway', pickup: 'pickup', delivery: 'delivery',
 }
 
 // C6 ----------------------------------------------------------------------------------------------
@@ -62,7 +62,7 @@ function timeline(order: OrderStatus): { label: string; at: string | null; state
   steps.push({ key: 'confirmed', label: 'Pembayaran dikonfirmasi staf', at: at('confirmed') })
   steps.push({ key: 'preparing', label: 'Sedang disiapkan', at: at('preparing') })
   if (order.fulfillment === 'delivery') steps.push({ key: 'out_for_delivery', label: 'Dalam pengantaran', at: at('out_for_delivery') })
-  else steps.push({ key: 'ready', label: order.fulfillment === 'pickup' ? 'Siap diambil' : 'Siap diantar ke meja', at: at('ready') })
+  else steps.push({ key: 'ready', label: order.fulfillment === 'dine_in' ? 'Siap diantar ke meja' : 'Siap diambil', at: at('ready') })
   steps.push({ key: 'completed', label: 'Selesai', at: at('completed') })
   const reached = steps.map((s) => s.at !== null)
   const lastDone = reached.lastIndexOf(true)
@@ -76,7 +76,7 @@ function timeline(order: OrderStatus): { label: string; at: string | null; state
 export function StatusCard({ order, link }: { order: OrderStatus; link: string }) {
   const [copied, setCopied] = useState(false)
   const count = order.items.reduce((s, i) => s + i.quantity, 0)
-  const fulfillment = { dine_in: 'Dine-in', pickup: 'Pickup', delivery: 'Delivery' }[order.fulfillment]
+  const fulfillment = { dine_in: 'Dine-in', takeaway: 'Takeaway', pickup: 'Pickup', delivery: 'Delivery' }[order.fulfillment]
   async function copy() {
     try {
       await navigator.clipboard.writeText(link)

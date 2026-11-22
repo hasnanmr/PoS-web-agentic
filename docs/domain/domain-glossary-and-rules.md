@@ -85,8 +85,8 @@ Enum values are lower snake case in the database and API; UI labels are Bahasa I
 | `tenant_type` | `restaurant`, `cafe` | `dropshipper` added in Phase 3 (T-097). |
 | `user_role` | `owner`, `staff` | Stored role. The `app_role` JWT claim (T-113) is `owner`, `staff`, or `owner_pending` (invited owner, no tenant yet). |
 | `payment_mode` | `pay_first`, `open_bill` | Dine-in only. Online orders always pay first. |
-| `order_channel` | `web_online`, `web_table`, `counter`, `whatsapp_online`, `whatsapp_table` | FR2.8. `web_online` = web chat order from the outlet link `/o/<slug>` (pickup or delivery, name + phone); `web_table` = web chat order from a table QR `/t/<token>` (dine-in). Both are always paid first with the outlet's static QRIS, never on an open bill, and carry a per-order access key. The WhatsApp values are reserved for Phase 3; no MVP flow creates them. |
-| `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in. Counter: dine_in/takeaway. |
+| `order_channel` | `web_online`, `web_table`, `counter`, `whatsapp_online`, `whatsapp_table` | FR2.8. `web_online` = web chat order from the outlet link `/o/<slug>` (pickup or delivery, name + phone); `web_table` = web chat order from a table QR `/t/<token>` (dine-in, or takeaway that still records the table). Both are always paid first with the outlet's static QRIS, never on an open bill, and carry a per-order access key. The WhatsApp values are reserved for Phase 3; no MVP flow creates them. |
+| `order_type` | `delivery`, `pickup`, `dine_in`, `takeaway` | Online: delivery/pickup. Table QR: dine_in/takeaway (C8 "Makan di sini" / "Bawa pulang"; a table QR takeaway keeps its `table_id` so staff know who ordered, but it does not occupy the table). Counter: dine_in/takeaway (a counter takeaway has no table). |
 | `order_status` | `pending_payment`, `confirmed`, `preparing`, `ready`, `out_for_delivery`, `served`, `completed`, `cancelled` | Flows in §5. |
 | `payment_status` | `unpaid`, `proof_submitted`, `paid`, `refunded` | `refunded` only through a reversal. |
 | `payment_method` | `cash`, `qris`, `transfer` (T-125) | Online orders: QRIS only. `transfer` only for supplier payments. |
@@ -120,7 +120,7 @@ Allowed status transitions. Anything not listed is refused (AC10.1). `→ cancel
 | Online (pay first) | channel `web_online` (and Phase 3 `whatsapp_online`) | `pending_payment` → `confirmed` → `preparing` → `ready` → (`out_for_delivery` if delivery) → `completed` |
 | Dine-in, pay first | outlet `pay_first`, type `dine_in` | `pending_payment` → `confirmed` → `preparing` → `ready` → `completed` |
 | Dine-in, open bill | outlet `open_bill`, type `dine_in` | `confirmed` → `preparing` → `ready` → `served` → `completed` (when the bill is paid) |
-| Takeaway, counter | type `takeaway` | `confirmed` → `preparing` → `ready` → `completed` (only once paid) |
+| Takeaway (counter or table QR) | type `takeaway` | `confirmed` → `preparing` → `ready` → `completed` (only once paid). A table QR takeaway (channel `web_table`) starts at `pending_payment` and is `confirmed` by the payment, like every web order. |
 
 Rules:
 

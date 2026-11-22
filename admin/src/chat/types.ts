@@ -69,7 +69,7 @@ export interface OrderStatus {
   id: string
   order_no: string
   created_at: string
-  fulfillment: 'dine_in' | 'pickup' | 'delivery'
+  fulfillment: 'dine_in' | 'takeaway' | 'pickup' | 'delivery'
   customer_name: string | null
   delivery_address: string | null
   note: string | null
@@ -91,7 +91,7 @@ export interface OrderStatus {
 export interface OrderOverview {
   order_id: string
   order_no: string
-  fulfillment: 'dine_in' | 'pickup' | 'delivery'
+  fulfillment: 'dine_in' | 'takeaway' | 'pickup' | 'delivery'
   status: string
   payment_status: string
   total: number
