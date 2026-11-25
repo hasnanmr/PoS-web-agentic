@@ -5,6 +5,8 @@
 // GET /ops/outlets/{id}/qris/image. Tablet absensi (T-121): GET /owner/outlets/{id}/attendance-devices,
 // POST /owner/outlets/{id}/attendance-pairing-codes, POST /owner/attendance-devices/{id}/revoke
 // ("Lupakan perangkat"). One active tablet per outlet: pairing is offered only when none is left.
+// Umum → "Link pesan" (page 07 note "Bagikan link outlet"): the outlet link, Salin · Bagikan,
+// read-only (GET /owner/outlets/{id}/public-link; the slug is changed in O8).
 import { useEffect, useState, type ReactNode } from 'react'
 import { useSession } from '../app/session'
 import { errorMessage } from '../lib/api'
@@ -15,6 +17,7 @@ import { usePolling } from '../lib/usePolling'
 import { PageHeader } from '../layout/PageHeader'
 import { useQrisImage } from '../lib/useQrisImage'
 import { Alert, Button, Card, FieldRow, LinkButton, Loading, Select, StatusDot, TextInput } from '../ui/kit'
+import { OutletLinkValue } from './shared/OutletShareLink'
 
 type Draft = Omit<OutletDetail, 'id' | 'order_prefix' | 'whatsapp_status' | 'catalog_synced_at' | 'is_active'>
 
@@ -153,6 +156,9 @@ export default function BusinessPage() {
                 <Select id="o-tz" value={draft.timezone} onChange={(e) => set('timezone', e.target.value as Timezone)}>
                   {Object.entries(TIMEZONE_LABEL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
                 </Select>
+              </FieldRow>
+              <FieldRow label="Link pesan">
+                <OutletLinkValue key={detail.data.id} outletId={detail.data.id} outletName={detail.data.name} />
               </FieldRow>
               <FieldRow label="Nomor WhatsApp" htmlFor="o-wa">
                 <div className="flex flex-wrap items-center gap-2">

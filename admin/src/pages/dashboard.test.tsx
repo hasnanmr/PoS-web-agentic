@@ -169,7 +169,7 @@ describe('O2 Dashboard · Ringkasan', () => {
     expect(await screen.findByText('Belum ada data minggu lalu')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Jam ramai' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.selectOptions(screen.getByLabelText('Outlet'), 'o-riau')
-    await waitFor(() => expect(api.calls.map((c) => c[1]).filter((u) => !u.includes('top-items'))).toEqual([
+    await waitFor(() => expect(api.calls.map((c) => c[1]).filter((u) => !u.includes('top-items') && !u.includes('public-link'))).toEqual([
       '/owner/dashboard?period=today&hours=all',
       '/owner/dashboard?period=week&hours=all',
       '/owner/dashboard?period=week&hours=busy',

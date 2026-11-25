@@ -15,6 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
+from app.core import link_preview
 from app.core.web_chat import PRIVACY_NOTICE_VERSION
 from app.main import create_app
 
@@ -200,6 +201,23 @@ def test_no_qris_means_menu_only(client, ctx) -> None:
     assert admin_sql("select count(*) from app.customers where outlet_id = %s", (ctx["outlet"],))[
         0
     ] == (0,)  # rolled back with the refused order
+
+
+def test_link_preview_names_the_outlet_for_preview_bots(client, ctx) -> None:
+    page = client.get(_base(ctx)).json()
+    res = client.get(f"/api/v1/public/o/{ctx['slug'].upper()}/share")
+    assert res.status_code == 200 and res.headers["content-type"].startswith("text/html")
+    assert '<meta property="og:title" content="Pesan di Senja Dago · Thinker" />' in res.text
+    assert f'content="https://admin.test/o/{ctx["slug"]}"' in res.text
+    assert 'content="https://admin.test/og-outlet.png"' in res.text
+    expected = link_preview.outlet_description(
+        web_ordering=page["web_ordering"], reservations_enabled=page["reservations_enabled"]
+    )
+    assert f'<meta property="og:description" content="{expected}" />' in res.text
+    # Unknown or old slug: the generic card, no outlet data (C13).
+    res = client.get("/api/v1/public/o/tidak-ada-outlet/share")
+    assert res.status_code == 404 and "Senja" not in res.text
+    assert '<meta property="og:title" content="Thinker" />' in res.text
 
 
 # C4 · C5 ---------------------------------------------------------------------------------------

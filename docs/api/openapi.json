@@ -20156,6 +20156,49 @@
         ]
       }
     },
+    "/api/v1/public/o/{slug}/share": {
+      "get": {
+        "description": "Open Graph page for link-preview bots (WhatsApp, Instagram DM, Facebook, Telegram, ...).\n\nThe admin nginx proxies `/o/<slug>` here only for those bots; people get the chat page.\nTitle \"Pesan di <outlet> · Thinker\", a description that follows what the outlet offers, and\nthe shared 1200x630 image. An unknown or old slug → 404 with the generic Thinker card and no\noutlet data (C13 rule).",
+        "operationId": "share_preview_api_v1_public_o__slug__share_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Share Preview",
+        "tags": [
+          "public: web chat from the outlet link (C1)"
+        ]
+      }
+    },
     "/api/v1/public/t/{token}": {
       "get": {
         "description": "C8: the outlet and table, and whether ordering is possible here.",
