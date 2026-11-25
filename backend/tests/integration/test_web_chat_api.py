@@ -6,6 +6,7 @@ FR12.1, FR12.2; AC2.1, AC2.7, AC2.11, AC2.17, AC2.20, AC6.5, AC6.6, AC12.1, AC12
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,6 +16,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
+from app.core import crypto
+from app.core.agent.gateway import HISTORY_CONTEXT
 from app.core.web_chat import PRIVACY_NOTICE_VERSION
 from app.main import create_app
 
@@ -425,6 +428,47 @@ def test_unpaid_online_order_is_cancelled_after_the_limit(client, ctx) -> None:
 
 
 # Chat session (FR6.2) --------------------------------------------------------------------------
+
+
+def test_placing_an_order_resets_the_agents_memory(client, ctx) -> None:
+    """After Pesan & bayar the phone clears the chat; the agent must not still remember the old
+    summary as unplaced (it told customers to tap Pesan & bayar again)."""
+    _upload_qris(client, ctx)
+    res = client.put(
+        f"{_base(ctx)}/chat-session",
+        headers=SESSION,
+        json={"step": "summary", "cart": {"lines": []}, "fulfillment": "pickup"},
+    )
+    assert res.status_code == 200, res.text
+    old = [
+        {"role": "user", "text": "2 italian chicken"},
+        {"role": "assistant", "text": "Siap [ringkasan pesanan ditampilkan: 2x Italian chicken]"},
+    ]
+    admin_sql(
+        "update app.chat_sessions set agent_history = %s where outlet_id = %s",
+        (crypto.encrypt(json.dumps(old), HISTORY_CONTEXT), ctx["outlet"]),
+    )
+    americano = _menu(client, ctx)["Americano"]["product_id"]
+    res = client.post(
+        f"{_base(ctx)}/orders",
+        headers={**SESSION, "Idempotency-Key": uuid4().hex, "X-Order-Key": _new_key()},
+        json={
+            "items": [{"product_id": americano, "quantity": 1}],
+            "fulfillment": "pickup",
+            "customer": {"name": "Bima", "phone": "0812-3456 7890"},
+            "privacy_notice_version": PRIVACY_NOTICE_VERSION,
+        },
+    )
+    assert res.status_code == 201, res.text
+    blob = admin_sql(
+        "select agent_history from app.chat_sessions where outlet_id = %s", (ctx["outlet"],)
+    )[0][0]
+    history = json.loads(plain(blob, HISTORY_CONTEXT) or "[]")
+    assert [h["role"] for h in history] == ["user", "assistant"]
+    assert history[0]["text"] == "Pesan & bayar"
+    assert res.json()["order_no"] in history[1]["text"]
+    assert "Italian" not in json.dumps(history)
+    admin_sql("delete from app.chat_sessions where outlet_id = %s", (ctx["outlet"],))
 
 
 def test_chat_session_resumes_and_expires_after_two_hours(client, ctx) -> None:

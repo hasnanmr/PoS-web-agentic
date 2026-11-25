@@ -210,6 +210,28 @@ async def save_turn(
         )
 
 
+async def note_order_placed(
+    conn: Any, scope: web_chat.ChatScope, session: str, order_no: str
+) -> None:
+    """After "Pesan & bayar" the phone clears the chat and shows only that tap and the order,
+    so the agent's memory starts over the same way. Without this the next turn still remembers
+    the old summary and tells the customer to tap Pesan & bayar on what is already an order."""
+    history = [
+        {"role": "user", "text": "Pesan & bayar"},
+        {
+            "role": "assistant",
+            "text": f"[pesanan {order_no} sudah dibuat dan sedang diproses; ringkasan sebelumnya"
+            " sudah dipesan. Pesanan baru mulai dari keranjang kosong.]",
+        },
+    ]
+    blob = crypto.encrypt(json.dumps(history, ensure_ascii=False), HISTORY_CONTEXT)
+    await conn.execute(
+        "update app.chat_sessions set agent_history = %s where outlet_id = %s"
+        " and table_id is not distinct from %s and session_key_hash = %s",
+        (blob, scope.outlet_id, scope.table_id, session),
+    )
+
+
 def _history_messages(history: list[dict[str, str]]) -> list[BaseMessage]:
     return [
         HumanMessage(h["text"]) if h["role"] == "user" else AIMessage(h["text"])

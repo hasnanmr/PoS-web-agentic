@@ -445,6 +445,24 @@ describe('C9 AI / C14 / C15 agent', () => {
     expect(await screen.findByText(/Pilih susu/)).toBeInTheDocument()
   })
 
+  it('C7: typing while an order is in progress keeps the order card above the new chat', async () => {
+    const user = userEvent.setup()
+    stubAgent(sse([['final', { ...FINAL, reply_text: 'Bisa, mau pesan apa?' }]]))
+    const loc = memoryLocation('#order=ord-1&key=' + 'k'.repeat(40) + '&no=%23A-1050')
+    renderChat({ [`GET ${O}`]: AGENT_O, [`GET ${O}/orders/ord-1`]: status({ status: 'preparing', payment_status: 'paid',
+      claimed_at: '2026-11-21T05:44:00Z' }) }, 'o', loc)
+    await screen.findByText('Pesanan #A-1050')
+    await user.type(screen.getByRole('textbox'), 'Mau pesan baru lagi bisa?{Enter}')
+    const reply = await screen.findByText('Bisa, mau pesan apa?')
+    const mine = screen.getByText('Mau pesan baru lagi bisa?')
+    // Chronological: the order card (still live, drawn once), then the message, then the reply.
+    const order = await screen.findByText('Pesanan #A-1050')
+    expect(screen.getAllByText('Pesanan #A-1050')).toHaveLength(1)
+    expect(order.compareDocumentPosition(mine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(mine.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(loc.value).toBe('')
+  })
+
   it('C14: the order draft becomes the cart; Pesan & bayar asks the details first', async () => {
     const user = userEvent.setup()
     stubAgent(sse([['final', { ...FINAL, reply_text: 'Ini ringkasannya ya.', order_draft: {
