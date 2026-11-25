@@ -10,6 +10,8 @@
 //   higher revenue); paid orders only; revenue excl. PB1 and delivery fee; empty → "Belum ada item
 //   terjual di periode ini."
 //   Header "Rentang ▾" (period=range&from=&to=): a custom range of at most 92 days up to today.
+//   "Link pesan online" strip above the KPI tiles (page 07 note "Bagikan link outlet",
+//   ./shared/OutletShareLink, GET /owner/outlets/{id}/public-link): follows the header outlet.
 // - O2b drawer (./dashboard/OrdersDrawer, GET /owner/dashboard/orders): opened by the Revenue and
 //   Order tiles, a bar of "Order per jam", or a row of "Item terlaris".
 // - Tab PO & Supplier (O17 cards + O15 list/detail, ./po/PoTab): its own outlet + month filter,
@@ -29,6 +31,7 @@ import { OrdersDrawer, type Drill } from './dashboard/OrdersDrawer'
 import { MAX_RANGE_DAYS, revenueChange, type DayRange } from './dashboard/period'
 import { BusynessMap, ChannelsAndMethods, CurrentCrowd, KpiTiles, LowStock, OrdersPerHour } from './dashboard/Summary'
 import { SupplierDialog } from './po/dialogs'
+import { OutletLinkStrip } from './shared/OutletShareLink'
 import { PoForm } from './po/PoForm'
 import { PoTab } from './po/PoTab'
 import { monthLabel, recentMonths } from './po/util'
@@ -178,6 +181,7 @@ export default function DashboardPage() {
         </div>
       } />
       <div className="space-y-4 p-4 md:p-6">
+        <OutletLinkStrip headerOutletId={outletId} />
         <SummaryCards outletId={outletId} period={period} range={range} hours={hours}
           outletCount={outletId ? 1 : me.outlets.length} onDrill={setDrill} />
         <TopItemsCard outletId={outletId}

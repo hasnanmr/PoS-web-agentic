@@ -18,13 +18,14 @@ from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Header, Query, Request, Response, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app import db
 from app.api.errors import ApiError
 from app.api.v1 import public_chat as chat
 from app.api.v1.public_chat import ChatOutlet, LineIn, PrivacyNotice, WebOrderCreated
-from app.core import idempotency, orders, web_booking, web_chat
+from app.core import idempotency, link_preview, orders, web_booking, web_chat
 from app.core.errors import NotFoundError, ValidationFailedError
 
 router = APIRouter(prefix="/api/v1/public/o", tags=["public: web chat from the outlet link (C1)"])
@@ -77,6 +78,43 @@ async def outlet_page(slug: str, request: Request) -> OutletPage:
         agent_enabled=chat.agent_enabled(request),
         privacy_notice=chat.privacy_notice(),
     )
+
+
+# Link preview (page 07 "Pratinjau link outlet") ------------------------------------------------
+
+
+@router.get("/{slug}/share", response_class=HTMLResponse)
+async def share_preview(slug: str, request: Request) -> HTMLResponse:
+    """Open Graph page for link-preview bots (WhatsApp, Instagram DM, Facebook, Telegram, ...).
+
+    The admin nginx proxies `/o/<slug>` here only for those bots; people get the chat page.
+    Title "Pesan di <outlet> · Thinker", a description that follows what the outlet offers, and
+    the shared 1200x630 image. An unknown or old slug → 404 with the generic Thinker card and no
+    outlet data (C13 rule)."""
+    app_url = request.app.state.settings.admin_app_url
+    app_url = str(app_url) if app_url else None
+    try:
+        scope = await _resolve(slug, request)
+    except ApiError as e:
+        if e.status_code != 404:
+            raise
+        page = link_preview.render(
+            title=link_preview.GENERIC_TITLE,
+            description=link_preview.GENERIC_DESCRIPTION,
+            app_url=app_url,
+            slug=None,
+        )
+        return HTMLResponse(page, status_code=404, headers={"Cache-Control": "no-store"})
+    page = link_preview.render(
+        title=link_preview.outlet_title(scope.outlet_name),
+        description=link_preview.outlet_description(
+            web_ordering=scope.web_ordering, reservations_enabled=scope.reservations_enabled
+        ),
+        app_url=app_url,
+        slug=slug.lower(),
+    )
+    # Short cache: a renamed outlet or a changed slug shows up in new previews within minutes.
+    return HTMLResponse(page, headers={"Cache-Control": "public, max-age=300"})
 
 
 # C4 + C5 Pesan & bayar ----------------------------------------------------------------------------

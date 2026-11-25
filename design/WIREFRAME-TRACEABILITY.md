@@ -18,7 +18,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | 04 · Mobile 360 | M1–M6 | [04-mobile-360.png](previews/04-mobile-360.png) |
 | 05 · Tablet Absensi Outlet | K0–K4 | [05-tablet-absensi.png](previews/05-tablet-absensi.png) |
 | 06 · QR Meja Pelanggan (diganti page 07) | Q0–Q5, Q2a, S2 kartu order web — built in PR #47–#51; the customer screens are replaced by page 07 | [06-qr-meja-pelanggan.png](previews/06-qr-meja-pelanggan.png) |
-| 07 · Web Chat Pelanggan | C1–C15 (customer web chat: outlet link + table QR, AI agent C9/C14/C15), S2 kartu order web_online/web_table, O8 link outlet & QR, behaviour notes | [07-web-chat-pelanggan.png](previews/07-web-chat-pelanggan.png) |
+| 07 · Web Chat Pelanggan | C1–C15 (customer web chat: outlet link + table QR, AI agent C9/C14/C15), S2 kartu order web_online/web_table, O8 link outlet & QR, pratinjau link outlet (WhatsApp / IG DM card + 1200×630 image) and the "Bagikan link outlet" note (O2 strip, O3 row), behaviour notes | [07-web-chat-pelanggan.png](previews/07-web-chat-pelanggan.png) |
 | 99 · Components | `Sidebar/Owner`, `Sidebar/Staff` (with the Thinker logo + name), "Logo Thinker · 2 opsi" (option 1 · Gelembung T chosen) | — |
 
 ## Screen → user story → task
@@ -28,9 +28,9 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | Screen | User stories | Tasks |
 |---|---|---|
 | O1 Login (invite-only) & Buat Bisnis | US-001, US-002, US-003, US-008 | T-006, T-010, T-011, T-024, T-066 |
-| O2 Dashboard — tab Ringkasan + keramaian (busy/quiet hours, busyness map, current crowd, item terlaris); header tabs Ringkasan · PO & Supplier; periode Hari ini · Minggu · Bulan · Rentang | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
+| O2 Dashboard — tab Ringkasan + strip "Link pesan online" (link outlet: Salin · Bagikan · Atur link & QR →) + keramaian (busy/quiet hours, busyness map, current crowd, item terlaris); header tabs Ringkasan · PO & Supplier; periode Hari ini · Minggu · Bulan · Rentang | US-007, US-032, US-033, US-056 | T-043, T-071, T-123, T-124 |
 | O2b Dashboard — drawer detail Revenue / Order (dari tile Revenue, tile Order, bar Order per jam, baris Item terlaris): ringkasan, per outlet, daftar order → S3 | US-032, US-056 | T-071, T-124 |
-| O3 Bisnis & Outlet (PB1, payment mode, QRIS, cash drawers, attendance tablets, grace period) | US-002, US-017, US-018, US-019, US-020, US-053, US-055 | T-011, T-014, T-039, T-066, T-118, T-121 |
+| O3 Bisnis & Outlet (Umum: baris "Link pesan" — Salin · Bagikan; PB1, payment mode, QRIS, cash drawers, attendance tablets, grace period) | US-002, US-017, US-018, US-019, US-020, US-053, US-055 | T-011, T-014, T-039, T-066, T-118, T-121 |
 | O4 Staf & Akses (staff invitation, access matrix) | US-003, US-033 | T-006, T-012, T-013, T-066 |
 | O5 Menu, Add-on & Harga Outlet | US-002, US-005, US-008 | T-016, T-017, T-018, T-051, T-066 |
 | O6 Resep & Bahan | US-006, US-007 | T-019, T-021, T-022, T-066 |
@@ -145,6 +145,7 @@ This document links every wireframe screen in [`SME-POS-Wireframe.figcraft`](SME
 | C15 Reservasi teks bebas oleh agent AI (cek meja tersedia) + penolakan di luar lingkup | US-043, US-066 | T-085, T-086, T-088, T-091 |
 | S2 Kartu order web (delivery/pickup dengan HP & alamat, meja tanpa HP) — page 07 | US-012, US-017, US-062 | T-146 |
 | O8 Link outlet & QR (slug, QR outlet, QR meja; pilihan "tujuan QR" dihapus) — page 07 | US-063, US-013 | T-147, T-136 |
+| Pratinjau link outlet (kartu WhatsApp / IG DM, gambar 1200×630) + catatan "Bagikan link outlet" (O2 strip, O3 baris) — page 07 | US-063 | T-147 |
 
 Role-aware navigation (`Sidebar/Owner`, `Sidebar/Staff`) covers US-003 and US-033 through T-013 and T-072.
 
