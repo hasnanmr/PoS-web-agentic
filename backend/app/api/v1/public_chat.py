@@ -325,6 +325,11 @@ async def create_order(
                 return WebOrderCreated(**{**cached, "access_key": access_key})
             draft = await build(conn, web_chat.hash_key(access_key))
             created = await web_chat.place_order(conn, ctx, scope, draft)
+            session = request.headers.get("x-chat-session")
+            if session and web_chat.SESSION_PATTERN.match(session):
+                await gateway.note_order_placed(
+                    conn, scope, web_chat.hash_key(session), created["order_no"]
+                )
             out = WebOrderCreated(
                 order_id=created["id"],
                 access_key=access_key,

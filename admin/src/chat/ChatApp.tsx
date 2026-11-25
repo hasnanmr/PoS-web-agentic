@@ -62,6 +62,8 @@ type Step =
 type Msg =
   | { id: number; kind: 'me' | 'ok' | 'info' | 'warn' | 'expired' | 'resumed'; text: string }
   | { id: number; kind: 'ai'; turn: AgentTurn }
+  // C7: the order card stays where it was in the chat (still live) once the customer types on.
+  | { id: number; kind: 'order'; saved: SavedOrder }
 
 const RESUME_IDLE_MS = 2 * 60 * 60 * 1000
 
@@ -129,7 +131,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
   const restored = useRef(false)
 
   const byId = useMemo(() => new Map(menu.map((m) => [m.product_id, m])), [menu])
-  const say = useCallback((kind: Exclude<Msg['kind'], 'ai'>, text: string) => {
+  const say = useCallback((kind: Exclude<Msg['kind'], 'ai' | 'order'>, text: string) => {
     setMsgs((m) => [...m.slice(-20), { id: nextId.current++, kind, text }])
   }, [])
 
@@ -300,8 +302,23 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
       return
     }
     if (page?.agent_enabled) { void askAgent(text.trim().slice(0, 500)); return }
+    moveOn()
     say('me', text)
     say('info', 'Untuk sekarang pakai tombol di atas ya. Ketik "menu" kapan saja untuk kembali ke menu utama.')
+  }
+
+  // The order, booking, and list cards are drawn under the bubbles, so typing there (e.g. "mau
+  // pesan lagi" while an order is in progress) would put the new chat above the card. The chat
+  // moves on instead: the order card stays in place in the chat (C7, still refreshing), and
+  // Pesanan Saya / Reservasi Saya stay in the main menu (C1).
+  function moveOn() {
+    if (!['order', 'myOrders', 'booked', 'myBookings'].includes(step.name)) return
+    if (step.name === 'order') {
+      const saved = step.saved
+      setMsgs((m) => [...m.slice(-20), { id: nextId.current++, kind: 'order', saved }])
+    }
+    location.write('')
+    setStep({ name: 'menu', quiet: true })
   }
 
   // C9 AI / C14 / C15: one message to the agent, the reply streamed into its bubble.
@@ -320,6 +337,7 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
     if ((step.name === 'menu' || step.name === 'recs') && !step.quiet) setStep({ ...step, quiet: true })
     const context: AgentContext = step.name === 'recs' ? 'recommend' : step.name === 'book' ? 'book'
       : ['menu', 'addons', 'cart', 'details', 'summary'].includes(step.name) ? 'order' : 'auto'
+    moveOn()
     say('me', text)
     const id = nextId.current++
     setMsgs((m) => [...m.slice(-20), { id, kind: 'ai', turn: { context, text: '', result: null } }])
@@ -414,6 +432,15 @@ export function ChatScreens({ api, apiBaseUrl, scope, location = windowHash }: {
             onAdd={startAdd} onQuick={(q) => void askAgent(q)} onOrder={applyOrderDraft} onBook={applyBookingDraft}
             onPick={(target) => go(target === 'menu' ? 'Pesan' : target === 'recs' ? 'Rekomendasi' : 'Reservasi meja', { name: target })} />
         )
+          : m.kind === 'order' ? (
+            <OrderView key={m.id} chat={chat} saved={m.saved} link={location.href(orderFragment(m.saved))}
+              others={[]} timezone={page.outlet.timezone}
+              onGone={() => {
+                setOrders(forgetOrder(key, m.saved.order_id))
+                setMsgs((all) => all.filter((x) => x.id !== m.id))
+              }}
+              onOpen={() => undefined} />
+          )
           : m.kind === 'me' ? <Mine key={m.id}>{m.text}</Mine>
           : m.kind === 'resumed' ? (
             <p key={m.id} className="flex items-center gap-2 py-1 text-[11px] text-text-muted" role="separator">
