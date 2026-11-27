@@ -1,0 +1,135 @@
+# SAST (opengrep) on every push to main, i.e. once a PR is merged. Advisory: findings never
+# block a merge or a deploy. This workflow is separate from CI, so it cannot hold up or cancel
+# the migrate/deploy chain in ci.yml.
+#
+# Results:
+#   - Security -> Code scanning (SARIF, category "opengrep")
+#   - the run's "opengrep-reports" artifact (SARIF + GitLab SAST JSON), kept 7 days
+#   - optionally Studio, which stores both reports in its S3 bucket, when the repository secret
+#     STUDIO_SCAN_INGEST_TOKEN and the variable STUDIO_SCAN_INGEST_URL are set
+#
+# It also runs on demand (Actions -> SAST -> Run workflow) and on a pull request that changes
+# this file, so a change to the scan itself is checked before it reaches main.
+name: SAST
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: [".github/workflows/sast.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Each merge gets its own scan; a newer merge never cancels an older one.
+concurrency:
+  group: sast-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  opengrep:
+    name: opengrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+    env:
+      # Pinned release; bump the version and both digests together, taken from the asset
+      # digests on https://github.com/opengrep/opengrep/releases.
+      OPENGREP_VERSION: v2.1.0
+      OPENGREP_SHA256_X64: d6a68a84c01a3d8ee933f60847decf1b4d0fd7791a26833b32b95922baf28974
+      OPENGREP_SHA256_ARM64: 3abfc87d66f208efd143a1b408d489af934cea7d9968ab1f37dca001f9886092
+      # opengrep defaults --jobs to the CPU count; pinning it bounds memory.
+      # backend/app + admin/src with these settings: ~9 s, ~1.2 GB peak.
+      OPENGREP_JOBS: "2"
+      OPENGREP_MAX_MEMORY_MB: "2048"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install opengrep (pinned, checksum verified)
+        run: |
+          set -euo pipefail
+          # opengrep resolves "https" to a port through /etc/services; without it every rule
+          # pack download fails with "resolution failed: unknown scheme" (minimal Ubuntu images).
+          if [ ! -f /etc/services ]; then
+            $(command -v sudo || true) apt-get update -qq
+            $(command -v sudo || true) apt-get install -y -qq --no-install-recommends netbase
+          fi
+          case "$RUNNER_ARCH" in
+            X64) asset=opengrep_linux_x86; sha="$OPENGREP_SHA256_X64" ;;
+            ARM64) asset=opengrep_linux_aarch64; sha="$OPENGREP_SHA256_ARM64" ;;
+            *) echo "::error::Unsupported runner architecture: $RUNNER_ARCH"; exit 1 ;;
+          esac
+          # ~160 MB static binary: retry a dropped or partial download (safe for a GET).
+          curl -fsSL --retry 3 --retry-all-errors --retry-delay 5 -o /usr/local/bin/opengrep \
+            "https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/${asset}"
+          echo "${sha}  /usr/local/bin/opengrep" | sha256sum -c -
+          chmod 755 /usr/local/bin/opengrep
+          opengrep --version
+          echo "runner: arch=$(uname -m) cpus=$(nproc) $(grep MemTotal /proc/meminfo)"
+
+      - name: Scan backend and admin
+        run: |
+          set -euo pipefail
+          opengrep scan \
+            --jobs "$OPENGREP_JOBS" \
+            --max-memory "$OPENGREP_MAX_MEMORY_MB" \
+            --config p/python \
+            --config p/fastapi \
+            --config p/jwt \
+            --config p/secrets \
+            --config p/typescript \
+            --config p/react \
+            --sarif-output opengrep-results.sarif \
+            --gitlab-sast-output gl-sast-report.json \
+            backend/app admin/src
+
+      - name: Upload to code scanning
+        if: always() && hashFiles('opengrep-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: opengrep-results.sarif
+          category: opengrep
+
+      - name: Keep the reports
+        if: always() && hashFiles('opengrep-results.sarif') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: opengrep-reports
+          path: |
+            opengrep-results.sarif
+            gl-sast-report.json
+          retention-days: 7
+
+      # Studio ingest endpoint: sdlc-studio-core plan 495, POST /api/security-scans/reports.
+      # One row per (tool, pipeline_id, job_id): the run id and the attempt number.
+      - name: Send reports to Studio
+        if: github.event_name != 'pull_request'
+        env:
+          STUDIO_SCAN_INGEST_URL: ${{ vars.STUDIO_SCAN_INGEST_URL }}
+          STUDIO_SCAN_INGEST_TOKEN: ${{ secrets.STUDIO_SCAN_INGEST_TOKEN }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STUDIO_SCAN_INGEST_URL}" ] || [ -z "${STUDIO_SCAN_INGEST_TOKEN}" ]; then
+            echo "STUDIO_SCAN_INGEST_URL or STUDIO_SCAN_INGEST_TOKEN not set; skipping upload to Studio."
+            exit 0
+          fi
+          curl --silent --show-error --fail-with-body \
+            --retry 3 --retry-connrefused --retry-delay 5 --max-time 120 \
+            --header "X-Scan-Ingest-Token: ${STUDIO_SCAN_INGEST_TOKEN}" \
+            --form "sarif=@opengrep-results.sarif;type=application/sarif+json" \
+            --form "gitlab_report=@gl-sast-report.json;type=application/json" \
+            --form-string "tool=opengrep" \
+            --form-string "tool_version=${OPENGREP_VERSION#v}" \
+            --form-string "repository_url=${REPOSITORY_URL}" \
+            --form-string "ref=${GITHUB_REF_NAME//\//-}" \
+            --form-string "commit_sha=${GITHUB_SHA}" \
+            --form-string "pipeline_id=${GITHUB_RUN_ID}" \
+            --form-string "job_id=${GITHUB_RUN_ATTEMPT}" \
+            --form-string "job_url=${RUN_URL}" \
+            --write-out "\nHTTP %{http_code}\n" \
+            "${STUDIO_SCAN_INGEST_URL}"

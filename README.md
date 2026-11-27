@@ -129,6 +129,24 @@ as `registry.npmmirror.com` has none, so it errors out instead of auditing. `mak
 and accepted go in `.github/osv-ignore.txt` with a reason; CI (job `security`) fails on anything
 else, so bump the dependency instead.
 
+## Static analysis (SAST)
+
+`.github/workflows/sast.yml` runs [opengrep](https://github.com/opengrep/opengrep) on every push
+to `main` (each merged PR) over `backend/app` and `admin/src`, with the `p/python`, `p/fastapi`,
+`p/jwt`, `p/secrets`, `p/typescript`, and `p/react` rule packs. It is advisory: findings never
+block a merge or a deploy, and it runs apart from `ci.yml`.
+
+- Findings: Security -> Code scanning (category `opengrep`). The SARIF and GitLab-format JSON
+  are also kept as the run's `opengrep-reports` artifact for 7 days.
+- opengrep is a pinned release whose SHA-256 is checked before it runs. To bump it, change
+  `OPENGREP_VERSION` and both digests together.
+- `--jobs 2 --max-memory 2048` bound memory (about 1.2 GB peak, about 9 s on this repo).
+- Run it by hand from Actions -> SAST -> Run workflow. A PR that changes the workflow file runs
+  it too.
+- Optional: set the repository variable `STUDIO_SCAN_INGEST_URL` and the secret
+  `STUDIO_SCAN_INGEST_TOKEN` to also send both reports to Studio, which stores them in S3.
+  Without them that step is skipped.
+
 ## Deployment (Railway)
 
 Two Railway services in one project, both deployed by GitHub Actions (`.github/workflows/ci.yml`):
